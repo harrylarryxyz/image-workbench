@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@image-workbench/shared": [
+        "packages/shared/src/index.ts"
+      ],
+      "@image-workbench/provider-sdk": [
+        "packages/provider-sdk/src/index.ts"
+      ],
+      "@image-workbench/image-utils": [
+        "packages/image-utils/src/index.ts"
+      ]
+    },
+    "ignoreDeprecations": "6.0"
+  }
+}

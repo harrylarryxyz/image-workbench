@@ -1,0 +1,45 @@
+{
+  "name": "@image-workbench/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@image-workbench/image-utils": "workspace:*",
+    "@image-workbench/provider-sdk": "workspace:*",
+    "@image-workbench/shared": "workspace:*",
+    "@nestjs/bullmq": "latest",
+    "@nestjs/common": "latest",
+    "@nestjs/config": "latest",
+    "@nestjs/core": "latest",
+    "@nestjs/platform-express": "latest",
+    "@prisma/client": "^6.19.3",
+    "bullmq": "latest",
+    "ioredis": "latest",
+    "reflect-metadata": "latest",
+    "rxjs": "latest",
+    "sharp": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "latest",
+    "@nestjs/schematics": "latest",
+    "@nestjs/testing": "latest",
+    "@types/express": "^5.0.6",
+    "@types/node": "latest",
+    "prisma": "^6.19.3",
+    "ts-loader": "latest",
+    "ts-node": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
