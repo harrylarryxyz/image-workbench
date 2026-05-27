@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { apiPost } from '../../lib/api';
 import { pollTaskUntilTerminal, subscribeTaskEvents } from '../../lib/task-events';
+import { MaskEditor } from './mask-editor';
 
 type Uploaded = { storageKey: string; assetUrl: string; originalName?: string; format: string; sizeBytes: number };
 type TaskImage = { id: string; assetUrl: string; format: string; sizeBytes: number; width?: number | null; height?: number | null; createdAt?: string };
@@ -28,6 +29,7 @@ export default function EditPage() {
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [provider, setProvider] = useState<ProviderSummary | null>(null);
+  const [mask, setMask] = useState<Uploaded | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -85,6 +87,22 @@ export default function EditPage() {
     }
   }
 
+  async function uploadMask(file: File) {
+    setBusy(true);
+    const form = new FormData();
+    form.set('file', file);
+    try {
+      const res = await fetch('/api/assets/upload', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`mask upload failed: ${res.status} ${await res.text()}`);
+      const uploaded = await res.json();
+      setMask(uploaded);
+    } catch (error) {
+      setResult({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitEdit() {
     setSubmitting(true);
     setTask(null);
@@ -101,6 +119,7 @@ export default function EditPage() {
         count: 1,
         timeoutSec: 600,
         refKeys: uploads.map((x) => x.storageKey),
+        maskKey: mask?.storageKey,
       });
       setTask(created);
       setResult(created);
@@ -129,6 +148,9 @@ export default function EditPage() {
       </form>
       <label>Edit Prompt</label>
       <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+      <h3>Mask</h3>
+      <MaskEditor imageUrl={uploads[0] ? `/api${uploads[0].assetUrl}` : null} onMaskReady={uploadMask} />
+      {mask ? <div className="muted">Mask ready: {mask.storageKey}</div> : <div className="muted">Mask optional；当前 provider 不支持时可留空。</div>}
       <button className="btn" disabled={submitting || uploads.length === 0} onClick={submitEdit}>{submitting ? '提交中…' : '创建编辑任务'}</button>
     </div>
     <div className="card">

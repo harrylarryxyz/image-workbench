@@ -83,6 +83,7 @@ export class ImageGenerationProcessor extends WorkerHost {
 
   private async callImagesEdit(baseUrl: string, apiKey: string, model: string, request: any, params: any): Promise<string | null> {
     const refKeys = Array.isArray(params?.refKeys) ? params.refKeys.slice(0, 4) : [];
+    const maskKey = typeof params?.maskKey === 'string' && params.maskKey ? params.maskKey : null;
     if (!refKeys.length) throw new Error('at least one reference image is required');
     const form = new FormData();
     form.set('model', model);
@@ -95,6 +96,10 @@ export class ImageGenerationProcessor extends WorkerHost {
       const ext = key.split('.').pop()?.toLowerCase() || 'png';
       const type = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
       form.append('image', new Blob([Buffer.from(bytes)], { type }), key.split('/').pop() || `reference.${ext}`);
+    }
+    if (maskKey) {
+      const maskBytes = await this.storage.readImage(maskKey);
+      form.set('mask', new Blob([Buffer.from(maskBytes)], { type: 'image/png' }), maskKey.split('/').pop() || 'mask.png');
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Number(request.timeoutSec ?? 300) * 1000);

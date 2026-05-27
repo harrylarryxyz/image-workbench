@@ -14,11 +14,13 @@
   "dependencies": {
     "@image-workbench/shared": "workspace:*",
     "@tanstack/react-query": "latest",
+    "konva": "^10.3.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "zustand": "latest",
-    "zod": "latest"
+    "react-konva": "^19.2.4",
+    "zod": "latest",
+    "zustand": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
