@@ -9,3 +9,6 @@ coverage
 *.log
 /uploads
 /data
+
+*.tsbuildinfo
+.turbo
