@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -48,7 +48,7 @@ export class LocalStorageService {
   readonly bucket: string;
   readonly publicBaseUrl?: string;
 
-  constructor(options: StorageOptions = {}) {
+  constructor(@Optional() @Inject('STORAGE_OPTIONS') options: StorageOptions = {}) {
     this.backend = normalizeBackend(options.backend ?? process.env.STORAGE_BACKEND);
     this.root = options.root ?? process.env.STORAGE_DIR ?? './data/uploads';
     this.bucket = options.bucket ?? process.env.STORAGE_BUCKET ?? process.env.S3_BUCKET ?? 'image-workbench';
