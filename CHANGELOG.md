@@ -8,6 +8,13 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 ### Added
 
+- Server-sent events task streaming through `GET /tasks/:id/events`, with web fallback polling.
+- Gallery 2.0 filters, thumbnails/assets, downloads, task links, prompt reuse, and reference-image reuse.
+- Konva mask editor and mask upload support for edit tasks.
+- Prompt Library style templates, tag filtering, history-style reuse, and local prompt enhancer.
+- React Flow Canvas workflow with Prompt/Image/Task nodes, edges, JSON import/export, and task creation from canvas prompts.
+- Backend-prefixed storage key contract for local and S3-compatible targets.
+- AES-256-GCM provider secret encryption for new/updated provider records while preserving legacy plaintext readability.
 - Professional project README covering product scope, architecture, setup, workflows, API surface, quality checks, and operational notes.
 - Reference-image edit workflow:
   - Upload reference images through `POST /assets/upload`.
@@ -32,7 +39,7 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 - Replaced the temporary `image-draw-web` concept with a TypeScript monorepo based on Next.js, NestJS, Prisma, Redis, BullMQ, and pnpm/Turborepo.
 - Generation requests now run through queued tasks instead of synchronous browser-bound requests.
-- Generate UI now polls task status and displays generated output images when available.
+- Generate UI now streams task status with SSE and falls back to polling when the connection is unavailable.
 - Task detail and Gallery flows now support reusing prompts and generation parameters.
 - Provider keys are submitted only to the server and shown in the UI as masked values.
 
@@ -47,7 +54,7 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 ### Security
 
 - Documented that provider API keys must remain server-side and must not be committed.
-- Documented current provider key storage limitations and the need for encryption-at-rest before broader deployments.
+- Provider API keys are encrypted-at-rest for new and updated database records with `enc:v1:` AES-256-GCM payloads.
 - Confirmed runtime data, local uploads, logs, `.env`, and `.env.local` are ignored by Git.
 
 ## [0.1.0] - 2026-05-27

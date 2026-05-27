@@ -1,6 +1,6 @@
 # Image Workbench
 
-Image Workbench is a private, production-oriented AI image creation workbench for GPT Image 2 and OpenAI-compatible image providers. It replaces the temporary `image-draw-web` FastAPI demo with a TypeScript monorepo, queued generation pipeline, provider management, task diagnostics, gallery, prompt library, and a roadmap toward node-based canvas workflows.
+Image Workbench is a private, production-oriented AI image creation workbench for GPT Image 2 and OpenAI-compatible image providers. It replaces the temporary `image-draw-web` FastAPI demo with a TypeScript monorepo, queued generation pipeline, provider management, SSE task diagnostics, gallery, prompt library, mask editing, React Flow canvas workflows, S3-compatible storage-key contracts, and encrypted provider secrets.
 
 ## What it does
 
@@ -8,32 +8,32 @@ Image Workbench is a private, production-oriented AI image creation workbench fo
 - Edit images with uploaded reference images through `/images/edits`.
 - Queue long-running image jobs with Redis and BullMQ instead of blocking browser requests.
 - Store task metadata, provider profiles, route diagnostics, errors, and image assets in PostgreSQL via Prisma.
-- Serve generated/uploaded assets from local storage with an abstraction that can later move to S3-compatible storage.
+- Serve generated/uploaded assets from local storage with backend-prefixed keys that are compatible with S3, R2, and MinIO object stores.
 - Manage providers from the UI, including masked keys, model capability summaries, `/models` checks, and `/images/edits` probes.
 - Inspect tasks, retry failed/cancelled jobs, cancel queued jobs, reuse prompts/parameters, and browse outputs in Gallery.
 - Maintain reusable prompt presets for recurring styles and workflows.
 
 ## Current status
 
-This project is in active `0.1.x` development. The core generate/edit pipeline is functional; canvas workflows and S3-compatible storage are planned but not implemented yet.
+This project is in active `0.2.x` development. The core generate/edit pipeline, SSE status updates, Gallery 2.0, prompt workflows, mask editing, canvas workflow prototype, backend-prefixed storage keys, and provider secret encryption are implemented. Remaining hardening focuses on attaching a real remote-object adapter for S3/R2/MinIO deployments and adding browser E2E tests.
 
 Implemented:
 
-- Next.js web UI with pages for Generate, Edit, Tasks, Task Detail, Gallery, Providers, Prompts, and Canvas roadmap.
+- Next.js web UI with pages for Generate, Edit, Tasks, Task Detail, Gallery, Providers, Prompts, and Canvas.
 - NestJS API with provider, task, gallery, asset, and prompt modules.
 - PostgreSQL schema for providers, generation tasks, image assets, canvas projects/nodes/edges, and prompt presets.
 - Redis/BullMQ worker for async image generation and editing.
-- Local image upload, asset serving, and metadata extraction.
-- Provider diagnostics and error classification for common upstream failures.
+- SSE task updates with polling fallback.
+- Local image upload, asset serving, metadata extraction, and S3/R2/MinIO-compatible storage key contracts.
+- Provider diagnostics, encrypted provider secrets, and error classification for common upstream failures.
+- React Flow canvas workflow prototype and Konva mask editor.
 
 Planned:
 
-- Server-sent events or websocket task updates.
-- Thumbnail generation and richer gallery filtering.
-- Mask upload and Konva-based mask editing.
-- React Flow canvas projects with prompt/image/task nodes.
-- S3/R2/MinIO storage backend.
-- Provider secret encryption at rest.
+- Remote object SDK adapter for `STORAGE_BACKEND=s3|r2|minio` deployments.
+- Database migration helper for rewriting legacy plaintext provider keys to `enc:v1:*`.
+- Persisted Canvas project CRUD.
+- Browser E2E tests for core workflows.
 
 ## Architecture
 
@@ -44,7 +44,7 @@ apps/web  ──HTTP──>  apps/api  ──Prisma──> PostgreSQL
    │                    │
    │                    ├─Worker──> OpenAI-compatible image provider
    │                    │
-   │                    └─Storage──> local filesystem data/uploads
+   │                    └─Storage──> local filesystem data/uploads or S3-compatible object keys
    │
    └─Next.js UI: generate, edit, tasks, gallery, providers, prompts
 ```
@@ -55,7 +55,7 @@ apps/web  ──HTTP──>  apps/api  ──Prisma──> PostgreSQL
 - **API:** NestJS, TypeScript
 - **Database:** PostgreSQL, Prisma
 - **Queue:** Redis, BullMQ
-- **Storage:** Local filesystem first; S3-compatible storage planned
+- **Storage:** Local filesystem with S3/R2/MinIO-compatible key contract
 - **Image utilities:** Sharp
 - **Monorepo tooling:** pnpm, Turborepo
 - **Canvas roadmap:** React Flow, Konva
@@ -101,7 +101,11 @@ WEB_ORIGIN=http://localhost:3000
 DATABASE_URL=postgresql://image:***@localhost:5432/image_workbench
 REDIS_HOST=localhost
 REDIS_PORT=6379
+STORAGE_BACKEND=local
 STORAGE_DIR=./data/uploads
+STORAGE_BUCKET=image-workbench
+STORAGE_PUBLIC_BASE_URL=
+PROVIDER_SECRET_KEY=64_HEX_CHARS_FOR_AES_256_GCM
 IMAGE_API_BASE=https://api.example.com/v1
 IMAGE_API_KEY=YOUR_PROVIDER_API_KEY
 IMAGE_MODEL=gpt-image-2
@@ -111,7 +115,7 @@ Notes:
 
 - Keep API keys server-side only. Do not expose provider keys to the browser.
 - `.env.local` is ignored by Git.
-- Provider records created in the UI are stored in the database. The current `apiKeyEncrypted` field stores the configured key value; encryption-at-rest is still planned.
+- Provider records created in the UI are stored in the database. New and updated provider keys are encrypted-at-rest with AES-256-GCM and stored with an `enc:v1:` prefix; legacy plaintext values remain readable for migration compatibility.
 
 ## Local development
 
@@ -166,7 +170,7 @@ Default local URLs:
 1. Open `Generate`.
 2. Enter prompt/model/size/quality/format/API mode.
 3. Submit the task.
-4. The UI polls task status and shows the result image when complete.
+4. The UI streams task status over SSE and shows the result image when complete.
 5. Use `Tasks` for route diagnostics and `Gallery` for output history.
 
 ### Edit with reference images
@@ -175,7 +179,7 @@ Default local URLs:
 2. Upload one or more reference images.
 3. Write the edit prompt.
 4. Submit the edit task.
-5. The UI polls `/tasks/:id` and renders returned images when the task reaches a terminal state.
+5. The UI streams `/tasks/:id/events` and renders returned images when the task reaches a terminal state.
 
 ### Diagnose failures
 
@@ -192,6 +196,7 @@ Main endpoints:
 - `POST /tasks/edit` — create a reference-image edit task.
 - `GET /tasks` — list recent tasks.
 - `GET /tasks/:id` — get task detail with images and diagnostics.
+- `GET /tasks/:id/events` — stream task snapshots with Server-Sent Events.
 - `POST /tasks/:id/retry` — requeue a failed/cancelled task.
 - `POST /tasks/:id/cancel` — cancel a queued task.
 - `GET /tasks/queue/status` — inspect queue and database status counts.
@@ -238,9 +243,9 @@ Deployment note: when frontend source changes, sync both `apps/web/lib/*` and a 
 ## Security and operational notes
 
 - Never commit `.env`, `.env.local`, generated uploads, logs, or local runtime data.
-- Provider API keys must remain server-side.
-- The local provider key storage field is not yet encrypted; use trusted private deployments until encryption-at-rest is implemented.
-- Generated assets are stored under `STORAGE_DIR`; back this directory up if image outputs are important.
+- Provider API keys must remain server-side and are encrypted-at-rest for new/updated database records.
+- Set a stable `PROVIDER_SECRET_KEY` before production writes; changing it makes existing `enc:v1:` keys undecryptable.
+- Generated assets are stored under `STORAGE_DIR` for `STORAGE_BACKEND=local`; back this directory up if image outputs are important.
 - Long-running tasks depend on Redis and the BullMQ worker being online.
 
 ## Documentation
