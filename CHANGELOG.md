@@ -8,6 +8,17 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 ### Added
 
+- Operations runbook for backups, restore principles, and low-memory Rabisu copy deployments.
+- `scripts/backup-image-workbench.sh` for timestamped PostgreSQL/upload backups with manifests, checksums, dry-run mode, and retention pruning.
+- `scripts/deploy-rabisu.sh` for locally verified artifact deployment to the low-memory Rabisu VPS.
+- Root package scripts `pnpm backup` and `pnpm deploy:rabisu`.
+
+### Changed
+
+- Documented local storage plus backup as the recommended single-VPS operating model until S3/R2/MinIO resources are available.
+
+### Added
+
 - Server-sent events task streaming through `GET /tasks/:id/events`, with web fallback polling.
 - Gallery 2.0 filters, thumbnails/assets, downloads, task links, prompt reuse, and reference-image reuse.
 - Konva mask editor and mask upload support for edit tasks.

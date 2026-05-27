@@ -14,7 +14,9 @@
     "infra:up": "docker compose -f infra/docker-compose.yml up -d",
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "dev:api": "pnpm --filter @image-workbench/api dev",
-    "dev:web": "pnpm --filter @image-workbench/web dev"
+    "dev:web": "pnpm --filter @image-workbench/web dev",
+    "backup": "./scripts/backup-image-workbench.sh",
+    "deploy:rabisu": "./scripts/deploy-rabisu.sh"
   },
   "devDependencies": {
     "turbo": "latest",

@@ -280,5 +280,6 @@ Deployment note: when frontend source changes, sync both `apps/web/lib/*` and a 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Operations](docs/operations.md)
 - [Roadmap](docs/roadmap.md)
 - [Changelog](CHANGELOG.md)
