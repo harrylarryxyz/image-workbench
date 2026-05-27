@@ -17,6 +17,10 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 - Documented local storage plus backup as the recommended single-VPS operating model until S3/R2/MinIO resources are available.
 
+### Fixed
+
+- Reconciled stale `RUNNING` tasks that already have persisted image assets so tasks interrupted between provider success and final status update are shown as `SUCCEEDED`.
+
 ### Added
 
 - Server-sent events task streaming through `GET /tasks/:id/events`, with web fallback polling.

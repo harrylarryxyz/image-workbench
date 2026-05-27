@@ -56,6 +56,7 @@ export class TasksService {
   }
 
   async queueStatus() {
+    await this.reconcileRunningTasksWithImages();
     const [waiting, active, delayed, failed, completed, paused] = await Promise.all([
       this.queue.getWaitingCount(),
       this.queue.getActiveCount(),
@@ -106,6 +107,7 @@ export class TasksService {
   }
 
   async listRecent() {
+    await this.reconcileRunningTasksWithImages();
     const rows = await this.prisma.generationTask.findMany({
       orderBy: { createdAt: 'desc' },
       take: 80,
@@ -129,6 +131,27 @@ export class TasksService {
 
   private async enqueueTask(taskId: string) {
     await this.queue.add('generate', { taskId }, { attempts: 1, removeOnComplete: 100, removeOnFail: 100, jobId: `task:${taskId}:${Date.now()}` });
+  }
+
+  private async reconcileRunningTasksWithImages() {
+    const rows = await this.prisma.imageAsset.groupBy({
+      by: ['taskId'],
+      where: { task: { status: 'RUNNING' } },
+      _count: { _all: true },
+    });
+    for (const row of rows) {
+      if (!row.taskId || row._count._all < 1) continue;
+      await this.prisma.generationTask.update({
+        where: { id: row.taskId },
+        data: {
+          status: 'SUCCEEDED',
+          errorCode: null,
+          errorMessage: null,
+          diagnosticsJson: undefined,
+        },
+      });
+      this.notifyTaskChanged(row.taskId);
+    }
   }
 
   private serializeTask(task: any, includeDetails = false) {
