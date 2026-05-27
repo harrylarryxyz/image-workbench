@@ -114,8 +114,32 @@ export class ImageGenerationProcessor extends WorkerHost {
 
   private parseProviderBody(text: string): any {
     try { return JSON.parse(text); } catch {}
-    const eventIndex = text.indexOf('\nevent:');
-    const dataIndex = text.indexOf('\ndata:');
+    const trimmed = text.trim();
+    if (trimmed.startsWith('{')) {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      for (let i = 0; i < trimmed.length; i += 1) {
+        const char = trimmed[i];
+        if (inString) {
+          if (escaped) escaped = false;
+          else if (char === '\\') escaped = true;
+          else if (char === '"') inString = false;
+          continue;
+        }
+        if (char === '"') inString = true;
+        else if (char === '{') depth += 1;
+        else if (char === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            try { return JSON.parse(trimmed.slice(0, i + 1)); } catch {}
+            break;
+          }
+        }
+      }
+    }
+    const eventIndex = text.indexOf('event:');
+    const dataIndex = text.indexOf('data:');
     const cut = [eventIndex, dataIndex].filter((x) => x > 0).sort((a, b) => a - b)[0];
     if (cut) {
       const first = text.slice(0, cut).trim();
