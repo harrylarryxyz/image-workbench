@@ -42,3 +42,8 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #070b13; borde
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .pill { display: inline-flex; align-items: center; border-radius: 999px; padding: 7px 11px; background: rgba(255,255,255,.08); color: #dbeafe; font-size: 13px; }
 .pill:hover { background: rgba(125,211,252,.18); color: white; }
+.queue-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 12px 0; }
+.metric { border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 12px; background: rgba(255,255,255,.04); }
+.metric b { display: block; font-size: 24px; color: #e0f2fe; }
+.metric span { color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.pill { border: 0; cursor: pointer; }

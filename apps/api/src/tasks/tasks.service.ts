@@ -26,8 +26,56 @@ export class TasksService {
         status: 'QUEUED',
       },
     });
-    await this.queue.add('generate', { taskId: task.id }, { attempts: 1, removeOnComplete: 100, removeOnFail: 100 });
+    await this.enqueueTask(task.id);
     return { id: task.id, status: task.status };
+  }
+
+  async queueStatus() {
+    const [waiting, active, delayed, failed, completed, paused] = await Promise.all([
+      this.queue.getWaitingCount(),
+      this.queue.getActiveCount(),
+      this.queue.getDelayedCount(),
+      this.queue.getFailedCount(),
+      this.queue.getCompletedCount(),
+      this.queue.isPaused(),
+    ]);
+    const dbCounts = await this.prisma.generationTask.groupBy({ by: ['status'], _count: { status: true } });
+    return {
+      queue: { waiting, active, delayed, failed, completed, paused },
+      database: Object.fromEntries(dbCounts.map((row) => [row.status, row._count.status])),
+    };
+  }
+
+  async retryTask(id: string) {
+    const task = await this.prisma.generationTask.findUnique({ where: { id } });
+    if (!task) return { ok: false, error: 'task not found' };
+    await this.prisma.generationTask.update({
+      where: { id },
+      data: {
+        status: 'QUEUED',
+        errorCode: null,
+        errorMessage: null,
+        diagnosticsJson: undefined,
+        routeJson: undefined,
+        elapsedMs: null,
+      },
+    });
+    await this.enqueueTask(id);
+    return { ok: true, id, status: 'QUEUED' };
+  }
+
+  async cancelTask(id: string) {
+    const task = await this.prisma.generationTask.findUnique({ where: { id } });
+    if (!task) return { ok: false, error: 'task not found' };
+    const jobs = await this.queue.getJobs(['waiting', 'delayed', 'prioritized']);
+    for (const job of jobs) {
+      if (job.data?.taskId === id) await job.remove();
+    }
+    if (task.status === 'QUEUED') {
+      await this.prisma.generationTask.update({ where: { id }, data: { status: 'CANCELLED', errorCode: 'cancelled', errorMessage: 'Task cancelled before execution.' } });
+      return { ok: true, id, status: 'CANCELLED' };
+    }
+    return { ok: false, id, status: task.status, error: 'Only queued tasks can be cancelled safely.' };
   }
 
   async listRecent() {
@@ -42,6 +90,10 @@ export class TasksService {
   async getTask(id: string) {
     const task = await this.prisma.generationTask.findUnique({ where: { id }, include: { images: true, provider: true } });
     return task ? this.serializeTask(task, true) : null;
+  }
+
+  private async enqueueTask(taskId: string) {
+    await this.queue.add('generate', { taskId }, { attempts: 1, removeOnComplete: 100, removeOnFail: 100, jobId: `task:${taskId}:${Date.now()}` });
   }
 
   private serializeTask(task: any, includeDetails = false) {

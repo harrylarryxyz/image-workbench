@@ -6,7 +6,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3100';
 function statusClass(status?: string) {
   const normalized = (status ?? '').toLowerCase();
   if (normalized === 'succeeded') return 'status ok';
-  if (normalized === 'failed') return 'status bad';
+  if (normalized === 'failed' || normalized === 'cancelled') return 'status bad';
   if (normalized === 'running') return 'status run';
   return 'status wait';
 }
@@ -27,6 +27,8 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <Link className="pill" href="/tasks">返回任务列表</Link>
         <Link className="pill" href={reuseHref}>复用参数生成</Link>
         <Link className="pill" href="/gallery">打开 Gallery</Link>
+        {task.status === 'FAILED' || task.status === 'CANCELLED' ? <form action={`/api/tasks/${task.id}/retry`} method="post"><button className="pill" type="submit">重试任务</button></form> : null}
+        {task.status === 'QUEUED' ? <form action={`/api/tasks/${task.id}/cancel`} method="post"><button className="pill" type="submit">取消排队</button></form> : null}
       </div>
       {firstImage ? <img className="preview" src={`${API_BASE}${firstImage.assetUrl}`} alt={task.prompt ?? 'generated image'} /> : null}
       {task.errorMessage ? <pre className="error">{task.errorMessage}</pre> : null}
