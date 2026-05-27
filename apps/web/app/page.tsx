@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiGet, apiPost } from '../lib/api';
 
 type TaskResult = {
@@ -24,6 +24,22 @@ export default function GeneratePage() {
   const [apiMode, setApiMode] = useState('auto');
   const [result, setResult] = useState<TaskResult | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextPrompt = params.get('prompt');
+    if (nextPrompt) setPrompt(nextPrompt);
+    const nextModel = params.get('model');
+    if (nextModel) setModel(nextModel);
+    const nextSize = params.get('size');
+    if (nextSize) setSize(nextSize);
+    const nextQuality = params.get('quality');
+    if (nextQuality) setQuality(nextQuality);
+    const nextFormat = params.get('format');
+    if (nextFormat) setFormat(nextFormat);
+    const nextApiMode = params.get('apiMode');
+    if (nextApiMode) setApiMode(nextApiMode);
+  }, []);
 
   async function pollTask(id: string) {
     for (let i = 0; i < 90; i += 1) {
