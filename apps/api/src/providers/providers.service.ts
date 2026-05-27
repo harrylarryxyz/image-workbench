@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import type { ProviderProfile } from '../lib/shared';
+import { getModelCapability, normalizeBaseUrl } from '../lib/provider-sdk';
 
 function maskKey(value: string): string {
   if (!value) return '';
@@ -20,13 +21,15 @@ function toType(value: unknown): 'OPENAI_COMPATIBLE' | 'FAL' | 'CUSTOM_HTTP' {
   return 'OPENAI_COMPATIBLE';
 }
 
+const TINY_PNG = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=', 'base64'));
+
 @Injectable()
 export class ProvidersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list() {
     const rows = await this.prisma.providerProfile.findMany({ orderBy: [{ enabled: 'desc' }, { updatedAt: 'desc' }] });
-    return rows.map((row) => this.serialize(row));
+    return Promise.all(rows.map((row) => this.serialize(row, true)));
   }
 
   async create(body: any) {
@@ -98,6 +101,50 @@ export class ProvidersService {
     }
   }
 
+
+  async testEdit(id: string) {
+    const row = await this.prisma.providerProfile.findUnique({ where: { id } });
+    if (!row) return { ok: false, supported: false, error: 'provider not found' };
+    const started = Date.now();
+    const { baseUrl } = normalizeBaseUrl(row.baseUrl);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const form = new FormData();
+      form.set('model', row.defaultModel);
+      form.set('prompt', 'Capability probe: return the same tiny reference image.');
+      form.set('size', '1024x1024');
+      form.set('quality', 'low');
+      form.set('response_format', 'b64_json');
+      form.append('image', new Blob([TINY_PNG], { type: 'image/png' }), 'capability-probe.png');
+      const res = await fetch(`${baseUrl}/images/edits`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${row.apiKeyEncrypted}` },
+        body: form,
+        signal: controller.signal,
+      });
+      const contentType = res.headers.get('content-type') ?? '';
+      const text = await res.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = null; }
+      const hasImage = Array.isArray(parsed?.data) && parsed.data.some((item: any) => item?.b64_json || item?.url);
+      return {
+        ok: res.ok && hasImage,
+        supported: res.ok && hasImage,
+        status: res.status,
+        contentType,
+        elapsedMs: Date.now() - started,
+        endpoint: '/images/edits',
+        model: row.defaultModel,
+        preview: res.ok && hasImage ? undefined : text.slice(0, 360),
+      };
+    } catch (error) {
+      return { ok: false, supported: false, elapsedMs: Date.now() - started, endpoint: '/images/edits', model: row.defaultModel, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async getDefault() {
     const configured = await this.prisma.providerProfile.findFirst({ where: { enabled: true }, orderBy: { updatedAt: 'desc' } });
     if (configured) return configured;
@@ -134,7 +181,20 @@ export class ProvidersService {
     return this.serialize(row);
   }
 
-  private serialize(row: any) {
+  private async serialize(row: any, includeHealth = false) {
+    const capability = getModelCapability(row.defaultModel);
+    const lastEditTask = includeHealth ? await this.prisma.generationTask.findFirst({
+      where: { providerId: row.id, type: 'image.edit' },
+      orderBy: { updatedAt: 'desc' },
+      select: { status: true, errorCode: true, errorMessage: true, updatedAt: true },
+    }) : null;
+    const editHealth = lastEditTask ? {
+      status: lastEditTask.status === 'SUCCEEDED' ? 'healthy' : lastEditTask.status === 'FAILED' ? 'failing' : 'unknown',
+      lastTaskStatus: lastEditTask.status,
+      errorCode: lastEditTask.errorCode,
+      errorMessage: lastEditTask.errorMessage,
+      checkedAt: lastEditTask.updatedAt.toISOString(),
+    } : { status: 'untested', lastTaskStatus: null, errorCode: null, errorMessage: null, checkedAt: null };
     return {
       id: row.id,
       name: row.name,
@@ -144,6 +204,18 @@ export class ProvidersService {
       apiMode: row.apiMode.toLowerCase(),
       enabled: row.enabled,
       apiKeyMasked: maskKey(row.apiKeyEncrypted),
+      capabilities: {
+        model: row.defaultModel,
+        generate: capability?.supportsGenerate ?? null,
+        edit: capability?.supportsEdit ?? null,
+        mask: capability?.supportsMask ?? null,
+        transparent: capability?.supportsTransparent ?? null,
+        multipleRefs: capability?.supportsMultipleRefs ?? null,
+        maxRefs: capability?.maxRefs ?? null,
+        recommendedTimeoutSec: capability?.recommendedTimeoutSec ?? null,
+        source: capability ? 'builtin-model-profile' : 'unknown-model',
+      },
+      editHealth,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

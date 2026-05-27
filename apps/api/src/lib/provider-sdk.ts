@@ -9,17 +9,21 @@ export type RouteMetadata = {
   fallbackReason: string | null;
 };
 
-const BUILTIN_MODEL_CAPABILITIES: Record<string, { model: string; supportsTransparent: boolean }> = {
-  'gpt-image-2': { model: 'gpt-image-2', supportsTransparent: false },
-  'gpt-image-1.5': { model: 'gpt-image-1.5', supportsTransparent: true },
+const BUILTIN_MODEL_CAPABILITIES: Record<string, { model: string; supportsGenerate: boolean; supportsEdit: boolean; supportsMask: boolean; supportsTransparent: boolean; supportsMultipleRefs: boolean; maxRefs?: number; recommendedTimeoutSec?: number }> = {
+  'gpt-image-2': { model: 'gpt-image-2', supportsGenerate: true, supportsEdit: true, supportsMask: true, supportsTransparent: false, supportsMultipleRefs: true, maxRefs: 4, recommendedTimeoutSec: 600 },
+  'gpt-image-1.5': { model: 'gpt-image-1.5', supportsGenerate: true, supportsEdit: true, supportsMask: true, supportsTransparent: true, supportsMultipleRefs: true, maxRefs: 4, recommendedTimeoutSec: 300 },
 };
 
 export function canonicalModel(model: string): string {
   return model.trim().toLowerCase().split('/').at(-1) ?? model.trim().toLowerCase();
 }
 
+export function getModelCapability(model: string) {
+  return BUILTIN_MODEL_CAPABILITIES[canonicalModel(model)];
+}
+
 export function assertModelRequestSupported(request: GenerateImageRequest, model: string): void {
-  const capability = BUILTIN_MODEL_CAPABILITIES[canonicalModel(model)];
+  const capability = getModelCapability(model);
   if (!capability) return;
   if (request.background === 'transparent' && !capability.supportsTransparent) {
     throw new Error(`${capability.model} does not support transparent background; use gpt-image-1.5 or remove transparent background.`);

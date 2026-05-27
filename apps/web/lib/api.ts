@@ -2,7 +2,7 @@ function apiBase(): string {
   if (typeof window === 'undefined') {
     return process.env.API_INTERNAL_BASE ?? process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3100';
   }
-  return process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3100';
+  return process.env.NEXT_PUBLIC_API_BASE ?? '/api';
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

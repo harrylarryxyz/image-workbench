@@ -20,6 +20,9 @@ export class ProvidersController {
   @Post(':id/test')
   test(@Param('id') id: string) { return this.providers.test(id); }
 
+  @Post(':id/test-edit')
+  testEdit(@Param('id') id: string) { return this.providers.testEdit(id); }
+
   @Post('seed-env')
   seedEnv(@Body() body: { name?: string }) { return this.providers.seedEnvironmentProvider(body?.name); }
 }

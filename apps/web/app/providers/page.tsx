@@ -12,6 +12,23 @@ type Provider = {
   apiMode: string;
   enabled: boolean;
   apiKeyMasked: string;
+  capabilities?: {
+    generate: boolean | null;
+    edit: boolean | null;
+    mask: boolean | null;
+    transparent: boolean | null;
+    multipleRefs: boolean | null;
+    maxRefs: number | null;
+    recommendedTimeoutSec: number | null;
+    source: string;
+  };
+  editHealth?: {
+    status: 'healthy' | 'failing' | 'unknown' | 'untested';
+    lastTaskStatus: string | null;
+    errorCode: string | null;
+    errorMessage: string | null;
+    checkedAt: string | null;
+  };
   updatedAt?: string;
 };
 
@@ -64,10 +81,21 @@ export default function ProvidersPage() {
   }
 
   async function test(provider: Provider) {
-    setMessage(`Testing ${provider.name}...`);
+    setMessage(`Testing ${provider.name} /models...`);
     try {
       const result = await apiPost(`/providers/${provider.id}/test`, {});
       setMessage(JSON.stringify(result, null, 2));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function testEdit(provider: Provider) {
+    setMessage(`Testing ${provider.name} /images/edits with a tiny probe image...`);
+    try {
+      const result = await apiPost(`/providers/${provider.id}/test-edit`, {});
+      setMessage(JSON.stringify(result, null, 2));
+      await refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     }
@@ -115,10 +143,19 @@ export default function ProvidersPage() {
         <div className="task-head"><span className={provider.enabled ? 'status ok' : 'status bad'}>{provider.enabled ? 'ENABLED' : 'DISABLED'}</span><span className="muted">{provider.apiKeyMasked}</span></div>
         <h3>{provider.name}</h3>
         <p>{provider.baseUrl}</p>
-        <div className="kv"><b>Model</b><span>{provider.defaultModel}</span><b>Mode</b><span>{provider.apiMode}</span><b>Type</b><span>{provider.type}</span></div>
+        <div className="kv">
+          <b>Model</b><span>{provider.defaultModel}</span>
+          <b>Mode</b><span>{provider.apiMode}</span>
+          <b>Type</b><span>{provider.type}</span>
+          <b>Generate</b><span>{provider.capabilities?.generate === true ? 'supported' : provider.capabilities?.generate === false ? 'unsupported' : 'unknown'}</span>
+          <b>Edit</b><span>{provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'}</span>
+          <b>Edit health</b><span>{provider.editHealth?.status ?? 'untested'}{provider.editHealth?.errorCode ? ` · ${provider.editHealth.errorCode}` : ''}</span>
+        </div>
+        {provider.editHealth?.errorMessage ? <pre className="error">{provider.editHealth.errorMessage}</pre> : null}
         <div className="actions">
           <button className="pill" onClick={() => toggle(provider)}>{provider.enabled ? '禁用' : '启用'}</button>
           <button className="pill" onClick={() => test(provider)}>测试 /models</button>
+          <button className="pill" onClick={() => testEdit(provider)}>检测 /images/edits</button>
         </div>
       </div>)}
     </div>

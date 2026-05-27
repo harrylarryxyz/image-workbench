@@ -1,15 +1,24 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { apiPost } from '../../lib/api';
 
 type Uploaded = { storageKey: string; assetUrl: string; originalName?: string; format: string; sizeBytes: number };
+type ProviderSummary = { name: string; enabled: boolean; capabilities?: { edit: boolean | null; maxRefs: number | null; source: string }; editHealth?: { status: string; errorCode: string | null; errorMessage: string | null } };
 
 export default function EditPage() {
   const [uploads, setUploads] = useState<Uploaded[]>([]);
   const [prompt, setPrompt] = useState('Use the reference image and transform it into a polished cinematic illustration, preserving the main subject.');
   const [result, setResult] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [provider, setProvider] = useState<ProviderSummary | null>(null);
+
+  useEffect(() => {
+    fetch('/api/providers')
+      .then((res) => res.ok ? res.json() : Promise.reject(new Error(`providers failed: ${res.status}`)))
+      .then((rows: ProviderSummary[]) => setProvider(rows.find((item) => item.enabled) ?? rows[0] ?? null))
+      .catch(() => setProvider(null));
+  }, []);
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,6 +64,11 @@ export default function EditPage() {
       <p className="eyebrow">Edit</p>
       <h1>参考图编辑</h1>
       <p className="sub">上传 1-4 张参考图，创建 image.edit 任务。当前第一版走 Images API `/images/edits`。</p>
+      {provider ? <div className="metric" style={{ margin: '12px 0' }}>
+        <span>Current provider</span>
+        <b>{provider.name}</b>
+        <div className="muted">Edit capability: {provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'} · health: {provider.editHealth?.status ?? 'untested'}{provider.editHealth?.errorCode ? ` · ${provider.editHealth.errorCode}` : ''}</div>
+      </div> : null}
       <form onSubmit={upload}>
         <label>Reference Image</label>
         <input name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
