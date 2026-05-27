@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res, Sse } from '@nestjs/common';
+import type { Response } from 'express';
 import { TasksService } from './tasks.service';
 
 @Controller('tasks')
@@ -19,6 +20,15 @@ export class TasksController {
 
   @Get(':id')
   get(@Param('id') id: string) { return this.tasks.getTask(id); }
+
+  @Sse(':id/events')
+  async events(@Param('id') id: string, @Res({ passthrough: true }) res: Response) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+    return this.tasks.streamTaskEvents(id, res);
+  }
 
   @Post(':id/retry')
   retry(@Param('id') id: string) { return this.tasks.retryTask(id); }

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { apiGet, apiPost } from '../lib/api';
+import { apiPost } from '../lib/api';
+import { pollTaskUntilTerminal, subscribeTaskEvents } from '../lib/task-events';
 
 type TaskResult = {
   id?: string;
@@ -41,13 +42,18 @@ export default function GeneratePage() {
     if (nextApiMode) setApiMode(nextApiMode);
   }, []);
 
-  async function pollTask(id: string) {
-    for (let i = 0; i < 90; i += 1) {
-      await sleep(i < 6 ? 2000 : 5000);
-      const task = await apiGet<TaskResult>(`/tasks/${id}`);
+  async function watchTask(id: string) {
+    let fallbackStarted = false;
+    const fallback = async (error?: unknown) => {
+      if (fallbackStarted) return;
+      fallbackStarted = true;
+      if (error) console.warn('Task SSE unavailable; falling back to polling', error);
+      await pollTaskUntilTerminal<TaskResult>(id, setResult);
+    };
+    const unsubscribe = subscribeTaskEvents<TaskResult>(id, (task) => {
       setResult(task);
-      if (task.status === 'SUCCEEDED' || task.status === 'FAILED' || task.status === 'CANCELLED') return;
-    }
+      if (task.status === 'SUCCEEDED' || task.status === 'FAILED' || task.status === 'CANCELLED') unsubscribe();
+    }, fallback);
   }
 
   async function submit() {
@@ -55,7 +61,7 @@ export default function GeneratePage() {
     try {
       const created = await apiPost<TaskResult>('/tasks/generate', { prompt, model, size, quality, format, background, apiMode, count: 1, timeoutSec: 600 });
       setResult(created);
-      if (created.id) await pollTask(created.id);
+      if (created.id) await watchTask(created.id);
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -70,7 +76,7 @@ export default function GeneratePage() {
     <section className="card">
       <p className="eyebrow">Generate</p>
       <h1>创建图像任务</h1>
-      <p className="sub">提交后会自动轮询任务状态；生成完成后会在右侧显示图片，也可以到 Gallery 查看历史。</p>
+      <p className="sub">提交后会通过 SSE 实时接收任务状态；网络环境不支持时自动退回轮询。生成完成后会在右侧显示图片，也可以到 Gallery 查看历史。</p>
       <label>Prompt</label>
       <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
       <div className="row">

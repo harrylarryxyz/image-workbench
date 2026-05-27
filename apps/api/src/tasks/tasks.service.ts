@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import type { Response } from 'express';
 import { PrismaService } from '../prisma.service';
 import { ProvidersService } from '../providers/providers.service';
 import { GenerateImageRequestSchema } from '../lib/shared';
+import { TaskEventsService } from './task-events.service';
 
 @Injectable()
 export class TasksService {
@@ -11,6 +13,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly providers: ProvidersService,
     @InjectQueue('image-generation') private readonly queue: Queue,
+    private readonly events: TaskEventsService,
   ) {}
 
   async createGenerateTask(input: unknown) {
@@ -82,6 +85,7 @@ export class TasksService {
       },
     });
     await this.enqueueTask(id);
+    this.notifyTaskChanged(id);
     return { ok: true, id, status: 'QUEUED' };
   }
 
@@ -94,6 +98,7 @@ export class TasksService {
     }
     if (task.status === 'QUEUED') {
       await this.prisma.generationTask.update({ where: { id }, data: { status: 'CANCELLED', errorCode: 'cancelled', errorMessage: 'Task cancelled before execution.' } });
+      this.notifyTaskChanged(id);
       return { ok: true, id, status: 'CANCELLED' };
     }
     return { ok: false, id, status: task.status, error: 'Only queued tasks can be cancelled safely.' };
@@ -111,6 +116,14 @@ export class TasksService {
   async getTask(id: string) {
     const task = await this.prisma.generationTask.findUnique({ where: { id }, include: { images: true, provider: true } });
     return task ? this.serializeTask(task, true) : null;
+  }
+
+  streamTaskEvents(id: string, res: Response) {
+    return this.events.stream(id, () => this.getTask(id), this.events.closeSignal(res));
+  }
+
+  notifyTaskChanged(id: string) {
+    this.events.notify(id);
   }
 
   private async enqueueTask(taskId: string) {
