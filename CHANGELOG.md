@@ -12,9 +12,11 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 - Gallery 2.0 filters, thumbnails/assets, downloads, task links, prompt reuse, and reference-image reuse.
 - Konva mask editor and mask upload support for edit tasks.
 - Prompt Library style templates, tag filtering, history-style reuse, and local prompt enhancer.
-- React Flow Canvas workflow with Prompt/Image/Task nodes, edges, JSON import/export, and task creation from canvas prompts.
-- Backend-prefixed storage key contract for local and S3-compatible targets.
+- React Flow Canvas workflow with Prompt/Image/Task nodes, edges, JSON import/export, task creation from canvas prompts, and persisted Canvas project CRUD.
+- Backend-prefixed storage key contract for local and S3-compatible targets, plus real local WebP thumbnail generation for Gallery.
 - AES-256-GCM provider secret encryption for new/updated provider records while preserving legacy plaintext readability.
+- One-shot provider secret migration command for rewriting legacy plaintext keys to `enc:v1:*`.
+- Playwright browser E2E smoke tests for core pages and Canvas interactions.
 - Professional project README covering product scope, architecture, setup, workflows, API surface, quality checks, and operational notes.
 - Reference-image edit workflow:
   - Upload reference images through `POST /assets/upload`.

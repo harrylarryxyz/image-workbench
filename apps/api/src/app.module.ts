@@ -7,6 +7,7 @@ import { GalleryModule } from './gallery/gallery.module';
 import { StorageModule } from './storage/storage.module';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { PromptsModule } from './prompts/prompts.module';
+import { CanvasModule } from './canvas/canvas.module';
 import { PrismaService } from './prisma.service';
 
 @Module({
@@ -19,6 +20,7 @@ import { PrismaService } from './prisma.service';
     StorageModule,
     DiagnosticsModule,
     PromptsModule,
+    CanvasModule,
   ],
   providers: [PrismaService],
 })

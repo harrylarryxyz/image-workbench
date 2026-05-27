@@ -3,9 +3,10 @@
 import '@xyflow/react/dist/style.css';
 import { FormEvent, useMemo, useState } from 'react';
 import { Background, Controls, ReactFlow, addEdge, applyEdgeChanges, applyNodeChanges, type Edge, type Node } from '@xyflow/react';
-import { apiPost } from '../../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
 
 type CanvasExport = { nodes: Node[]; edges: Edge[] };
+type CanvasProject = CanvasExport & { id: string; name: string; description?: string | null; updatedAt?: string };
 
 const initialNodes: Node[] = [
   { id: 'prompt-1', type: 'default', position: { x: 40, y: 80 }, data: { label: 'Prompt\nA cinematic orange robot fixing a neon sign' } },
@@ -24,6 +25,9 @@ export default function CanvasPage() {
   const [edges, setEdges] = useState<Edge[]>(initialEdges);
   const [importText, setImportText] = useState('');
   const [result, setResult] = useState<unknown>(null);
+  const [projects, setProjects] = useState<CanvasProject[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState('Untitled canvas');
   const exported = useMemo(() => JSON.stringify({ nodes, edges } satisfies CanvasExport, null, 2), [nodes, edges]);
 
   function addPromptNode() {
@@ -45,6 +49,39 @@ export default function CanvasPage() {
     setEdges(parsed.edges ?? []);
   }
 
+  async function loadProjects() {
+    const rows = await apiGet<CanvasProject[]>('/canvas-projects');
+    setProjects(rows);
+    setResult({ loadedProjects: rows.length });
+  }
+
+  async function openProject(id: string) {
+    const project = await apiGet<CanvasProject>(`/canvas-projects/${id}`);
+    setActiveProjectId(project.id);
+    setProjectName(project.name);
+    setNodes(project.nodes ?? []);
+    setEdges(project.edges ?? []);
+    setImportText('');
+    setResult({ opened: project.id });
+  }
+
+  async function saveProject() {
+    const body = { name: projectName, nodes, edges };
+    const saved = activeProjectId ? await apiPatch<CanvasProject>(`/canvas-projects/${activeProjectId}`, body) : await apiPost<CanvasProject>('/canvas-projects', body);
+    setActiveProjectId(saved.id);
+    setProjectName(saved.name);
+    setResult({ saved: saved.id });
+    await loadProjects();
+  }
+
+  async function deleteProject() {
+    if (!activeProjectId) return;
+    await apiDelete(`/canvas-projects/${activeProjectId}`);
+    setActiveProjectId(null);
+    setResult({ deleted: true });
+    await loadProjects();
+  }
+
   async function createTaskFromCanvas() {
     const prompt = promptFromNodes(nodes);
     const created = await apiPost('/tasks/generate', { prompt, model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 });
@@ -53,12 +90,28 @@ export default function CanvasPage() {
   }
 
   return <section>
-    <div className="hero"><p className="eyebrow">Canvas Workflow</p><h1>节点画布</h1><p className="sub">React Flow 画布：Prompt / Image / Task 节点、引用边、JSON 导入导出，并可直接从 Prompt 节点创建生成任务。</p></div>
+    <div className="hero"><p className="eyebrow">Canvas Workflow</p><h1>节点画布</h1><p className="sub">React Flow 画布：Prompt / Image / Task 节点、引用边、JSON 导入导出、项目持久化，并可直接从 Prompt 节点创建生成任务。</p></div>
     <div className="actions" style={{ marginTop: 16 }}>
       <button className="pill" type="button" onClick={addPromptNode}>添加 Prompt 节点</button>
       <button className="pill" type="button" onClick={addImageNode}>添加 Image 节点</button>
       <button className="pill" type="button" onClick={addTaskNode}>添加 Task 节点</button>
       <button className="pill" type="button" onClick={createTaskFromCanvas}>从画布创建任务</button>
+    </div>
+    <div className="grid two" style={{ marginTop: 16 }}>
+      <div className="card">
+        <p className="eyebrow">Project CRUD</p>
+        <label>项目名</label>
+        <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+        <div className="actions" style={{ marginTop: 12 }}>
+          <button className="pill" type="button" onClick={saveProject}>{activeProjectId ? '保存项目' : '新建保存'}</button>
+          <button className="pill" type="button" onClick={loadProjects}>加载项目列表</button>
+          <button className="pill" type="button" onClick={deleteProject} disabled={!activeProjectId}>删除当前项目</button>
+        </div>
+      </div>
+      <div className="card">
+        <p className="eyebrow">Saved Projects</p>
+        {projects.length ? projects.map((project) => <button className="pill" style={{ margin: 4 }} type="button" key={project.id} onClick={() => openProject(project.id)}>{project.name}</button>) : <p className="muted">点击“加载项目列表”。</p>}
+      </div>
     </div>
     <div className="card" style={{ height: 520, marginTop: 16 }}>
       <ReactFlow nodes={nodes} edges={edges} onNodesChange={(changes) => setNodes((items) => applyNodeChanges(changes, items))} onEdgesChange={(changes) => setEdges((items) => applyEdgeChanges(changes, items))} onConnect={(params) => setEdges((items) => addEdge(params, items))} fitView>
@@ -70,7 +123,7 @@ export default function CanvasPage() {
       <form className="card" onSubmit={importCanvas}>
         <p className="eyebrow">Import / Export</p>
         <label>Canvas JSON</label>
-        <textarea value={importText || exported} onChange={(e) => setImportText(e.target.value)} />
+        <textarea data-testid="canvas-json" value={importText || exported} onChange={(e) => setImportText(e.target.value)} />
         <button className="btn" type="submit">导入 JSON</button>
       </form>
       <div className="card"><p className="eyebrow">Result</p><pre>{JSON.stringify(result ?? { hint: 'Create a task from canvas.' }, null, 2)}</pre></div>

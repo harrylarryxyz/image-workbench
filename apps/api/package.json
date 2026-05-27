@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "provider-secrets:migrate": "ts-node src/providers/provider-secret-migration.ts"
   },
   "dependencies": {
     "@image-workbench/image-utils": "workspace:*",

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -30,6 +30,21 @@ describe('LocalStorageService backend compatibility', () => {
     const bytes = await service.readImage(saved.storageKey);
     expect(Buffer.from(bytes).equals(tinyPng)).toBe(true);
     await expect(service.resolveExistingPath(saved.storageKey)).resolves.toContain(saved.storageKey.replace('local://', ''));
+  });
+
+  it('generates real local webp thumbnails for gallery assets', async () => {
+    const service = new LocalStorageService({ backend: 'local', root: await tempRoot() });
+
+    const saved = await service.putImage(tinyPng);
+
+    expect(saved.thumbnailKey).toMatch(/^local:\/\/thumbs\//);
+    expect(saved.thumbnailFormat).toBe('webp');
+    expect(saved.thumbnailSizeBytes).toBeGreaterThan(0);
+    const thumbnailPath = await service.resolveExistingPath(saved.thumbnailKey!);
+    expect(thumbnailPath).toBeTruthy();
+    const thumbnailBytes = await readFile(thumbnailPath!);
+    expect(thumbnailBytes.subarray(0, 4).toString('hex')).toBe('52494646');
+    expect(thumbnailBytes.subarray(8, 12).toString()).toBe('WEBP');
   });
 
   it('exposes remote-object metadata and rejects local path resolution for s3-compatible backends', async () => {

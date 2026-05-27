@@ -16,3 +16,15 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   if (!res.ok) throw new Error(`POST ${path} failed: ${res.status} ${await res.text()}`);
   return res.json() as Promise<T>;
 }
+
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${apiBase()}${path}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
+  if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status} ${await res.text()}`);
+  return res.json() as Promise<T>;
+}
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const res = await fetch(`${apiBase()}${path}`, { method: 'DELETE', cache: 'no-store' });
+  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status} ${await res.text()}`);
+  return res.json() as Promise<T>;
+}

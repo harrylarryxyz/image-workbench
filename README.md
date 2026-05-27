@@ -15,7 +15,7 @@ Image Workbench is a private, production-oriented AI image creation workbench fo
 
 ## Current status
 
-This project is in active `0.2.x` development. The core generate/edit pipeline, SSE status updates, Gallery 2.0, prompt workflows, mask editing, canvas workflow prototype, backend-prefixed storage keys, and provider secret encryption are implemented. Remaining hardening focuses on attaching a real remote-object adapter for S3/R2/MinIO deployments and adding browser E2E tests.
+This project is in active `0.2.x` development. The core generate/edit pipeline, SSE status updates, Gallery 2.0 with generated thumbnails, prompt workflows, mask editing, persisted Canvas projects, backend-prefixed storage keys, provider secret encryption, one-shot legacy key migration, and browser E2E smoke tests are implemented. The only deferred production-hardening item is attaching a real remote-object adapter for S3/R2/MinIO deployments when object-storage resources are available.
 
 Implemented:
 
@@ -24,16 +24,13 @@ Implemented:
 - PostgreSQL schema for providers, generation tasks, image assets, canvas projects/nodes/edges, and prompt presets.
 - Redis/BullMQ worker for async image generation and editing.
 - SSE task updates with polling fallback.
-- Local image upload, asset serving, metadata extraction, and S3/R2/MinIO-compatible storage key contracts.
-- Provider diagnostics, encrypted provider secrets, and error classification for common upstream failures.
-- React Flow canvas workflow prototype and Konva mask editor.
+- Local image upload, asset serving, metadata extraction, generated WebP thumbnails, and S3/R2/MinIO-compatible storage key contracts.
+- Provider diagnostics, encrypted provider secrets, one-shot legacy plaintext key migration, and error classification for common upstream failures.
+- Persisted React Flow canvas projects and Konva mask editor.
 
 Planned:
 
-- Remote object SDK adapter for `STORAGE_BACKEND=s3|r2|minio` deployments.
-- Database migration helper for rewriting legacy plaintext provider keys to `enc:v1:*`.
-- Persisted Canvas project CRUD.
-- Browser E2E tests for core workflows.
+- Remote object SDK adapter for `STORAGE_BACKEND=s3|r2|minio` deployments once object-storage resources are available.
 
 ## Architecture
 
@@ -46,7 +43,7 @@ apps/web  ──HTTP──>  apps/api  ──Prisma──> PostgreSQL
    │                    │
    │                    └─Storage──> local filesystem data/uploads or S3-compatible object keys
    │
-   └─Next.js UI: generate, edit, tasks, gallery, providers, prompts
+   └─Next.js UI: generate, edit, tasks, gallery, providers, prompts, canvas
 ```
 
 ## Stack
@@ -58,7 +55,8 @@ apps/web  ──HTTP──>  apps/api  ──Prisma──> PostgreSQL
 - **Storage:** Local filesystem with S3/R2/MinIO-compatible key contract
 - **Image utilities:** Sharp
 - **Monorepo tooling:** pnpm, Turborepo
-- **Canvas roadmap:** React Flow, Konva
+- **Canvas:** React Flow, Konva
+- **Testing:** Vitest, Node test runner, Playwright
 - **Deployment target:** Docker Compose and reverse proxy/Nginx
 
 ## Repository layout
@@ -116,6 +114,7 @@ Notes:
 - Keep API keys server-side only. Do not expose provider keys to the browser.
 - `.env.local` is ignored by Git.
 - Provider records created in the UI are stored in the database. New and updated provider keys are encrypted-at-rest with AES-256-GCM and stored with an `enc:v1:` prefix; legacy plaintext values remain readable for migration compatibility.
+- Until S3/R2/MinIO resources are available, keep `STORAGE_BACKEND=local` and back up `STORAGE_DIR`. This is the recommended low-cost production mode for a single VPS.
 
 ## Local development
 
@@ -178,8 +177,27 @@ Default local URLs:
 1. Open `Edit`.
 2. Upload one or more reference images.
 3. Write the edit prompt.
-4. Submit the edit task.
-5. The UI streams `/tasks/:id/events` and renders returned images when the task reaches a terminal state.
+4. Optionally draw or upload a mask.
+5. Submit the edit task.
+6. The UI streams `/tasks/:id/events` and renders returned images when the task reaches a terminal state.
+
+### Save a Canvas workflow
+
+1. Open `Canvas`.
+2. Add Prompt/Image/Task nodes and connect them.
+3. Enter a project name and click `新建保存` or `保存项目`.
+4. Use `加载项目列表` to reopen saved workflows later.
+
+### Migrate legacy provider secrets
+
+After setting a stable production `PROVIDER_SECRET_KEY`, dry-run and then rewrite legacy plaintext provider keys:
+
+```bash
+pnpm --filter @image-workbench/api provider-secrets:migrate -- --dry-run
+pnpm --filter @image-workbench/api provider-secrets:migrate
+```
+
+The command skips existing `enc:v1:` values and only rewrites plaintext rows.
 
 ### Diagnose failures
 
@@ -203,6 +221,11 @@ Main endpoints:
 - `GET /gallery` — list recent image assets.
 - `GET /assets/file?key=***` — serve a stored image asset.
 - `POST /assets/upload` — upload a reference image.
+- `GET /canvas-projects` — list saved Canvas projects.
+- `POST /canvas-projects` — create a Canvas project with nodes and edges.
+- `GET /canvas-projects/:id` — open a saved Canvas project.
+- `PATCH /canvas-projects/:id` — replace Canvas project graph state.
+- `DELETE /canvas-projects/:id` — delete a saved Canvas project.
 - `GET /providers` — list provider profiles with capabilities and edit health.
 - `POST /providers` — create a provider profile.
 - `PATCH /providers/:id` — update provider profile fields.
@@ -229,6 +252,12 @@ Build all apps/packages:
 
 ```bash
 pnpm build
+```
+
+Run browser E2E smoke tests:
+
+```bash
+pnpm --filter @image-workbench/web test:e2e
 ```
 
 Verify production browser chunks do not contain a localhost API fallback:
