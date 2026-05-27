@@ -226,6 +226,15 @@ Build all apps/packages:
 pnpm build
 ```
 
+Verify production browser chunks do not contain a localhost API fallback:
+
+```bash
+pnpm --filter @image-workbench/web build
+pnpm --filter @image-workbench/web test -- api-base.production.test.js
+```
+
+Deployment note: when frontend source changes, sync both `apps/web/lib/*` and a clean rebuilt `apps/web/.next/` directory. Do not overlay a stale `.next` build; stale chunks can make the browser call `http://localhost:3100` and produce `TypeError: Load failed`.
+
 ## Security and operational notes
 
 - Never commit `.env`, `.env.local`, generated uploads, logs, or local runtime data.
