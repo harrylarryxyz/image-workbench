@@ -5,6 +5,7 @@ import { LocalStorageService } from '../storage/local-storage.service';
 import { DiagnosticsService } from '../diagnostics/diagnostics.service';
 import { assertModelRequestSupported, buildRouteMetadata, normalizeBaseUrl, resolveApiMode } from '../lib/provider-sdk';
 import { GenerateImageRequestSchema, type ApiMode } from '../lib/shared';
+import { decryptSecret } from '../providers/secret-box';
 
 @Processor('image-generation')
 export class ImageGenerationProcessor extends WorkerHost {
@@ -33,7 +34,7 @@ export class ImageGenerationProcessor extends WorkerHost {
       if (task.type === 'image.edit') {
         apiMode = 'images';
         endpoint = '/images/edits';
-        b64 = await this.callImagesEdit(baseUrl, provider.apiKeyEncrypted, model, request, task.paramsJson as any);
+        b64 = await this.callImagesEdit(baseUrl, decryptSecret(provider.apiKeyEncrypted), model, request, task.paramsJson as any);
       } else {
         const callProvider = async (mode: ApiMode) => {
           const ep = mode === 'responses' ? '/responses' : '/images/generations';
@@ -45,7 +46,7 @@ export class ImageGenerationProcessor extends WorkerHost {
           try {
             const res = await fetch(`${baseUrl}${ep}`, {
               method: 'POST',
-              headers: { authorization: `Bearer ${provider.apiKeyEncrypted}`, 'content-type': 'application/json' },
+              headers: { authorization: `Bearer ${decryptSecret(provider.apiKeyEncrypted)}`, 'content-type': 'application/json' },
               body: JSON.stringify(payload),
               signal: controller.signal,
             });

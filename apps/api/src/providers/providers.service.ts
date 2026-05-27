@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import type { ProviderProfile } from '../lib/shared';
 import { getModelCapability, normalizeBaseUrl } from '../lib/provider-sdk';
+import { decryptSecret, encryptSecret, maskSecret } from './secret-box';
 
 function maskKey(value: string): string {
   if (!value) return '';
@@ -45,7 +46,7 @@ export class ProvidersService {
         name,
         type: toType(body?.type),
         baseUrl,
-        apiKeyEncrypted: apiKey,
+        apiKeyEncrypted: encryptSecret(apiKey),
         defaultModel,
         apiMode: toApiMode(body?.apiMode),
         enabled: body?.enabled !== false,
@@ -62,7 +63,7 @@ export class ProvidersService {
     if (body?.defaultModel !== undefined) data.defaultModel = String(body.defaultModel).trim();
     if (body?.apiMode !== undefined) data.apiMode = toApiMode(body.apiMode);
     if (body?.enabled !== undefined) data.enabled = Boolean(body.enabled);
-    if (body?.apiKey !== undefined && String(body.apiKey).trim()) data.apiKeyEncrypted = String(body.apiKey).trim();
+    if (body?.apiKey !== undefined && String(body.apiKey).trim()) data.apiKeyEncrypted = encryptSecret(String(body.apiKey).trim());
     const row = await this.prisma.providerProfile.update({ where: { id }, data });
     return this.serialize(row);
   }
@@ -80,7 +81,7 @@ export class ProvidersService {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15_000);
       const res = await fetch(`${row.baseUrl.replace(/\/+$/, '')}/models`, {
-        headers: { authorization: `Bearer ${row.apiKeyEncrypted}` },
+        headers: { authorization: `Bearer ${decryptSecret(row.apiKeyEncrypted)}` },
         signal: controller.signal,
       });
       clearTimeout(timer);
@@ -119,7 +120,7 @@ export class ProvidersService {
       form.append('image', new Blob([TINY_PNG], { type: 'image/png' }), 'capability-probe.png');
       const res = await fetch(`${baseUrl}/images/edits`, {
         method: 'POST',
-        headers: { authorization: `Bearer ${row.apiKeyEncrypted}` },
+        headers: { authorization: `Bearer ${decryptSecret(row.apiKeyEncrypted)}` },
         body: form,
         signal: controller.signal,
       });
@@ -155,7 +156,7 @@ export class ProvidersService {
       data: {
         name: 'Environment provider',
         baseUrl,
-        apiKeyEncrypted: apiKey,
+        apiKeyEncrypted: encryptSecret(apiKey),
         defaultModel: process.env.IMAGE_MODEL ?? 'gpt-image-2',
         apiMode: 'AUTO',
       },
@@ -170,7 +171,7 @@ export class ProvidersService {
     const data = {
       name,
       baseUrl,
-      apiKeyEncrypted: apiKey,
+      apiKeyEncrypted: encryptSecret(apiKey),
       defaultModel: process.env.IMAGE_MODEL ?? 'gpt-image-2',
       apiMode: 'AUTO' as const,
       enabled: true,
@@ -203,7 +204,7 @@ export class ProvidersService {
       defaultModel: row.defaultModel,
       apiMode: row.apiMode.toLowerCase(),
       enabled: row.enabled,
-      apiKeyMasked: maskKey(row.apiKeyEncrypted),
+      apiKeyMasked: maskSecret(row.apiKeyEncrypted),
       capabilities: {
         model: row.defaultModel,
         generate: capability?.supportsGenerate ?? null,
