@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { detectImageFormat } from '../lib/image-utils';
 
@@ -29,5 +29,11 @@ export class LocalStorageService {
     } catch {
       return null;
     }
+  }
+
+  async readImage(storageKey: string): Promise<Uint8Array> {
+    const file = await this.resolveExistingPath(storageKey);
+    if (!file) throw new Error(`image not found: ${storageKey}`);
+    return readFile(file);
   }
 }

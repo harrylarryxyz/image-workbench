@@ -30,6 +30,27 @@ export class TasksService {
     return { id: task.id, status: task.status };
   }
 
+  async createEditTask(input: any) {
+    const request = GenerateImageRequestSchema.parse(input);
+    const refKeys = Array.isArray(input?.refKeys) ? input.refKeys.map(String).filter(Boolean).slice(0, 4) : [];
+    if (refKeys.length < 1) throw new Error('at least one reference image is required');
+    const provider = await this.providers.getDefault();
+    const model = request.model || provider.defaultModel;
+    const params = { ...request, refKeys, editMode: 'reference' };
+    const task = await this.prisma.generationTask.create({
+      data: {
+        type: 'image.edit',
+        providerId: provider.id,
+        model,
+        prompt: request.prompt,
+        paramsJson: params,
+        status: 'QUEUED',
+      },
+    });
+    await this.enqueueTask(task.id);
+    return { id: task.id, status: task.status, type: task.type };
+  }
+
   async queueStatus() {
     const [waiting, active, delayed, failed, completed, paused] = await Promise.all([
       this.queue.getWaitingCount(),

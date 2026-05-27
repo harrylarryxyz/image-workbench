@@ -8,6 +8,9 @@ export class TasksController {
   @Post('generate')
   generate(@Body() body: unknown) { return this.tasks.createGenerateTask(body); }
 
+  @Post('edit')
+  edit(@Body() body: unknown) { return this.tasks.createEditTask(body); }
+
   @Get('queue/status')
   queueStatus() { return this.tasks.queueStatus(); }
 

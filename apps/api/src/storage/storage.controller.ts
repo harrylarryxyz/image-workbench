@@ -1,4 +1,5 @@
-import { Controller, Get, NotFoundException, Query, StreamableFile } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Post, Query, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { createReadStream } from 'node:fs';
 import { extname } from 'node:path';
 import { LocalStorageService } from './local-storage.service';
@@ -14,5 +15,13 @@ export class StorageController {
     const ext = extname(file).toLowerCase();
     const type = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'application/octet-stream';
     return new StreamableFile(createReadStream(file), { type });
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }))
+  async upload(@UploadedFile() file?: any) {
+    if (!file?.buffer) throw new Error('file is required');
+    const saved = await this.storage.putImage(file.buffer);
+    return { ...saved, assetUrl: `/assets/file?key=${encodeURIComponent(saved.storageKey)}`, originalName: file.originalname, mimeType: file.mimetype };
   }
 }

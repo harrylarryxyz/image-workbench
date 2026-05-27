@@ -28,34 +28,43 @@ export class ImageGenerationProcessor extends WorkerHost {
       let apiMode = resolveApiMode(request.apiMode as ApiMode, pointsToResponses);
       let endpoint = apiMode === 'responses' ? '/responses' : '/images/generations';
       let fallbackReason: string | null = null;
-      const callProvider = async (mode: ApiMode) => {
-        const ep = mode === 'responses' ? '/responses' : '/images/generations';
-        const payload = mode === 'responses'
-          ? { model, input: request.prompt, tools: [{ type: 'image_generation', size: request.size, quality: request.quality, output_format: request.format, moderation: 'low' }] }
-          : { model, prompt: request.prompt, n: request.count, size: request.size, quality: request.quality, format: request.format, response_format: 'b64_json', moderation: 'low' };
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), request.timeoutSec * 1000);
-        try {
-          const res = await fetch(`${baseUrl}${ep}`, {
-            method: 'POST',
-            headers: { authorization: `Bearer ${provider.apiKeyEncrypted}`, 'content-type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-          });
-          const contentType = res.headers.get('content-type') || '';
-          if (contentType.includes('text/html') && !res.ok) throw new Error(`server returned HTML instead of JSON | HTTP ${res.status} | Content-Type: ${contentType}`);
-          const json = await res.json() as any;
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${json?.error?.message || JSON.stringify(json).slice(0, 200)}`);
-          return json;
-        } finally {
-          clearTimeout(timer);
+      let b64: string | null;
+
+      if (task.type === 'image.edit') {
+        apiMode = 'images';
+        endpoint = '/images/edits';
+        b64 = await this.callImagesEdit(baseUrl, provider.apiKeyEncrypted, model, request, task.paramsJson as any);
+      } else {
+        const callProvider = async (mode: ApiMode) => {
+          const ep = mode === 'responses' ? '/responses' : '/images/generations';
+          const payload = mode === 'responses'
+            ? { model, input: request.prompt, tools: [{ type: 'image_generation', size: request.size, quality: request.quality, output_format: request.format, moderation: 'low' }] }
+            : { model, prompt: request.prompt, n: request.count, size: request.size, quality: request.quality, format: request.format, response_format: 'b64_json', moderation: 'low' };
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), request.timeoutSec * 1000);
+          try {
+            const res = await fetch(`${baseUrl}${ep}`, {
+              method: 'POST',
+              headers: { authorization: `Bearer ${provider.apiKeyEncrypted}`, 'content-type': 'application/json' },
+              body: JSON.stringify(payload),
+              signal: controller.signal,
+            });
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('text/html') && !res.ok) throw new Error(`server returned HTML instead of JSON | HTTP ${res.status} | Content-Type: ${contentType}`);
+            const json = await res.json() as any;
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${json?.error?.message || JSON.stringify(json).slice(0, 200)}`);
+            return json;
+          } finally {
+            clearTimeout(timer);
+          }
+        };
+        let json = await callProvider(apiMode);
+        b64 = this.extractImage(json);
+        if (!b64 && request.apiMode === 'auto' && apiMode === 'images') {
+          apiMode = 'responses'; endpoint = '/responses'; fallbackReason = 'images_empty_image_payload'; json = await callProvider(apiMode); b64 = this.extractImage(json);
         }
-      };
-      let json = await callProvider(apiMode);
-      let b64 = this.extractImage(json);
-      if (!b64 && request.apiMode === 'auto' && apiMode === 'images') {
-        apiMode = 'responses'; endpoint = '/responses'; fallbackReason = 'images_empty_image_payload'; json = await callProvider(apiMode); b64 = this.extractImage(json);
       }
+
       if (!b64) throw new Error('response did not contain image data');
       const bytes = Uint8Array.from(Buffer.from(b64, 'base64'));
       const saved = await this.storage.putImage(bytes);
@@ -69,6 +78,35 @@ export class ImageGenerationProcessor extends WorkerHost {
       const diagnostic = this.diagnostics.classify(message);
       await this.prisma.generationTask.update({ where: { id: task.id }, data: { status: 'FAILED', errorCode: diagnostic?.code, errorMessage: message, diagnosticsJson: diagnostic as any, elapsedMs: Date.now() - started } });
       throw error;
+    }
+  }
+
+  private async callImagesEdit(baseUrl: string, apiKey: string, model: string, request: any, params: any): Promise<string | null> {
+    const refKeys = Array.isArray(params?.refKeys) ? params.refKeys.slice(0, 4) : [];
+    if (!refKeys.length) throw new Error('at least one reference image is required');
+    const form = new FormData();
+    form.set('model', model);
+    form.set('prompt', request.prompt);
+    form.set('size', request.size ?? '1024x1024');
+    form.set('quality', request.quality ?? 'low');
+    form.set('response_format', 'b64_json');
+    for (const key of refKeys) {
+      const bytes = await this.storage.readImage(key);
+      const ext = key.split('.').pop()?.toLowerCase() || 'png';
+      const type = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+      form.append('image', new Blob([Buffer.from(bytes)], { type }), key.split('/').pop() || `reference.${ext}`);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Number(request.timeoutSec ?? 300) * 1000);
+    try {
+      const res = await fetch(`${baseUrl}/images/edits`, { method: 'POST', headers: { authorization: `Bearer ${apiKey}` }, body: form, signal: controller.signal });
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('text/html') && !res.ok) throw new Error(`server returned HTML instead of JSON | HTTP ${res.status} | Content-Type: ${contentType}`);
+      const json = await res.json() as any;
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${json?.error?.message || JSON.stringify(json).slice(0, 200)}`);
+      return this.extractImage(json);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
