@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { apiGet } from '../../lib/api';
+import { PromptEnhancer } from './prompt-enhancer';
 
 export default async function PromptsPage() {
   const prompts = await apiGet<any[]>('/prompts').catch((error) => [{ error: String(error) }]);
@@ -18,11 +19,12 @@ export default async function PromptsPage() {
         <label>标题</label>
         <input name="title" placeholder="例如：产品海报模板" />
         <label>Tags，用逗号分隔</label>
-        <input name="tags" placeholder="poster, product" />
+        <input name="tags" placeholder="poster, product, style" />
         <label>Prompt</label>
         <textarea name="content" placeholder="输入提示词模板，支持 [subject] 这样的占位符" />
         <button className="btn" type="submit">保存 Prompt</button>
       </form>
+      <PromptEnhancer />
       <div className="gallery">
         {prompts.map((prompt, i) => {
           const reuseHref = `/?prompt=${encodeURIComponent(prompt.content ?? '')}`;

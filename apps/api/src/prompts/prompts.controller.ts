@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 function parseTags(input: unknown): string[] {
@@ -12,8 +12,8 @@ export class PromptsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async list() {
-    const rows = await this.prisma.promptPreset.findMany({ orderBy: { updatedAt: 'desc' }, take: 200 });
+  async list(@Query('tag') tag?: string) {
+    const rows = await this.prisma.promptPreset.findMany({ orderBy: { updatedAt: 'desc' }, take: 200, where: tag ? { tags: { has: tag } } : undefined });
     return rows.map((row) => ({
       id: row.id,
       title: row.title,
@@ -29,8 +29,8 @@ export class PromptsController {
   async create(@Body() body: any) {
     const title = String(body?.title ?? '').trim();
     const content = String(body?.content ?? '').trim();
-    if (!title) throw new Error('title is required');
-    if (!content) throw new Error('content is required');
+    if (!title) throw new BadRequestException('title is required');
+    if (!content) throw new BadRequestException('content is required');
     const row = await this.prisma.promptPreset.create({
       data: {
         title,
@@ -42,9 +42,27 @@ export class PromptsController {
     return { id: row.id, title: row.title, content: row.content, tags: row.tags, source: row.source, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
   }
 
+  @Post('enhance')
+  enhance(@Body() body: any) {
+    const subject = String(body?.subject ?? body?.prompt ?? '').trim();
+    const style = String(body?.style ?? '').trim();
+    if (!subject) throw new BadRequestException('subject or prompt is required');
+    const styleLine = style ? `${style}, ` : '';
+    return {
+      prompt: `${styleLine}${subject}, clear subject, coherent composition, refined lighting, high detail, professional image generation prompt, no extra text`,
+      source: 'local-enhancer',
+    };
+  }
+
   @Post('seed')
   async seed() {
     const templates = [
+      {
+        title: 'Studio Ghibli-inspired warm illustration',
+        content: 'A warm hand-painted illustration of [subject], soft natural light, cozy atmosphere, lush environment, gentle color palette, whimsical but grounded, no text',
+        tags: ['style', 'illustration', 'warm'],
+        source: 'seed',
+      },
       {
         title: 'Icon / App 图标',
         content: 'A clean minimal app icon of [subject], centered, simple geometric shapes, soft gradient background, high contrast, no text, polished vector style',
