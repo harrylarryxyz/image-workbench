@@ -10,8 +10,9 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 - Operations runbook for backups, restore principles, and low-memory Rabisu copy deployments.
 - `scripts/backup-image-workbench.sh` for timestamped PostgreSQL/upload backups with manifests, checksums, dry-run mode, and retention pruning.
-- `scripts/deploy-rabisu.sh` for locally verified artifact deployment to the low-memory Rabisu VPS.
-- Root package scripts `pnpm backup` and `pnpm deploy:rabisu`.
+- `scripts/deploy-rabisu.sh` for locally verified artifact deployment to the low-memory Rabisu VPS, including old-release pruning after successful smoke checks.
+- `scripts/prune-rabisu-releases.sh` for standalone Rabisu release cleanup with dry-run support.
+- Root package scripts `pnpm backup`, `pnpm deploy:rabisu`, and `pnpm prune:rabisu-releases`.
 
 ### Changed
 
@@ -20,6 +21,7 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 ### Fixed
 
 - Reconciled stale `RUNNING` tasks that already have persisted image assets so tasks interrupted between provider success and final status update are shown as `SUCCEEDED`.
+- Avoided Prisma write failures when persisting generated images by storing runtime-only asset URLs and thumbnail metadata under `metadataJson` instead of top-level `ImageAsset` fields.
 
 ### Added
 

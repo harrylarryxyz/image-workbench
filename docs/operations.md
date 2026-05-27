@@ -74,12 +74,14 @@ The deployment script does the following:
 7. Preserves runtime state through symlinks to `/opt/image-workbench/shared/.env` and `/opt/image-workbench/shared/uploads`.
 8. Runs lightweight remote guards.
 9. Switches `/opt/image-workbench/current`, restarts services, and smoke-tests API/Web loopback.
+10. Prunes old release directories, keeping the latest 5 by default plus the active release.
 
 Useful options:
 
 ```bash
 pnpm deploy:rabisu -- --skip-restart
 pnpm deploy:rabisu -- --skip-local-verify
+pnpm deploy:rabisu -- --keep-releases 3
 ```
 
 Use `--skip-local-verify` only when the local build artifacts were just produced and verified.

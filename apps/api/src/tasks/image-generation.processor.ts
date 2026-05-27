@@ -70,9 +70,10 @@ export class ImageGenerationProcessor extends WorkerHost {
       const bytes = Uint8Array.from(Buffer.from(b64, 'base64'));
       const saved = await this.storage.putImage(bytes);
       const route = buildRouteMetadata({ requestedModel: model, resolvedModel: model, apiMode, endpoint, fallbackReason });
+      const imageCreate = this.toImageAssetCreate(saved, request.prompt);
       await this.prisma.generationTask.update({
         where: { id: task.id },
-        data: { status: 'SUCCEEDED', routeJson: route as any, elapsedMs: Date.now() - started, images: { create: { ...saved, prompt: request.prompt } } },
+        data: { status: 'SUCCEEDED', routeJson: route as any, elapsedMs: Date.now() - started, images: { create: imageCreate } },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -158,5 +159,24 @@ export class ImageGenerationProcessor extends WorkerHost {
     for (const item of json?.data || []) if (item?.b64_json) return item.b64_json;
     for (const item of json?.output || []) if (item?.type === 'image_generation_call' && (item.result || item.b64_json)) return item.result || item.b64_json;
     return null;
+  }
+
+  private toImageAssetCreate(saved: any, prompt: string) {
+    const metadataJson = {
+      backend: saved.backend,
+      assetUrl: saved.assetUrl,
+      thumbnailUrl: saved.thumbnailUrl,
+      thumbnailFormat: saved.thumbnailFormat,
+      thumbnailSizeBytes: saved.thumbnailSizeBytes,
+    };
+    return {
+      storageKey: saved.storageKey,
+      thumbnailKey: saved.thumbnailKey,
+      format: saved.format,
+      sizeBytes: saved.sizeBytes,
+      sha256: saved.sha256,
+      prompt,
+      metadataJson,
+    };
   }
 }

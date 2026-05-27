@@ -14,6 +14,7 @@ Options:
   --app-root DIR           Remote app root. Default: /opt/image-workbench
   --skip-local-verify      Skip local tests/build; use only existing artifacts
   --skip-restart           Upload/extract only; do not switch current or restart
+  --keep-releases N        Keep latest N release directories after a successful restart. Default: 5
   -h, --help               Show help
 
 The credentials file must define RABISU_SSH_PASSWORD for password SSH.
@@ -26,6 +27,7 @@ CREDENTIALS="/root/.vps-vault/credentials.env"
 APP_ROOT="/opt/image-workbench"
 SKIP_LOCAL_VERIFY="0"
 SKIP_RESTART="0"
+KEEP_RELEASES="5"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --app-root) APP_ROOT="$2"; shift 2 ;;
     --skip-local-verify) SKIP_LOCAL_VERIFY="1"; shift ;;
     --skip-restart) SKIP_RESTART="1"; shift ;;
+    --keep-releases) KEEP_RELEASES="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -60,6 +63,11 @@ if [[ -z "${RABISU_SSH_PASSWORD:-}" ]]; then
   exit 2
 fi
 export SSHPASS="$RABISU_SSH_PASSWORD"
+
+if ! [[ "$KEEP_RELEASES" =~ ^[0-9]+$ ]] || [[ "$KEEP_RELEASES" -lt 1 ]]; then
+  echo "--keep-releases must be a positive integer" >&2
+  exit 2
+fi
 
 if [[ "$SKIP_LOCAL_VERIFY" != "1" ]]; then
   rm -rf apps/api/dist apps/web/test-results
@@ -90,6 +98,7 @@ HEAD="$1"
 TS="$2"
 APP_ROOT="$3"
 SKIP_RESTART="$4"
+KEEP_RELEASES="$5"
 SRC="/tmp/image-workbench-${HEAD}-${TS}.tar.gz"
 ART="/tmp/image-workbench-artifacts-${HEAD}-${TS}.tar.gz"
 RELEASE="${APP_ROOT}/releases/${HEAD}-${TS}"
@@ -124,17 +133,23 @@ systemctl is-active --quiet image-workbench-api
 systemctl is-active --quiet image-workbench-web
 API_JSON=$(curl -fsS http://127.0.0.1:3100/tasks/queue/status)
 WEB_HTTP=$(curl -fsS -o /tmp/image-workbench-web-smoke.html -w '%{http_code}' http://127.0.0.1:3000/)
+CURRENT_REAL=$(readlink -f "${APP_ROOT}/current")
+mapfile -t OLD_RELEASES < <(find "${APP_ROOT}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | awk '{print $2}' | grep -Fvx "$CURRENT_REAL" | tail -n +"$KEEP_RELEASES" || true)
+if [[ "${#OLD_RELEASES[@]}" -gt 0 ]]; then
+  printf '%s\n' "${OLD_RELEASES[@]}" | xargs -r rm -rf --
+fi
 echo "release=$RELEASE"
 echo "backup=$BACKUP"
 echo "api=$(systemctl is-active image-workbench-api)"
 echo "web=$(systemctl is-active image-workbench-web)"
-echo "web_http=$WEB_HTTP"
+echo "web=$WEB_HTTP"
 echo "api_json=${API_JSON:0:220}"
+echo "pruned_releases=${#OLD_RELEASES[@]}"
 journalctl -u image-workbench-api -u image-workbench-web --since '2 minutes ago' --no-pager -p warning..alert | tail -80
 EOS
 )
 
-sshpass -e ssh -o StrictHostKeyChecking=no -F "$SSH_CONFIG" "$HOST" "bash -s" -- "$HEAD" "$TS" "$APP_ROOT" "$SKIP_RESTART" <<<"$REMOTE_SCRIPT"
+sshpass -e ssh -o StrictHostKeyChecking=no -F "$SSH_CONFIG" "$HOST" "bash -s" -- "$HEAD" "$TS" "$APP_ROOT" "$SKIP_RESTART" "$KEEP_RELEASES" <<<"$REMOTE_SCRIPT"
 
 rm -rf apps/api/dist apps/web/test-results
 git checkout -- apps/web/next-env.d.ts 2>/dev/null || true
