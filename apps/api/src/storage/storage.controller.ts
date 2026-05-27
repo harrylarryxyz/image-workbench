@@ -22,6 +22,6 @@ export class StorageController {
   async upload(@UploadedFile() file?: any) {
     if (!file?.buffer) throw new Error('file is required');
     const saved = await this.storage.putImage(file.buffer);
-    return { ...saved, assetUrl: `/assets/file?key=${encodeURIComponent(saved.storageKey)}`, originalName: file.originalname, mimeType: file.mimetype };
+    return { ...saved, assetUrl: this.storage.publicUrl(saved.storageKey), originalName: file.originalname, mimeType: file.mimetype };
   }
 }
