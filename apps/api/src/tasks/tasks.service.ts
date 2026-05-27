@@ -57,6 +57,7 @@ export class TasksService {
 
   async queueStatus() {
     await this.reconcileRunningTasksWithImages();
+    await this.requeueStaleLiveTasks();
     const [waiting, active, delayed, failed, completed, paused] = await Promise.all([
       this.queue.getWaitingCount(),
       this.queue.getActiveCount(),
@@ -131,6 +132,28 @@ export class TasksService {
 
   private async enqueueTask(taskId: string) {
     await this.queue.add('generate', { taskId }, { attempts: 1, removeOnComplete: 100, removeOnFail: 100, jobId: `task:${taskId}:${Date.now()}` });
+  }
+
+  private async requeueStaleLiveTasks() {
+    const cutoff = new Date(Date.now() - 5 * 60_000);
+    const liveTasks = await this.prisma.generationTask.findMany({
+      where: {
+        status: { in: ['QUEUED', 'RUNNING'] },
+        updatedAt: { lt: cutoff },
+      },
+      select: { id: true, status: true },
+      take: 50,
+    });
+    if (!liveTasks.length) return;
+
+    const jobs = await this.queue.getJobs(['waiting', 'active', 'delayed', 'prioritized'], 0, 500);
+    const queuedTaskIds = new Set(jobs.map((job: any) => job.data?.taskId).filter(Boolean));
+    for (const task of liveTasks) {
+      if (queuedTaskIds.has(task.id)) continue;
+      await this.enqueueTask(task.id);
+      if (task.status === 'RUNNING') await this.prisma.generationTask.update({ where: { id: task.id }, data: { status: 'QUEUED' } });
+      this.notifyTaskChanged(task.id);
+    }
   }
 
   private async reconcileRunningTasksWithImages() {

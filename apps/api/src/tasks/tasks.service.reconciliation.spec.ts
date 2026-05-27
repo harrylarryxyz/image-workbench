@@ -36,6 +36,7 @@ describe('TasksService reconciliation', () => {
       },
       generationTask: {
         update: vi.fn().mockResolvedValue({ id: 'task_with_image', status: 'SUCCEEDED' }),
+        findMany: vi.fn().mockResolvedValue([]),
         groupBy: vi.fn().mockResolvedValue([{ status: 'SUCCEEDED', _count: { status: 1 } }]),
       },
     };
@@ -99,5 +100,39 @@ describe('TasksService reconciliation', () => {
     expect(prisma.generationTask.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'task_with_image' } }));
     expect(rows[0].status).toBe('SUCCEEDED');
     expect(rows[0].images).toHaveLength(1);
+  });
+
+  it('requeues stale QUEUED/RUNNING tasks that are missing from BullMQ after restarts', async () => {
+    const staleCreatedAt = new Date(Date.now() - 15 * 60_000);
+    const prisma = {
+      imageAsset: {
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+      generationTask: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'stale_queued', status: 'QUEUED', createdAt: staleCreatedAt, updatedAt: staleCreatedAt },
+          { id: 'stale_running', status: 'RUNNING', createdAt: staleCreatedAt, updatedAt: staleCreatedAt },
+        ]),
+        update: vi.fn().mockResolvedValue({}),
+        groupBy: vi.fn().mockResolvedValue([
+          { status: 'QUEUED', _count: { status: 1 } },
+          { status: 'RUNNING', _count: { status: 1 } },
+        ]),
+      },
+    };
+    const queue = makeQueue({
+      getJobs: vi.fn().mockResolvedValue([]),
+      add: vi.fn().mockResolvedValue({}),
+    });
+    const service = makeService(prisma, queue);
+
+    await service.queueStatus();
+
+    expect(prisma.generationTask.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ status: { in: ['QUEUED', 'RUNNING'] } }),
+    }));
+    expect(queue.add).toHaveBeenCalledTimes(2);
+    expect(queue.add).toHaveBeenCalledWith('generate', { taskId: 'stale_queued' }, expect.objectContaining({ jobId: expect.stringContaining('task:stale_queued:') }));
+    expect(queue.add).toHaveBeenCalledWith('generate', { taskId: 'stale_running' }, expect.objectContaining({ jobId: expect.stringContaining('task:stale_running:') }));
   });
 });
