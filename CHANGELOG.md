@@ -1,0 +1,62 @@
+# Changelog
+
+All notable changes to Image Workbench are documented in this file.
+
+This project follows a practical changelog format inspired by [Keep a Changelog](https://keepachangelog.com/) and uses semantic versioning once public releases begin.
+
+## [Unreleased]
+
+### Added
+
+- Professional project README covering product scope, architecture, setup, workflows, API surface, quality checks, and operational notes.
+- Reference-image edit workflow:
+  - Upload reference images through `POST /assets/upload`.
+  - Create edit tasks through `POST /tasks/edit`.
+  - Process edit jobs through OpenAI-compatible `/images/edits`.
+  - Poll edit task status in the web UI and render returned images.
+- Provider capability and edit-health visibility:
+  - Built-in capability summaries for configured models.
+  - `/images/edits` probe with tiny reference image.
+  - Provider page display for generate/edit support, max references, and recent edit health.
+- Provider management UI for creating, updating, enabling/disabling, testing, and seeding provider profiles from environment variables.
+- Async task pipeline with Redis/BullMQ workers for image generation and editing.
+- Task operations for listing, detail inspection, retrying failed/cancelled jobs, and cancelling queued jobs.
+- Queue status dashboard with BullMQ counts and database status counts.
+- Gallery page for recent generated assets, downloads, task links, and prompt reuse.
+- Prompt library page for saving and reusing prompt presets.
+- Prisma schema for provider profiles, generation tasks, image assets, canvas projects, canvas nodes/edges, and prompt presets.
+- Local asset storage and image serving through `GET /assets/file`.
+- Route metadata and diagnostics payloads for provider request inspection.
+
+### Changed
+
+- Replaced the temporary `image-draw-web` concept with a TypeScript monorepo based on Next.js, NestJS, Prisma, Redis, BullMQ, and pnpm/Turborepo.
+- Generation requests now run through queued tasks instead of synchronous browser-bound requests.
+- Generate UI now polls task status and displays generated output images when available.
+- Task detail and Gallery flows now support reusing prompts and generation parameters.
+- Provider keys are submitted only to the server and shown in the UI as masked values.
+
+### Fixed
+
+- Classified common upstream edit failures for easier troubleshooting.
+- Parsed mixed provider error payloads more defensively, including malformed JSON/SSE-like responses.
+- Bound API host configuration from environment for deployment scenarios.
+- Added internal API base support for server-side rendering and deployment routing.
+- Ignored TypeScript build-info artifacts to keep the repository clean.
+
+### Security
+
+- Documented that provider API keys must remain server-side and must not be committed.
+- Documented current provider key storage limitations and the need for encryption-at-rest before broader deployments.
+- Confirmed runtime data, local uploads, logs, `.env`, and `.env.local` are ignored by Git.
+
+## [0.1.0] - 2026-05-27
+
+### Added
+
+- Initial Image Workbench monorepo scaffold.
+- Next.js web application shell.
+- NestJS API application shell.
+- Shared TypeScript packages for schemas, provider helpers, and image utilities.
+- Docker Compose infrastructure for local PostgreSQL and Redis.
+- Initial README with target stack and package layout.
