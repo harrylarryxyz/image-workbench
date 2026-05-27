@@ -3,7 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { PrismaService } from '../prisma.service';
 import { ProvidersService } from '../providers/providers.service';
-import { GenerateImageRequestSchema, type GenerateImageRequest } from '@image-workbench/shared';
+import { GenerateImageRequestSchema, type GenerateImageRequest } from '../lib/shared';
 
 @Injectable()
 export class TasksService {

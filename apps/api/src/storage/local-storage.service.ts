@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { detectImageFormat } from '@image-workbench/image-utils';
+import { detectImageFormat } from '../lib/image-utils';
 
 @Injectable()
 export class LocalStorageService {

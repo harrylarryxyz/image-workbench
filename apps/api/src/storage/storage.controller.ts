@@ -1,16 +1,18 @@
-import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { Controller, Get, NotFoundException, Query, StreamableFile } from '@nestjs/common';
+import { createReadStream } from 'node:fs';
+import { extname } from 'node:path';
 import { LocalStorageService } from './local-storage.service';
 
 @Controller('assets')
 export class StorageController {
   constructor(private readonly storage: LocalStorageService) {}
 
-  @Get('*key')
-  async getAsset(@Param('key') key: string[] | string, @Res() res: Response) {
-    const joined = Array.isArray(key) ? key.join('/') : key;
-    const file = await this.storage.resolveExistingPath(joined);
+  @Get('file')
+  async getAsset(@Query('key') key: string) {
+    const file = await this.storage.resolveExistingPath(key);
     if (!file) throw new NotFoundException('asset not found');
-    return res.sendFile(file);
+    const ext = extname(file).toLowerCase();
+    const type = ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'application/octet-stream';
+    return new StreamableFile(createReadStream(file), { type });
   }
 }

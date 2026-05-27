@@ -3,8 +3,8 @@ import type { Job } from 'bullmq';
 import { PrismaService } from '../prisma.service';
 import { LocalStorageService } from '../storage/local-storage.service';
 import { DiagnosticsService } from '../diagnostics/diagnostics.service';
-import { assertModelRequestSupported, buildRouteMetadata, normalizeBaseUrl, resolveApiMode } from '@image-workbench/provider-sdk';
-import { GenerateImageRequestSchema, type ApiMode } from '@image-workbench/shared';
+import { assertModelRequestSupported, buildRouteMetadata, normalizeBaseUrl, resolveApiMode } from '../lib/provider-sdk';
+import { GenerateImageRequestSchema, type ApiMode } from '../lib/shared';
 
 @Processor('image-generation')
 export class ImageGenerationProcessor extends WorkerHost {

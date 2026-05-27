@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import type { ProviderProfile } from '@image-workbench/shared';
+import type { ProviderProfile } from '../lib/shared';
 
 function maskKey(value: string): string {
   if (!value) return '';
