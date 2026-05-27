@@ -102,12 +102,26 @@ export class ImageGenerationProcessor extends WorkerHost {
       const res = await fetch(`${baseUrl}/images/edits`, { method: 'POST', headers: { authorization: `Bearer ${apiKey}` }, body: form, signal: controller.signal });
       const contentType = res.headers.get('content-type') || '';
       if (contentType.includes('text/html') && !res.ok) throw new Error(`server returned HTML instead of JSON | HTTP ${res.status} | Content-Type: ${contentType}`);
-      const json = await res.json() as any;
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${json?.error?.message || JSON.stringify(json).slice(0, 200)}`);
+      const text = await res.text();
+      const json = this.parseProviderBody(text);
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${json?.error?.message || text.slice(0, 240)}`);
       return this.extractImage(json);
     } finally {
       clearTimeout(timer);
     }
+  }
+
+
+  private parseProviderBody(text: string): any {
+    try { return JSON.parse(text); } catch {}
+    const eventIndex = text.indexOf('\nevent:');
+    const dataIndex = text.indexOf('\ndata:');
+    const cut = [eventIndex, dataIndex].filter((x) => x > 0).sort((a, b) => a - b)[0];
+    if (cut) {
+      const first = text.slice(0, cut).trim();
+      try { return JSON.parse(first); } catch {}
+    }
+    throw new Error(`Provider returned non-JSON response: ${text.slice(0, 240)}`);
   }
 
   private extractImage(json: any): string | null {
