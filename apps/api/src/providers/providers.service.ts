@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import type { ProviderProfile } from '../lib/shared';
 import { getModelCapability, normalizeBaseUrl } from '../lib/provider-sdk';
@@ -37,9 +37,9 @@ export class ProvidersService {
     const baseUrl = String(body?.baseUrl ?? '').trim().replace(/\/+$/, '');
     const apiKey = String(body?.apiKey ?? '').trim();
     const defaultModel = String(body?.defaultModel ?? 'gpt-image-2').trim();
-    if (!name) throw new Error('name is required');
-    if (!baseUrl) throw new Error('baseUrl is required');
-    if (!apiKey) throw new Error('apiKey is required');
+    if (!name) throw new BadRequestException('name is required');
+    if (!baseUrl) throw new BadRequestException('baseUrl is required');
+    if (!apiKey) throw new BadRequestException('apiKey is required');
     const row = await this.prisma.providerProfile.create({
       data: {
         name,
