@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma.service';
 import { ProvidersService } from '../providers/providers.service';
 import { GenerateImageRequestSchema } from '../lib/shared';
 import { TaskEventsService } from './task-events.service';
+import { ImageReferenceService } from './image-reference.service';
 
 @Injectable()
 export class TasksService {
@@ -14,6 +15,7 @@ export class TasksService {
     private readonly providers: ProvidersService,
     @InjectQueue('image-generation') private readonly queue: Queue,
     private readonly events: TaskEventsService,
+    private readonly refs: ImageReferenceService,
   ) {}
 
   async createGenerateTask(input: unknown) {
@@ -35,8 +37,7 @@ export class TasksService {
 
   async createEditTask(input: any) {
     const request = GenerateImageRequestSchema.parse(input);
-    const refKeys = Array.isArray(input?.refKeys) ? input.refKeys.map(String).filter(Boolean).slice(0, 4) : [];
-    if (refKeys.length < 1) throw new Error('at least one reference image is required');
+    const refKeys = await this.refs.assertExistingStorageKeys(Array.isArray(input?.refKeys) ? input.refKeys.map(String) : []);
     const provider = await this.providers.getDefault();
     const model = request.model || provider.defaultModel;
     const params = { ...request, refKeys, editMode: 'reference' };

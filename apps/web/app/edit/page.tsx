@@ -1,7 +1,8 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiPost } from '../../lib/api';
+import { pollTaskUntilTerminal, subscribeTaskEvents } from '../../lib/task-events';
 
 type Uploaded = { storageKey: string; assetUrl: string; originalName?: string; format: string; sizeBytes: number };
 type TaskImage = { id: string; assetUrl: string; format: string; sizeBytes: number; width?: number | null; height?: number | null; createdAt?: string };
@@ -29,6 +30,14 @@ export default function EditPage() {
   const [provider, setProvider] = useState<ProviderSummary | null>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) setUploads([{ storageKey: ref, assetUrl: `/assets/file?key=${encodeURIComponent(ref)}`, originalName: ref.split('/').pop(), format: ref.split('.').pop() ?? 'image', sizeBytes: 0 }]);
+    const nextPrompt = params.get('prompt');
+    if (nextPrompt) setPrompt(nextPrompt);
+  }, []);
+
+  useEffect(() => {
     fetch('/api/providers')
       .then((res) => res.ok ? res.json() : Promise.reject(new Error(`providers failed: ${res.status}`)))
       .then((rows: ProviderSummary[]) => setProvider(rows.find((item) => item.enabled) ?? rows[0] ?? null))
@@ -38,27 +47,25 @@ export default function EditPage() {
   useEffect(() => {
     if (!activeTaskId) return;
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    async function poll() {
-      try {
-        const next = await apiGet<EditTask>(`/tasks/${activeTaskId}`);
+    const unsubscribe = subscribeTaskEvents<EditTask>(activeTaskId, (next) => {
+      if (cancelled) return;
+      setTask(next);
+      setResult(next);
+      if (TERMINAL_STATUSES.has(next.status)) {
+        setActiveTaskId(null);
+        unsubscribe();
+      }
+    }, async () => {
+      await pollTaskUntilTerminal<EditTask>(activeTaskId, (next) => {
         if (cancelled) return;
         setTask(next);
         setResult(next);
-        if (!TERMINAL_STATUSES.has(next.status)) timer = setTimeout(poll, next.status === 'RUNNING' ? 1800 : 2500);
-        else setActiveTaskId(null);
-      } catch (error) {
-        if (cancelled) return;
-        setResult({ error: error instanceof Error ? error.message : String(error), taskId: activeTaskId });
-        timer = setTimeout(poll, 4000);
-      }
-    }
-
-    poll();
+        if (TERMINAL_STATUSES.has(next.status)) setActiveTaskId(null);
+      });
+    });
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
+      unsubscribe();
     };
   }, [activeTaskId]);
 
@@ -138,7 +145,7 @@ export default function EditPage() {
       {task ? <div className="result-panel">
         <div className="task-head">
           <span className={statusClass(task.status)}>{task.status}</span>
-          <span className="muted">{activeTaskId ? '自动轮询中…' : task.elapsedMs ? `${task.elapsedMs}ms` : '已停止轮询'}</span>
+          <span className="muted">{activeTaskId ? 'SSE 实时更新中…' : task.elapsedMs ? `${task.elapsedMs}ms` : '已停止更新'}</span>
         </div>
         {task.errorMessage ? <pre className="error">{task.errorMessage}</pre> : null}
         {task.images?.length ? <div className="gallery result-gallery">
