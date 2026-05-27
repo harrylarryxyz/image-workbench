@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/tasks">Tasks</Link>
               <Link href="/gallery">Gallery</Link>
               <Link href="/providers">Providers</Link>
+              <Link href="/prompts">Prompts</Link>
               <Link href="/canvas">Canvas Roadmap</Link>
             </nav>
           </aside>
