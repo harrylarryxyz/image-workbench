@@ -1,311 +1,175 @@
 # Image Workbench
 
-Image Workbench is a private, production-oriented AI image creation studio for GPT Image 2 and OpenAI-compatible image providers. It replaces the temporary `image-draw-web` FastAPI demo with a TypeScript monorepo, queued generation pipeline, productized Create Studio, Asset Library, Provider control center, SSE task diagnostics, prompt library, mask editing, React Flow canvas workflows, S3-compatible storage-key contracts, encrypted provider secrets, optional admin-token protection, audit logs, usage metrics, batch gallery actions, prompt versioning, and executable canvas workflows.
+Image Workbench is a production-oriented AI image generation and editing workbench. It combines provider routing, encrypted provider credentials, realtime task progress, an asset library, mask/reference editing, prompt workflows, React Flow canvases, team/session controls, and operations tooling for a single-VPS deployment.
 
-## What it does
+The current implementation covers the v0.2 roadmap slice through v15: production readiness, Canvas professional workflows, Create Studio 2.0, Asset Library 2.0, team/ops controls, and a creative Agent surface.
 
-- Generate images through OpenAI-compatible `/images/generations` or `/responses` routes.
-- Edit images with uploaded reference images through `/images/edits`.
-- Queue long-running image jobs with Redis and BullMQ instead of blocking browser requests.
-- Store task metadata, provider profiles, route diagnostics, errors, and image assets in PostgreSQL via Prisma.
-- Serve generated/uploaded assets from local storage with backend-prefixed keys that are compatible with S3, R2, and MinIO object stores.
-- Manage providers from the UI, including masked keys, model capability summaries, `/models` checks, and `/images/edits` probes.
-- Inspect tasks, retry failed/cancelled jobs, cancel queued jobs, reuse prompts/parameters, and browse outputs in an image-first Asset Library.
-- Maintain reusable prompt presets for recurring styles and workflows.
+## What is included
 
-## Current status
-
-This project is in active `0.9.x` productization work. The core generate/edit pipeline, SSE status updates, productized Create Studio, Asset Library with generated thumbnails, prompt workflows, mask editing, persisted Canvas projects, backend-prefixed storage keys, provider secret encryption, one-shot legacy key migration, and browser E2E smoke tests are implemented. S3/R2/MinIO remote-object adapters are implemented and configurable; single-VPS deployments can continue using local storage until object-storage credentials are configured.
-
-Implemented:
-
-- Next.js web UI with a dark studio AppShell, Create Studio, Edit workspace, Asset Library, Tasks, Task Detail, Provider control center, Prompts, Ops, Settings, and Canvas.
-- NestJS API with provider, task, gallery, asset, and prompt modules.
-- PostgreSQL schema for providers, generation tasks, image assets, canvas projects/nodes/edges, and prompt presets.
-- Redis/BullMQ worker for async image generation and editing.
-- SSE task updates with polling fallback.
-- Local image upload, asset serving, metadata extraction, generated WebP thumbnails, and S3/R2/MinIO-compatible storage key contracts.
-- Provider diagnostics, encrypted provider secrets, one-shot legacy plaintext key migration, and error classification for common upstream failures.
-- Persisted React Flow canvas projects, Canvas Dock/Inspector workflow, and Konva mask editor.
-
-Planned:
-
-- Canvas run history with node-level execution state, rerun/replay, and live output thumbnails.
-- Multi-user hardening beyond workspace/session groundwork, if public team access is required.
-
-## Architecture
-
-```text
-apps/web  ──HTTP──>  apps/api  ──Prisma──> PostgreSQL
-   │                    │
-   │                    ├─BullMQ──> Redis
-   │                    │
-   │                    ├─Worker──> OpenAI-compatible image provider
-   │                    │
-   │                    └─Storage──> local filesystem data/uploads or S3-compatible object keys
-   │
-   └─Next.js UI: Create Studio, Edit, Asset Library, Tasks, Providers, Prompts, Canvas, Ops
-```
-
-## Stack
-
-- **Web:** Next.js, React, TypeScript
-- **API:** NestJS, TypeScript
-- **Database:** PostgreSQL, Prisma
-- **Queue:** Redis, BullMQ
-- **Storage:** Local filesystem with S3/R2/MinIO-compatible key contract
-- **Image utilities:** Sharp
-- **Monorepo tooling:** pnpm, Turborepo
-- **Canvas:** React Flow, Konva
-- **Testing:** Vitest, Node test runner, Playwright
-- **Deployment target:** Docker Compose and reverse proxy/Nginx
+- **Create Studio**: generate, edit, reference image, mask, prompt variants, version/source lineage, before/after comparison, and `@image(storageKey)` reference extraction.
+- **Realtime tasks**: Server-Sent Events for task progress with polling fallback.
+- **Provider routing**: OpenAI-compatible image routes, validation, provider health/quota views, and encrypted provider API keys.
+- **Asset Library 2.0**: search, filters, thumbnails, lightbox/detail, collections, tags/favorites/ratings, lineage, manifest/ZIP download, and reusable image references.
+- **Canvas workflows**: React Flow projects, templates, template-to-project, run records, node execution state, rerun/replay, Agent next-step suggestions, and live result thumbnails.
+- **Prompt Library**: tags, style templates, history, local prompt enhancer, and optional provider-backed Agent enhancer.
+- **Mask workflow**: upload masks and draw masks in the browser with Konva.
+- **Storage**: local storage by default with S3/R2/MinIO-compatible backend support and local-to-remote migration status.
+- **Team and operations**: invite/session token UX, role checks, audit filter/export, queue controls, storage alerts, backup/restore/rollback helpers, health/version endpoints, and a CI quality-gate template.
 
 ## Repository layout
 
 ```text
 apps/
-  api/                 NestJS API, worker, Prisma schema
-  web/                 Next.js UI
+  api/                 NestJS API, Bull worker, Prisma schema/migrations
+  web/                 Next.js App Router UI
+  worker/              reserved worker package
 packages/
-  shared/              Shared request schemas and types
-  provider-sdk/        Provider routing and model capability helpers
-  image-utils/         Image metadata helpers
-infra/
-  docker-compose.yml   Local PostgreSQL and Redis infrastructure
+  schemas/             shared request/response schemas
+  provider-adapters/   provider routing/adapters
 docs/
-  architecture.md      Architecture notes
-  roadmap.md           Development roadmap
+  architecture.md      high-level architecture
+  operations.md        backup/restore/health/deploy/rollback runbooks
+  roadmap.md           completed and next roadmap slices
+scripts/
+  deploy-rabisu.sh     low-memory copy deploy for Rabisu
+  backup-rabisu.sh     remote backup helper
+  restore-rabisu-backup.sh
+  rollback-rabisu.sh
+infra/
+  docker-compose.yml   local Postgres/Redis helpers
 ```
 
 ## Prerequisites
 
-- Node.js 20+
-- pnpm 10+
-- Docker and Docker Compose for local PostgreSQL/Redis
-- An OpenAI-compatible image API provider key
+- Node.js 22+
+- pnpm 10.33+
+- PostgreSQL 16+
+- Redis 7+
+- Optional: S3/R2/MinIO credentials for remote object storage
 
-## Configuration
-
-Copy the example environment file and fill in provider credentials:
-
-```bash
-cp .env.example .env.local
-```
-
-Key variables:
-
-```env
-API_PORT=3100
-WEB_ORIGIN=http://localhost:3000
-DATABASE_URL=postgresql://image:***@localhost:5432/image_workbench
-REDIS_HOST=localhost
-REDIS_PORT=6379
-STORAGE_BACKEND=local
-STORAGE_DIR=./data/uploads
-STORAGE_BUCKET=image-workbench
-STORAGE_PUBLIC_BASE_URL=
-S3_ENDPOINT=
-S3_REGION=auto
-S3_ACCESS_KEY_ID=
-S3_SECRET_ACCESS_KEY=
-PROVIDER_SECRET_KEY=64_HEX_CHARS_FOR_AES_256_GCM
-WORKBENCH_ADMIN_TOKEN=optional_admin_token_for_api
-WORKBENCH_RATE_LIMIT_PER_MINUTE=240
-NEXT_PUBLIC_WORKBENCH_TOKEN=optional_session_token_for_internal_browser
-NEXT_PUBLIC_WORKSPACE_ID=default
-IMAGE_API_BASE=https://api.example.com/v1
-IMAGE_API_KEY=YOUR_PROVIDER_API_KEY
-IMAGE_MODEL=gpt-image-2
-```
-
-Notes:
-
-- Keep API keys server-side only. Do not expose provider keys to the browser.
-- `.env.local` is ignored by Git.
-- Provider records created in the UI are stored in the database. New and updated provider keys are encrypted-at-rest with AES-256-GCM and stored with an `enc:v1:` prefix; legacy plaintext values remain readable for migration compatibility.
-- Use `WORKBENCH_ADMIN_TOKEN` as the server-only bootstrap owner token. Browser users should open `Settings`, login with the bootstrap/session token, and then operate through the HttpOnly session cookie plus CSRF header.
-- Create narrower session tokens from `Settings` or `POST /auth/tokens`; avoid exposing the bootstrap token through `NEXT_PUBLIC_*` unless this is a trusted private deployment.
-- Open `Settings` to inspect the current auth context, save a browser token, and manage workspace session tokens.
-- Keep `STORAGE_BACKEND=local` on a single VPS unless R2/S3/MinIO credentials are ready; remote storage can be enabled through the S3-compatible variables above.
-
-## Local development
-
-Install dependencies:
+## Quick start
 
 ```bash
+cp .env.example .env
 pnpm install
-```
-
-Start PostgreSQL and Redis:
-
-```bash
-pnpm infra:up
-```
-
-Generate Prisma client and apply migrations:
-
-```bash
 pnpm db:generate
-pnpm db:migrate
-```
-
-Run API and web apps:
-
-```bash
+pnpm infra:up
+pnpm --filter @image-workbench/api prisma:migrate
 pnpm dev
-```
-
-Useful individual commands:
-
-```bash
-pnpm dev:api
-pnpm dev:web
 ```
 
 Default local URLs:
 
 - Web: `http://localhost:3000`
 - API: `http://localhost:3100`
+- Health: `http://localhost:3100/health/live`
 
-## Common workflows
-
-### Create or sync a provider
-
-1. Open `Providers`.
-2. Add a provider manually, or use the environment-provider seed action to sync from environment variables.
-3. Run the `/models` test to verify the base URL and key.
-4. Run the `/images/edits` probe to verify reference-image edit support.
-
-### Generate an image in Create Studio
-
-1. Open `Studio`.
-2. Enter prompt/model/size/quality/format/API mode.
-3. Submit the task.
-4. PreviewStage streams task status over SSE and shows the result image when complete.
-5. Use the image action toolbar for download, continued editing, Canvas handoff, or task diagnostics.
-
-### Edit with reference images
-
-1. Open `Edit`.
-2. Upload one or more reference images.
-3. Write the edit prompt.
-4. Optionally draw or upload a mask.
-5. Submit the edit task.
-6. PreviewStage streams `/tasks/:id/events`, renders returned images, and exposes download / continue-edit / Canvas actions.
-
-### Save a Canvas workflow
-
-1. Open `Canvas`.
-2. Use the Canvas Dock to add Prompt/Image/Task nodes and connect them.
-3. Use the right Inspector to edit project name, prompt text, image storage keys, model, size, and quality.
-4. Enter a project name and click `新建保存` or `保存项目`.
-5. Click `执行画布任务` to auto-save and run saved Task nodes; connected Prompt/Image nodes become generate/edit task inputs.
-6. Import/export JSON is available under a collapsed diagnostics-style panel so the main canvas stays visual.
-
-### Migrate legacy provider secrets
-
-After setting a stable production `PROVIDER_SECRET_KEY`, dry-run and then rewrite legacy plaintext provider keys:
+## Core environment
 
 ```bash
-pnpm --filter @image-workbench/api provider-secrets:migrate -- --dry-run
+DATABASE_URL=postgresql://workbench:workbench@localhost:5432/image_workbench
+REDIS_HOST=localhost
+REDIS_PORT=6379
+WORKBENCH_ADMIN_TOKEN=change-me
+PROVIDER_SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+IMAGE_API_MODE=auto
+STORAGE_BACKEND=local
+STORAGE_DIR=./data/uploads
+```
+
+Remote object storage uses the same application API:
+
+```bash
+STORAGE_BACKEND=s3       # s3, r2, or minio
+STORAGE_BUCKET=image-workbench
+S3_ENDPOINT=https://example.invalid
+S3_REGION=auto
+S3_ACCESS_KEY_ID=...
+S3_SECRET_ACCESS_KEY=...
+STORAGE_PUBLIC_BASE_URL= # optional CDN/base URL
+```
+
+Do not expose provider credentials or storage credentials through browser environment variables.
+
+## API highlights
+
+- `GET /health/live`, `/health/ready`, `/health/version`
+- `POST /tasks/generate`, `POST /tasks/edit`, `GET /tasks/:id/events`
+- `GET /gallery`, `GET /gallery/:id`, `POST /gallery/collections`, `GET /gallery/batch/download.zip`
+- `POST /assets/upload`, `POST /assets/upload/batch`, `GET /assets/status`, `POST /assets/migration/local-to-remote`
+- `GET/POST/PATCH /canvas-projects`, `POST /canvas-projects/:id/run`, `POST /canvas-projects/:id/runs/:runId/replay`
+- `POST /agent/suggestions`, `POST /agent/canvas/next-step`, `POST /agent/enhance`, `POST /agent/suggestions/:id/apply`
+- `GET /ops/queue/status`, `/ops/alerts`, `/ops/export/audit`
+
+## Verification
+
+Run the same quality gates used before deploy. A GitHub Actions template is available at `docs/ci/quality.yml`; copy it to `.github/workflows/quality.yml` using credentials that have GitHub `workflow` scope when enabling CI:
+
+```bash
+pnpm --filter @image-workbench/api prisma:generate
+pnpm --filter @image-workbench/api exec prisma validate --schema prisma/schema.prisma
+pnpm --filter @image-workbench/api test
+pnpm --filter @image-workbench/api typecheck
+pnpm --filter @image-workbench/web typecheck
+pnpm --filter @image-workbench/web test
+pnpm --filter @image-workbench/web test:e2e
+pnpm --filter @image-workbench/api build
+pnpm --filter @image-workbench/web build
+node apps/web/api-base.production.test.js
+bash -n scripts/*.sh
+```
+
+The production Web build must not contain browser calls to `localhost:3100`; `apps/web/api-base.production.test.js` guards this.
+
+## Production deployment: Rabisu
+
+Rabisu uses a copy-deploy model, not `git checkout` on the server. Build and verify locally, upload source/build artifacts, then switch the `current` symlink.
+
+```bash
+set -a; . /root/.vps-vault/credentials.env; set +a
+pnpm deploy:rabisu
+```
+
+The deploy script verifies API/Web locally, uploads artifacts, runs Prisma migration, restarts `image-workbench-api` and `image-workbench-web`, and checks API/Web/health loopback.
+
+Useful operational commands:
+
+```bash
+pnpm backup:rabisu
+RESTORE_MANIFEST=/opt/image-workbench/backups/data/latest-manifest.json pnpm restore:rabisu
+ROLLBACK_RELEASE=<release-basename> pnpm rollback:rabisu
+```
+
+See `docs/operations.md` for the full runbook.
+
+## Security model
+
+- Admin and session access use server-side bearer/cookie tokens.
+- Provider API keys are encrypted at rest when `PROVIDER_SECRET_KEY` is set.
+- Invite/session tokens are hashed before storage.
+- `/health/ready` is public but intentionally redacted: it reports readiness states, not paths, credentials, or provider secret fingerprints.
+- Gallery lineage and collection actions are workspace-scoped.
+- Destructive actions are surfaced through explicit confirmation flows.
+
+## Secret migration
+
+After setting a stable `PROVIDER_SECRET_KEY`, run the provider secret migration once from a trusted maintenance shell:
+
+```bash
 pnpm --filter @image-workbench/api provider-secrets:migrate
 ```
 
-The command skips existing `enc:v1:` values and only rewrites plaintext rows.
+Before migration:
 
-### Diagnose failures
+1. Take a fresh backup.
+2. Confirm the key is stable and stored in production secrets.
+3. Run the migration.
+4. Restart API workers.
+5. Create a provider validation task and confirm it succeeds.
 
-- `Tasks` shows queue status and recent task states with raw payloads tucked into Diagnostics.
-- `Task Detail` shows status, generated images, actions, and a Diagnostics panel for route metadata, request parameters, and raw image payloads.
-- Failed or cancelled tasks can be retried.
-- Queued tasks can be cancelled safely.
+## Development notes
 
-## API overview
-
-Main endpoints:
-
-- `POST /tasks/generate` — create an image generation task.
-- `POST /tasks/edit` — create a reference-image edit task.
-- `GET /tasks` — list recent tasks.
-- `GET /tasks/:id` — get task detail with images and diagnostics.
-- `GET /tasks/:id/events` — stream task snapshots with Server-Sent Events.
-- `POST /tasks/:id/retry` — requeue a failed/cancelled task.
-- `POST /tasks/:id/cancel` — cancel a queued task.
-- `GET /tasks/queue/status` — inspect queue and database status counts.
-- `GET /tasks/failed` — list failed/dead-letter style tasks.
-- `GET /auth/me`, `POST /auth/login`, `POST /auth/logout` — inspect/login/logout with bootstrap or session tokens.
-- `GET /auth/tokens`, `POST /auth/tokens`, `POST /auth/tokens/:id/revoke` — manage workspace session tokens.
-- `GET /workspaces`, `GET /workspaces/me`, `POST /workspaces` — inspect and create workspaces.
-- `GET /tasks/metrics/summary` — usage metrics by status/model and image storage totals.
-- `GET /audit-logs` — recent workspace-scoped audit events.
-- `POST /gallery/batch/delete` — batch delete image asset database rows.
-- `GET /prompts/history`, `PATCH /prompts/:id`, `GET /prompts/:id/versions`, `POST /prompts/:id/render` — prompt history, versioning, and template variables.
-- `POST /canvas-projects/:id/run` — execute saved canvas Task nodes and write task ids back to the graph.
-- `GET /gallery` — list recent image assets.
-- `GET /assets/file?key=***` — serve a stored image asset.
-- `POST /assets/upload` — upload a reference image.
-- `GET /canvas-projects` — list saved Canvas projects.
-- `POST /canvas-projects` — create a Canvas project with nodes and edges.
-- `GET /canvas-projects/:id` — open a saved Canvas project.
-- `PATCH /canvas-projects/:id` — replace Canvas project graph state.
-- `DELETE /canvas-projects/:id` — delete a saved Canvas project.
-- `GET /providers` — list provider profiles with capabilities and edit health.
-- `POST /providers` — create a provider profile.
-- `PATCH /providers/:id` — update provider profile fields.
-- `DELETE /providers/:id` — remove a provider profile.
-- `POST /providers/:id/test` — test provider `/models`.
-- `POST /providers/:id/test-edit` — test provider `/images/edits`.
-- `POST /providers/seed-env` — seed a provider from environment variables.
-
-## Quality checks
-
-Run type checks across the monorepo:
-
-```bash
-pnpm typecheck
-```
-
-Run package tests:
-
-```bash
-pnpm test
-```
-
-Build all apps/packages:
-
-```bash
-pnpm build
-```
-
-Run browser E2E smoke tests:
-
-```bash
-pnpm --filter @image-workbench/web test:e2e
-```
-
-Verify production browser chunks do not contain a localhost API fallback:
-
-```bash
-pnpm --filter @image-workbench/web build
-pnpm --filter @image-workbench/web test -- api-base.production.test.js
-```
-
-Deployment note: when frontend source changes, sync both `apps/web/lib/*` and a clean rebuilt `apps/web/.next/` directory. Do not overlay a stale `.next` build; stale chunks can make the browser call `http://localhost:3100` and produce `TypeError: Load failed`.
-
-## Security and operational notes
-
-- Never commit `.env`, `.env.local`, generated uploads, logs, or local runtime data.
-- Provider API keys must remain server-side and are encrypted-at-rest for new/updated database records.
-- Set a stable `PROVIDER_SECRET_KEY` before production writes; changing it makes existing `enc:v1:` keys undecryptable.
-- Generated assets are stored under `STORAGE_DIR` for `STORAGE_BACKEND=local`; back this directory up if image outputs are important.
-- Long-running tasks depend on Redis and the BullMQ worker being online.
-- Session roles are `owner`, `admin`, `operator`, and `viewer`; viewers are read-only, operators can run normal workflows, and admin/owner roles manage providers, workspaces, tokens, and deletes.
-- Workspace-scoped API requests use bearer tokens plus optional `x-workspace-id`; generated tasks/assets/prompts/canvases inherit the resolved workspace context.
-- Audit logs include workspace, actor label/role, token hash, IP, and user agent for high-risk operations.
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [Operations](docs/operations.md)
-- [Roadmap](docs/roadmap.md)
-- [Changelog](CHANGELOG.md)
+- Keep local development API base at `http://localhost:3100`.
+- Production routing should go through `/api` behind nginx; the production build guard catches regressions.
+- Use SSE first for task status, polling only as fallback.
+- Keep provider-specific private endpoints out of public docs.

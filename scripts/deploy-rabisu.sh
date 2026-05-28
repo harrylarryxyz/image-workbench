@@ -140,6 +140,9 @@ AUTH_ARGS=()
 if [[ -n "${WORKBENCH_ADMIN_TOKEN:-}" ]]; then
   AUTH_ARGS=(-H "Authorization: Bearer ${WORKBENCH_ADMIN_TOKEN}")
 fi
+LIVE_JSON=$(curl -fsS http://127.0.0.1:3100/health/live)
+READY_JSON=$(curl -fsS http://127.0.0.1:3100/health/ready)
+VERSION_JSON=$(curl -fsS http://127.0.0.1:3100/health/version)
 API_JSON=$(curl -fsS "${AUTH_ARGS[@]}" http://127.0.0.1:3100/tasks/queue/status)
 WEB_HTTP=$(curl -fsS -o /tmp/image-workbench-web-smoke.html -w '%{http_code}' http://127.0.0.1:3000/)
 CURRENT_REAL=$(readlink -f "${APP_ROOT}/current")
@@ -152,6 +155,9 @@ echo "backup=$BACKUP"
 echo "api=$(systemctl is-active image-workbench-api)"
 echo "web=$(systemctl is-active image-workbench-web)"
 echo "web=$WEB_HTTP"
+echo "health_live=${LIVE_JSON:0:160}"
+echo "health_ready=${READY_JSON:0:260}"
+echo "version=${VERSION_JSON:0:180}"
 echo "api_json=${API_JSON:0:220}"
 echo "pruned_releases=${#OLD_RELEASES[@]}"
 journalctl -u image-workbench-api -u image-workbench-web --since '2 minutes ago' --no-pager -p warning..alert | tail -80

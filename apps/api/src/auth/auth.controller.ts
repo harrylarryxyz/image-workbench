@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma.service';
 import { Public } from './public.decorator';
-import { getRequestContext, resolveRequestContext, tokenHash, type WorkbenchRole } from './request-context';
+import { getRequestContext, normalizeRole, tokenHash, type WorkbenchRole } from './request-context';
 
 function newToken() { return `iwb_${randomBytes(24).toString('base64url')}`; }
 function maskedHash(hash: string) { return `${hash.slice(0, 10)}…${hash.slice(-6)}`; }
@@ -64,11 +64,15 @@ export class AuthController {
   @Post('tokens')
   async createToken(@Body() body: any, @Req() req: Request) {
     const ctx = getRequestContext(req);
-    const role = String(body?.role ?? 'operator').toLowerCase() as WorkbenchRole;
+    const role = normalizeRole(body?.role ?? 'operator') as WorkbenchRole;
+    if (role === 'owner' && ctx.role !== 'owner') throw new UnauthorizedException('only owners can create owner tokens');
     const token = newToken();
     const workspaceId = ctx.role === 'owner' && body?.workspaceId ? String(body.workspaceId) : ctx.workspaceId;
-    const row = await this.prisma.userSession.create({ data: { workspaceId, tokenHash: tokenHash(token), label: body?.label ? String(body.label) : 'generated token', role, expiresAt: body?.expiresAt ? new Date(String(body.expiresAt)) : null } });
-    return { id: row.id, token, label: row.label, role: row.role, workspaceId: row.workspaceId };
+    const label = body?.label ? String(body.label) : `${role} invite`;
+    await this.prisma.workspace.upsert({ where: { id: workspaceId }, update: {}, create: { id: workspaceId, slug: workspaceId, name: workspaceId === 'default' ? 'Default Workspace' : workspaceId } });
+    const row = await this.prisma.userSession.create({ data: { workspaceId, tokenHash: tokenHash(token), label, role, expiresAt: body?.expiresAt ? new Date(String(body.expiresAt)) : null } });
+    const inviteUrl = `/settings?token=${encodeURIComponent(token)}&workspace=${encodeURIComponent(workspaceId)}`;
+    return { id: row.id, token, label: row.label, role: row.role, workspaceId: row.workspaceId, inviteUrl };
   }
 
   @Post('tokens/:id/revoke')

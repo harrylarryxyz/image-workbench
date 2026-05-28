@@ -70,7 +70,9 @@ export class ImageGenerationProcessor extends WorkerHost {
       const bytes = Uint8Array.from(Buffer.from(b64, 'base64'));
       const saved = await this.storage.putImage(bytes);
       const route = buildRouteMetadata({ requestedModel: model, resolvedModel: model, apiMode, endpoint, fallbackReason });
-      const imageCreate = this.toImageAssetCreate(saved, request.prompt, task.workspaceId);
+      const refKeys = Array.isArray((task.paramsJson as any)?.refKeys) ? (task.paramsJson as any).refKeys.map(String) : [];
+      const sourceAsset = refKeys.length ? await this.prisma.imageAsset.findFirst({ where: { storageKey: { in: refKeys }, ...(task.workspaceId ? { workspaceId: task.workspaceId } : {}) }, select: { id: true } }) : null;
+      const imageCreate = this.toImageAssetCreate(saved, request.prompt, task.workspaceId, sourceAsset?.id);
       await this.prisma.generationTask.update({
         where: { id: task.id },
         data: { status: 'SUCCEEDED', routeJson: route as any, elapsedMs: Date.now() - started, images: { create: imageCreate } },
@@ -161,7 +163,7 @@ export class ImageGenerationProcessor extends WorkerHost {
     return null;
   }
 
-  private toImageAssetCreate(saved: any, prompt: string, workspaceId?: string | null) {
+  private toImageAssetCreate(saved: any, prompt: string, workspaceId?: string | null, sourceAssetId?: string | null) {
     const metadataJson = {
       backend: saved.backend,
       assetUrl: saved.assetUrl,
@@ -177,6 +179,7 @@ export class ImageGenerationProcessor extends WorkerHost {
       sha256: saved.sha256,
       prompt,
       workspaceId: workspaceId ?? undefined,
+      sourceAssetId: sourceAssetId ?? undefined,
       metadataJson,
     };
   }

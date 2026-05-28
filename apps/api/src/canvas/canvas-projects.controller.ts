@@ -1,173 +1,234 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { PrismaService } from '../prisma.service';
 import { TasksService } from '../tasks/tasks.service';
-import { getRequestContext, type RequestContext } from '../auth/request-context';
+import { getRequestContext } from '../auth/request-context';
 
-type FlowNode = { id: string; type?: string; position?: { x?: number; y?: number }; data?: unknown };
-type FlowEdge = { id: string; source: string; target: string; type?: string; data?: unknown; label?: unknown };
-type CanvasBody = { name?: string; description?: string | null; nodes?: FlowNode[]; edges?: FlowEdge[]; isTemplate?: boolean };
+type FlowNode = { id: string; type?: string; position?: { x?: number; y?: number }; data?: Record<string, any> };
+type FlowEdge = { id: string; source: string; target: string; type?: string; data?: Record<string, any> | null; label?: string };
 
-function toNodeCreate(node: FlowNode) {
-  return { id: String(node.id), type: String(node.type ?? 'default'), positionX: Number(node.position?.x ?? 0), positionY: Number(node.position?.y ?? 0), dataJson: (node.data ?? {}) as any };
-}
-
-function toEdgeCreate(edge: FlowEdge) {
-  const data = edge.data ?? (edge.label !== undefined ? { label: edge.label } : null);
-  return { id: String(edge.id), sourceNodeId: String(edge.source), targetNodeId: String(edge.target), type: String(edge.type ?? 'default'), dataJson: data as any };
-}
-
-function serializeProject(row: any) {
+function serializeProject(project: any) {
   return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    isTemplate: row.isTemplate,
-    createdAt: row.createdAt?.toISOString?.() ?? row.createdAt,
-    updatedAt: row.updatedAt?.toISOString?.() ?? row.updatedAt,
-    nodes: (row.nodes ?? []).map((node: any) => ({ id: node.id, type: node.type, position: { x: node.positionX, y: node.positionY }, data: node.dataJson })),
-    edges: (row.edges ?? []).map((edge: any) => ({ id: edge.id, source: edge.sourceNodeId, target: edge.targetNodeId, type: edge.type, data: edge.dataJson ?? undefined, ...(edge.dataJson?.label ? { label: edge.dataJson.label } : {}) })),
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    isTemplate: Boolean(project.isTemplate),
+    createdAt: project.createdAt?.toISOString?.() ?? project.createdAt,
+    updatedAt: project.updatedAt?.toISOString?.() ?? project.updatedAt,
+    nodes: (project.nodes ?? []).map((node: any) => ({ id: node.id, type: node.type, position: { x: node.positionX, y: node.positionY }, data: node.dataJson ?? {} })),
+    edges: (project.edges ?? []).map((edge: any) => ({ id: edge.id, source: edge.sourceNodeId, target: edge.targetNodeId, type: edge.type, data: edge.dataJson ?? undefined, label: edge.dataJson?.label })),
   };
 }
 
-const includeGraph = { nodes: { orderBy: { createdAt: 'asc' as const } }, edges: { orderBy: { id: 'asc' as const } } };
-
-
-function normalizeStorageRef(value: unknown) {
-  const text = String(value ?? '').trim();
-  if (!text) return '';
-  if (/^(?:local|s3|r2|minio):\/\//.test(text)) return text;
-  const keyMatch = text.match(/[?&]key=([^&\s]+)/);
-  if (keyMatch) return decodeURIComponent(keyMatch[1]);
-  return text.includes('://') ? text : '';
-}
-
-function topoTaskNodes(nodes: Array<{ id: string; data?: any }>, edges: Array<{ source: string; target: string }>) {
-  const taskIds = new Set(nodes.filter((node) => node.id.startsWith('task') || String(node.data?.label ?? '').toLowerCase().startsWith('task')).map((node) => node.id));
-  if (!taskIds.size) for (const node of nodes.filter((node) => node.id.startsWith('prompt')).slice(0, 1)) taskIds.add(node.id);
-  const indegree = new Map<string, number>();
-  for (const id of taskIds) indegree.set(id, 0);
-  for (const edge of edges) if (taskIds.has(edge.target) && taskIds.has(edge.source)) indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1);
-  const queue = [...indegree.entries()].filter(([, degree]) => degree === 0).map(([id]) => id);
-  const ordered: string[] = [];
-  while (queue.length) {
-    const id = queue.shift()!;
-    ordered.push(id);
-    for (const edge of edges.filter((item) => item.source === id && taskIds.has(item.target))) {
-      indegree.set(edge.target, (indegree.get(edge.target) ?? 0) - 1);
-      if (indegree.get(edge.target) === 0) queue.push(edge.target);
-    }
-  }
-  return ordered.length ? ordered.map((id) => nodes.find((node) => node.id === id)!).filter(Boolean) : nodes.filter((node) => taskIds.has(node.id));
+function flowNodesFromProject(project: any): FlowNode[] { return serializeProject(project).nodes; }
+function flowEdgesFromProject(project: any): FlowEdge[] { return serializeProject(project).edges; }
+function nodePrompt(node?: FlowNode) { return String(node?.data?.prompt ?? node?.data?.label ?? '').split('\n').filter(Boolean).slice(-1)[0] ?? ''; }
+function nodeKind(node: FlowNode) {
+  const explicit = String(node.data?.kind ?? node.type ?? '').toLowerCase();
+  if (explicit.includes('image') || node.id.startsWith('image')) return 'image';
+  if (explicit.includes('prompt') || explicit.includes('text') || node.id.startsWith('prompt')) return 'prompt';
+  if (explicit.includes('task') || explicit.includes('generation') || node.id.startsWith('task')) return 'task';
+  return 'node';
 }
 
 @Controller('canvas-projects')
 export class CanvasProjectsController {
   constructor(private readonly prisma: PrismaService, private readonly tasks?: TasksService) {}
 
+  private include = { nodes: true, edges: true };
+
   @Get('templates')
   async templates(@Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    const rows = await this.prisma.canvasProject.findMany({ where: { isTemplate: true, workspaceId: ctx.workspaceId }, orderBy: { updatedAt: 'desc' }, include: includeGraph });
+    const rows = await this.prisma.canvasProject.findMany({ where: { workspaceId: ctx.workspaceId, isTemplate: true }, orderBy: { updatedAt: 'desc' }, take: 50, include: this.include });
     return rows.map(serializeProject);
   }
 
-  @Get()
-  async list(@Req() req: Request = {} as any) {
+  @Post('templates/:id/use')
+  async useTemplate(@Param('id') id: string, @Body() body: any = {}, @Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    const rows = await this.prisma.canvasProject.findMany({ where: { workspaceId: ctx.workspaceId }, orderBy: { updatedAt: 'desc' }, include: includeGraph });
+    const template = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId, isTemplate: true }, include: this.include });
+    if (!template) throw new NotFoundException('template not found');
+    const suffix = Date.now();
+    const remap = (value: string) => `${value}-${suffix}`;
+    const created = await this.prisma.canvasProject.create({ data: {
+      name: body?.name ? String(body.name) : `${template.name} copy`,
+      description: template.description,
+      workspaceId: ctx.workspaceId,
+      isTemplate: false,
+      nodes: { create: flowNodesFromProject(template).map((node) => ({ id: remap(node.id), type: node.type ?? 'default', positionX: Number(node.position?.x ?? 0), positionY: Number(node.position?.y ?? 0), dataJson: node.data ?? {} })) },
+      edges: { create: flowEdgesFromProject(template).map((edge) => ({ id: remap(edge.id), sourceNodeId: remap(edge.source), targetNodeId: remap(edge.target), type: edge.type ?? 'default', dataJson: edge.data ?? {} })) },
+    }, include: this.include });
+    return serializeProject(created);
+  }
+
+  @Get()
+  async list(@Query('templates') templates: string | undefined, @Req() req: Request = {} as any) {
+    const ctx = getRequestContext(req);
+    const rows = await this.prisma.canvasProject.findMany({ where: { workspaceId: ctx.workspaceId, ...(templates === '1' ? { isTemplate: true } : {}) }, orderBy: { updatedAt: 'desc' }, take: 100, include: this.include });
     return rows.map(serializeProject);
+  }
+
+  @Post()
+  async create(@Body() body: any, @Req() req: Request = {} as any) {
+    const ctx = getRequestContext(req);
+    const nodes: FlowNode[] = Array.isArray(body?.nodes) ? body.nodes : [];
+    const edges: FlowEdge[] = Array.isArray(body?.edges) ? body.edges : [];
+    const created = await this.prisma.canvasProject.create({ data: {
+      name: body?.name ? String(body.name) : 'Untitled canvas',
+      description: body?.description ? String(body.description) : null,
+      workspaceId: ctx.workspaceId,
+      isTemplate: Boolean(body?.isTemplate),
+      nodes: { create: nodes.map((node) => ({ id: node.id, type: node.type ?? 'default', positionX: Number(node.position?.x ?? 0), positionY: Number(node.position?.y ?? 0), dataJson: node.data ?? {} })) },
+      edges: { create: edges.map((edge) => ({ id: edge.id, sourceNodeId: edge.source, targetNodeId: edge.target, type: edge.type ?? 'default', dataJson: edge.data ?? (edge.label ? { label: edge.label } : undefined) })) },
+    }, include: this.include });
+    return serializeProject(created);
   }
 
   @Get(':id')
   async get(@Param('id') id: string, @Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    const row = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, include: includeGraph });
+    const row = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, include: this.include });
     if (!row) throw new NotFoundException('canvas project not found');
-    return serializeProject(row);
-  }
-
-  @Post()
-  async create(@Body() body: CanvasBody, @Req() req: Request = {} as any) {
-    const ctx = getRequestContext(req);
-    const row = await this.prisma.canvasProject.create({ data: { name: String(body.name ?? 'Untitled canvas').trim() || 'Untitled canvas', description: body.description ?? null, isTemplate: Boolean(body.isTemplate), workspaceId: ctx.workspaceId, nodes: { create: (body.nodes ?? []).map(toNodeCreate) }, edges: { create: (body.edges ?? []).map(toEdgeCreate) } }, include: includeGraph });
     return serializeProject(row);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: CanvasBody, @Req() req: Request = {} as any) {
+  async update(@Param('id') id: string, @Body() body: any, @Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    return this.updateScoped(id, body, ctx);
-  }
-
-  private async updateScoped(id: string, body: CanvasBody, ctx: RequestContext) {
     const existing = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, select: { id: true } });
     if (!existing) throw new NotFoundException('canvas project not found');
-    const data: any = {};
-    if (body.name !== undefined) data.name = String(body.name).trim() || 'Untitled canvas';
-    if (body.description !== undefined) data.description = body.description;
-    if (body.isTemplate !== undefined) data.isTemplate = Boolean(body.isTemplate);
-    if (body.nodes !== undefined) data.nodes = { deleteMany: {}, create: body.nodes.map(toNodeCreate) };
-    if (body.edges !== undefined) data.edges = { deleteMany: {}, create: body.edges.map(toEdgeCreate) };
-    const row = await this.prisma.canvasProject.update({ where: { id }, data, include: includeGraph });
+    const data: any = {
+      name: body?.name ? String(body.name) : undefined,
+      description: body?.description === undefined ? undefined : String(body.description || ''),
+      isTemplate: body?.isTemplate === undefined ? undefined : Boolean(body.isTemplate),
+    };
+    if (Array.isArray(body?.nodes)) {
+      const nodes: FlowNode[] = body.nodes;
+      data.nodes = { deleteMany: {}, create: nodes.map((node) => ({ id: node.id, type: node.type ?? 'default', positionX: Number(node.position?.x ?? 0), positionY: Number(node.position?.y ?? 0), dataJson: node.data ?? {} })) };
+    }
+    if (Array.isArray(body?.edges)) {
+      const edges: FlowEdge[] = body.edges;
+      data.edges = { deleteMany: {}, create: edges.map((edge) => ({ id: edge.id, sourceNodeId: edge.source, targetNodeId: edge.target, type: edge.type ?? 'default', dataJson: edge.data ?? (edge.label ? { label: edge.label } : undefined) })) };
+    }
+    const row = await this.prisma.canvasProject.update({ where: { id }, data, include: this.include });
     return serializeProject(row);
   }
 
-  @Post(':id/snapshots')
-  async snapshot(@Param('id') id: string, @Body() body: any, @Req() req: Request = {} as any) {
+  @Delete(':id')
+  async delete(@Param('id') id: string, @Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    const row = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, include: includeGraph });
-    if (!row) throw new NotFoundException('canvas project not found');
-    const serialized = serializeProject(row);
-    return this.prisma.canvasSnapshot.create({ data: { projectId: id, label: body?.label ? String(body.label) : null, nodesJson: serialized.nodes as any, edgesJson: serialized.edges as any } });
+    const result = await this.prisma.canvasProject.deleteMany({ where: { id, workspaceId: ctx.workspaceId } });
+    return { ok: result.count > 0, id };
   }
 
-  @Get(':id/snapshots')
-  async snapshots(@Param('id') id: string, @Req() req: Request = {} as any) {
+  @Get(':id/runs')
+  async runs(@Param('id') id: string, @Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    const project = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, select: { id: true } });
-    if (!project) throw new NotFoundException('canvas project not found');
-    return this.prisma.canvasSnapshot.findMany({ where: { projectId: id }, orderBy: { createdAt: 'desc' }, take: 50 });
+    const rows = await (this.prisma as any).canvasRun.findMany({ where: { projectId: id, workspaceId: ctx.workspaceId }, orderBy: { createdAt: 'desc' }, take: 30, include: { nodes: { include: { task: { include: { images: true } } } } } });
+    const reconciled = await Promise.all(rows.map((run: any) => this.reconcileRun(run)));
+    return reconciled.map((run: any) => this.serializeRun(run));
   }
 
   @Post(':id/run')
-  async run(@Param('id') id: string, @Req() req: Request = {} as any) {
+  async run(@Param('id') id: string, @Body() body: any = {}, @Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    const row = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, include: includeGraph });
-    if (!row) throw new NotFoundException('canvas project not found');
-    if (!this.tasks) throw new Error('tasks service unavailable');
-    const serialized = serializeProject(row);
-    const nodes = serialized.nodes as Array<{ id: string; data?: any }>;
-    const edges = serialized.edges as Array<{ source: string; target: string }>;
-    const taskNodes = topoTaskNodes(nodes, edges);
-    const created: Array<{ nodeId: string; taskId: string; status: string }> = [];
-    const nodeOutputRefs = new Map<string, string>();
-    for (const taskNode of taskNodes) {
-      const upstream = edges.filter((edge) => edge.target === taskNode.id).map((edge) => nodes.find((node) => node.id === edge.source)).filter(Boolean) as any[];
-      const promptNode = upstream.find((node) => String(node.id).startsWith('prompt')) ?? nodes.find((node) => String(node.id).startsWith('prompt')) ?? taskNode;
-      const explicitRefs = upstream.filter((node) => String(node.id).startsWith('image')).map((node) => normalizeStorageRef(node.data?.storageKey ?? String(node.data?.label ?? '').split('\n').at(-1))).filter(Boolean);
-      const generatedRefs = upstream.map((node) => nodeOutputRefs.get(node.id)).filter(Boolean) as string[];
-      const imageRefs = [...explicitRefs, ...generatedRefs];
-      const label = String(promptNode.data?.prompt ?? promptNode.data?.label ?? '');
-      const prompt = label.split('\n').slice(1).join('\n').trim() || label || 'Canvas generated image';
-      const createdTask = imageRefs.length
-        ? await this.tasks.createEditTask({ prompt, refKeys: imageRefs, model: taskNode.data?.model ?? 'gpt-image-2', size: taskNode.data?.size ?? '1024x1024', quality: taskNode.data?.quality ?? 'low', format: taskNode.data?.format ?? 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 }, ctx)
-        : await this.tasks.createGenerateTask({ prompt, model: taskNode.data?.model ?? 'gpt-image-2', size: taskNode.data?.size ?? '1024x1024', quality: taskNode.data?.quality ?? 'low', format: taskNode.data?.format ?? 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 }, ctx);
-      created.push({ nodeId: taskNode.id, taskId: createdTask.id, status: createdTask.status });
-      nodeOutputRefs.set(taskNode.id, `task://${createdTask.id}`);
-    }
-    const nextNodes = serialized.nodes.map((node: any) => {
-      const match = created.find((item) => item.nodeId === node.id);
-      return match ? { ...node, data: { ...(node.data ?? {}), taskId: match.taskId, status: match.status } } : node;
-    });
-    await this.updateScoped(id, { nodes: nextNodes, edges: serialized.edges }, ctx);
-    return { projectId: id, created };
+    const project = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, include: this.include });
+    if (!project) throw new NotFoundException('canvas project not found');
+    return this.executeRun(project, ctx, { label: body?.label ? String(body.label) : undefined, targetNodeIds: Array.isArray(body?.nodeIds) ? body.nodeIds.map(String) : undefined });
   }
 
-  @Delete(':id')
-  async remove(@Param('id') id: string, @Req() req: Request = {} as any) {
+  @Post(':id/run/:nodeId')
+  async rerunNode(@Param('id') id: string, @Param('nodeId') nodeId: string, @Req() req: Request = {} as any) {
     const ctx = getRequestContext(req);
-    const result = await this.prisma.canvasProject.deleteMany({ where: { id, workspaceId: ctx.workspaceId } });
-    return { ok: result.count === 1 };
+    const project = await this.prisma.canvasProject.findFirst({ where: { id, workspaceId: ctx.workspaceId }, include: this.include });
+    if (!project) throw new NotFoundException('canvas project not found');
+    return this.executeRun(project, ctx, { label: `rerun ${nodeId}`, targetNodeIds: [nodeId] });
+  }
+
+  @Post(':id/runs/:runId/replay')
+  async replay(@Param('id') id: string, @Param('runId') runId: string, @Req() req: Request = {} as any) {
+    const ctx = getRequestContext(req);
+    const run = await (this.prisma as any).canvasRun.findFirst({ where: { id: runId, projectId: id, workspaceId: ctx.workspaceId } });
+    if (!run) throw new NotFoundException('canvas run not found');
+    const pseudoProject = { id, nodes: (run.nodesJson as any[]).map((node) => ({ id: node.id, type: node.type, positionX: node.position?.x ?? 0, positionY: node.position?.y ?? 0, dataJson: node.data ?? {} })), edges: (run.edgesJson as any[]).map((edge) => ({ id: edge.id, sourceNodeId: edge.source, targetNodeId: edge.target, type: edge.type, dataJson: edge.data ?? {} })) };
+    return this.executeRun(pseudoProject, ctx, { label: `replay ${runId}` });
+  }
+
+  private async executeRun(project: any, ctx: any, options: { label?: string; targetNodeIds?: string[] } = {}) {
+    if (!this.tasks) throw new Error('TasksService is not available');
+    const nodes = flowNodesFromProject(project);
+    const edges = flowEdgesFromProject(project);
+    const run = await (this.prisma as any).canvasRun.create({ data: { projectId: project.id, workspaceId: ctx.workspaceId, status: 'RUNNING', label: options.label ?? null, nodesJson: nodes as any, edgesJson: edges as any } });
+    const targets = nodes.filter((node) => nodeKind(node) === 'task' && (!options.targetNodeIds?.length || options.targetNodeIds.includes(node.id)));
+    const created: any[] = [];
+    for (const target of targets) {
+      const incoming = edges.filter((edge) => edge.target === target.id).map((edge) => nodes.find((node) => node.id === edge.source)).filter(Boolean) as FlowNode[];
+      const promptNode = incoming.find((node) => nodeKind(node) === 'prompt') ?? nodes.find((node) => nodeKind(node) === 'prompt');
+      const imageNodes = incoming.filter((node) => nodeKind(node) === 'image');
+      const refKeys = imageNodes.map((node) => String(node.data?.storageKey ?? '')).filter(Boolean);
+      const prompt = String(target.data?.prompt ?? nodePrompt(promptNode) ?? 'Create a refined image variation.');
+      const payload = { prompt, model: target.data?.model ?? 'gpt-image-2', size: target.data?.size ?? '1024x1024', quality: target.data?.quality ?? 'low', format: target.data?.format ?? 'png', apiMode: target.data?.apiMode ?? 'auto', count: 1, timeoutSec: Number(target.data?.timeoutSec ?? 600), ...(refKeys.length ? { refKeys, maskKey: target.data?.maskKey } : {}) };
+      const runNode = await (this.prisma as any).canvasRunNode.create({ data: { runId: run.id, nodeId: target.id, status: 'QUEUED', inputJson: payload as any } });
+      try {
+        const task = refKeys.length ? await this.tasks.createEditTask(payload, ctx) : await this.tasks.createGenerateTask(payload, ctx);
+        await (this.prisma as any).canvasRunNode.update({ where: { id: runNode.id }, data: { taskId: task.id, status: task.status ?? 'QUEUED', outputJson: task as any } });
+        created.push({ nodeId: target.id, runNodeId: runNode.id, taskId: task.id, status: task.status, type: refKeys.length ? 'image.edit' : 'image.generate' });
+      } catch (error) {
+        await (this.prisma as any).canvasRunNode.update({ where: { id: runNode.id }, data: { status: 'FAILED', errorMessage: error instanceof Error ? error.message : String(error) } });
+        created.push({ nodeId: target.id, runNodeId: runNode.id, status: 'FAILED', error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    const status = created.some((item) => item.status === 'FAILED') ? 'FAILED' : created.length ? 'RUNNING' : 'SUCCEEDED';
+    const updated = await (this.prisma as any).canvasRun.update({ where: { id: run.id }, data: { status, completedAt: status === 'SUCCEEDED' || status === 'FAILED' ? new Date() : null }, include: { nodes: { include: { task: { include: { images: true } } } } } });
+    await this.prisma.canvasProject.update({ where: { id: project.id }, data: { updatedAt: new Date() } }).catch(() => undefined);
+    return { ...this.serializeRun(updated), projectId: project.id, created };
+  }
+
+
+  private taskStatusForRun(status?: string) {
+    if (status === 'SUCCEEDED' || status === 'FAILED' || status === 'CANCELLED') return status;
+    if (status === 'QUEUED' || status === 'RUNNING') return status;
+    return 'RUNNING';
+  }
+
+  private async reconcileRun(run: any) {
+    const nodes = run.nodes ?? [];
+    const reconciledNodes = [];
+    for (const node of nodes) {
+      const taskStatus = this.taskStatusForRun(node.task?.status ?? node.status);
+      const images = node.task?.images ?? [];
+      const outputJson = node.task ? { ...(node.outputJson ?? {}), taskId: node.task.id, status: node.task.status, images: images.map((image: any) => ({ id: image.id, storageKey: image.storageKey, thumbnailKey: image.thumbnailKey })) } : node.outputJson;
+      let current = { ...node, status: taskStatus, outputJson };
+      if (taskStatus !== node.status || (node.task && JSON.stringify(outputJson) !== JSON.stringify(node.outputJson ?? {}))) {
+        current = await (this.prisma as any).canvasRunNode.update({ where: { id: node.id }, data: { status: taskStatus, outputJson: outputJson as any }, include: { task: { include: { images: true } } } }).catch(() => current);
+      }
+      reconciledNodes.push(current);
+    }
+    const statuses = reconciledNodes.map((node: any) => node.status);
+    const finalStatus = !statuses.length ? 'SUCCEEDED'
+      : statuses.some((status: string) => status === 'QUEUED' || status === 'RUNNING') ? 'RUNNING'
+        : statuses.some((status: string) => status === 'FAILED') ? 'FAILED'
+          : statuses.some((status: string) => status === 'CANCELLED') ? 'CANCELLED'
+            : 'SUCCEEDED';
+    let nextRun = { ...run, nodes: reconciledNodes, status: finalStatus };
+    const terminal = finalStatus === 'SUCCEEDED' || finalStatus === 'FAILED' || finalStatus === 'CANCELLED';
+    if (run.status !== finalStatus || (terminal && !run.completedAt)) {
+      nextRun = await (this.prisma as any).canvasRun.update({ where: { id: run.id }, data: { status: finalStatus, completedAt: terminal ? (run.completedAt ?? new Date()) : null }, include: { nodes: { include: { task: { include: { images: true } } } } } }).catch(() => nextRun);
+    }
+    return nextRun;
+  }
+
+  private serializeRun(run: any) {
+    return {
+      id: run.id,
+      projectId: run.projectId,
+      label: run.label,
+      status: run.status,
+      createdAt: run.createdAt?.toISOString?.() ?? run.createdAt,
+      updatedAt: run.updatedAt?.toISOString?.() ?? run.updatedAt,
+      completedAt: run.completedAt?.toISOString?.() ?? run.completedAt,
+      nodes: (run.nodes ?? []).map((node: any) => ({ id: node.id, nodeId: node.nodeId, status: node.status, taskId: node.taskId, input: node.inputJson, output: node.outputJson, errorMessage: node.errorMessage, images: (node.task?.images ?? []).map((image: any) => ({ id: image.id, storageKey: image.storageKey, thumbnailUrl: image.thumbnailKey ? `/assets/file?key=${encodeURIComponent(image.thumbnailKey)}` : undefined, assetUrl: `/assets/file?key=${encodeURIComponent(image.storageKey)}` })) })),
+    };
   }
 }

@@ -8,6 +8,7 @@ const nav = [
   ['Studio', '/'],
   ['Assets', '/gallery'],
   ['Canvas', '/canvas'],
+  ['Agent', '/agent'],
   ['Prompts', '/prompts'],
   ['Tasks', '/tasks'],
   ['Providers', '/providers'],

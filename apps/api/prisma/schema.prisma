@@ -29,46 +29,48 @@ enum TaskStatus {
 }
 
 model Workspace {
-  id        String @id @default(cuid())
-  slug      String @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  users     UserSession[]
-  providers ProviderProfile[]
-  tasks     GenerationTask[]
-  assets    ImageAsset[]
-  prompts   PromptPreset[]
-  canvases  CanvasProject[]
+  id               String            @id @default(cuid())
+  slug             String            @unique
+  name             String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  users            UserSession[]
+  providers        ProviderProfile[]
+  tasks            GenerationTask[]
+  assets           ImageAsset[]
+  collections      ImageCollection[]
+  prompts          PromptPreset[]
+  canvases         CanvasProject[]
+  agentSuggestions AgentSuggestion[]
 }
 
 model UserSession {
-  id          String @id @default(cuid())
+  id          String    @id @default(cuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  tokenHash   String @unique
+  tokenHash   String    @unique
   label       String?
-  role        String @default("admin")
-  createdAt   DateTime @default(now())
+  role        String    @default("admin")
+  createdAt   DateTime  @default(now())
   lastSeenAt  DateTime?
   expiresAt   DateTime?
   revokedAt   DateTime?
 }
 
 model ProviderProfile {
-  id              String   @id @default(cuid())
+  id              String           @id @default(cuid())
   name            String
-  type            ProviderType @default(OPENAI_COMPATIBLE)
+  type            ProviderType     @default(OPENAI_COMPATIBLE)
   baseUrl         String
   apiKeyEncrypted String
   defaultModel    String
-  apiMode         ApiMode @default(AUTO)
-  enabled         Boolean @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  apiMode         ApiMode          @default(AUTO)
+  enabled         Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   tasks           GenerationTask[]
   workspaceId     String?
-  workspace       Workspace? @relation(fields: [workspaceId], references: [id])
+  workspace       Workspace?       @relation(fields: [workspaceId], references: [id])
 }
 
 model AuditLog {
@@ -87,77 +89,105 @@ model AuditLog {
 }
 
 model GenerationTask {
-  id              String @id @default(cuid())
-  type            String @default("image.generate")
-  status          TaskStatus @default(QUEUED)
-  providerId      String?
-  provider        ProviderProfile? @relation(fields: [providerId], references: [id])
-  model           String
-  prompt          String
-  paramsJson      Json
-  routeJson       Json?
-  diagnosticsJson Json?
-  errorCode       String?
-  errorMessage    String?
-  elapsedMs       Int?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  images          ImageAsset[]
-  workspaceId     String?
-  workspace       Workspace? @relation(fields: [workspaceId], references: [id])
-  estimatedCostUsd Decimal? @db.Decimal(10, 6)
+  id               String           @id @default(cuid())
+  type             String           @default("image.generate")
+  status           TaskStatus       @default(QUEUED)
+  providerId       String?
+  provider         ProviderProfile? @relation(fields: [providerId], references: [id])
+  model            String
+  prompt           String
+  paramsJson       Json
+  routeJson        Json?
+  diagnosticsJson  Json?
+  errorCode        String?
+  errorMessage     String?
+  elapsedMs        Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  images           ImageAsset[]
+  canvasRunNodes   CanvasRunNode[]
+  workspaceId      String?
+  workspace        Workspace?       @relation(fields: [workspaceId], references: [id])
+  estimatedCostUsd Decimal?         @db.Decimal(10, 6)
 }
 
 model ImageAsset {
-  id             String @id @default(cuid())
-  taskId         String
-  task           GenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  storageKey     String
-  thumbnailKey   String?
-  width          Int?
-  height         Int?
-  format         String
-  sizeBytes      Int
-  sha256         String
-  prompt         String?
-  revisedPrompt  String?
-  metadataJson   Json?
-  createdAt      DateTime @default(now())
-  workspaceId    String?
-  workspace      Workspace? @relation(fields: [workspaceId], references: [id])
-  favorite       Boolean @default(false)
-  rating         Int?
-  tags           String[]
+  id              String                @id @default(cuid())
+  taskId          String
+  task            GenerationTask        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  storageKey      String
+  thumbnailKey    String?
+  width           Int?
+  height          Int?
+  format          String
+  sizeBytes       Int
+  sha256          String
+  prompt          String?
+  revisedPrompt   String?
+  metadataJson    Json?
+  createdAt       DateTime              @default(now())
+  workspaceId     String?
+  workspace       Workspace?            @relation(fields: [workspaceId], references: [id])
+  favorite        Boolean               @default(false)
+  rating          Int?
+  tags            String[]
+  sourceAssetId   String?
+  sourceAsset     ImageAsset?           @relation("ImageAssetLineage", fields: [sourceAssetId], references: [id])
+  derivatives     ImageAsset[]          @relation("ImageAssetLineage")
+  collectionItems ImageCollectionItem[]
+}
+
+model ImageCollection {
+  id          String                @id @default(cuid())
+  name        String
+  description String?
+  workspaceId String?
+  workspace   Workspace?            @relation(fields: [workspaceId], references: [id])
+  items       ImageCollectionItem[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+}
+
+model ImageCollectionItem {
+  id           String          @id @default(cuid())
+  collectionId String
+  collection   ImageCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  imageId      String
+  image        ImageAsset      @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  createdAt    DateTime        @default(now())
+
+  @@unique([collectionId, imageId])
 }
 
 model CanvasProject {
-  id          String @id @default(cuid())
+  id          String           @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   nodes       CanvasNode[]
   edges       CanvasEdge[]
   workspaceId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace?       @relation(fields: [workspaceId], references: [id])
   snapshots   CanvasSnapshot[]
-  isTemplate  Boolean @default(false)
+  runs        CanvasRun[]
+  isTemplate  Boolean          @default(false)
 }
 
 model CanvasNode {
-  id        String @id @default(cuid())
+  id        String        @id @default(cuid())
   projectId String
   project   CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   type      String
   positionX Float
   positionY Float
   dataJson  Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model CanvasEdge {
-  id           String @id @default(cuid())
+  id           String        @id @default(cuid())
   projectId    String
   project      CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sourceNodeId String
@@ -167,36 +197,80 @@ model CanvasEdge {
 }
 
 model PromptPreset {
-  id        String @id @default(cuid())
-  title     String
-  content   String
-  tags      String[]
-  source    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  versions  PromptVersion[]
+  id          String          @id @default(cuid())
+  title       String
+  content     String
+  tags        String[]
+  source      String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  versions    PromptVersion[]
   workspaceId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace?      @relation(fields: [workspaceId], references: [id])
 }
 
 model PromptVersion {
-  id        String @id @default(cuid())
+  id        String       @id @default(cuid())
   promptId  String
   prompt    PromptPreset @relation(fields: [promptId], references: [id], onDelete: Cascade)
   version   Int
   title     String
   content   String
   tags      String[]
-  createdAt DateTime @default(now())
+  createdAt DateTime     @default(now())
 }
 
-
 model CanvasSnapshot {
-  id        String @id @default(cuid())
+  id        String        @id @default(cuid())
   projectId String
   project   CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   label     String?
   nodesJson Json
   edgesJson Json
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
+}
+
+model CanvasRun {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     CanvasProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status      TaskStatus      @default(QUEUED)
+  label       String?
+  nodesJson   Json
+  edgesJson   Json
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  completedAt DateTime?
+  workspaceId String?
+  nodes       CanvasRunNode[]
+}
+
+model CanvasRunNode {
+  id           String          @id @default(cuid())
+  runId        String
+  run          CanvasRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeId       String
+  status       TaskStatus      @default(QUEUED)
+  taskId       String?
+  task         GenerationTask? @relation(fields: [taskId], references: [id])
+  inputJson    Json?
+  outputJson   Json?
+  errorMessage String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model AgentSuggestion {
+  id          String     @id @default(cuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  sourceType  String
+  sourceId    String?
+  kind        String
+  title       String
+  content     String
+  payloadJson Json?
+  status      String     @default("draft")
+  createdAt   DateTime   @default(now())
+  appliedAt   DateTime?
 }

@@ -43,6 +43,14 @@ describe('CanvasProjectsController', () => {
       ],
     };
     const prisma = {
+      canvasRun: {
+        create: vi.fn().mockResolvedValue({ id: 'run_1', status: 'RUNNING' }),
+        update: vi.fn().mockResolvedValue({ id: 'run_1', projectId: 'canvas_1', status: 'RUNNING', createdAt: new Date('2026-05-27T00:00:00Z'), updatedAt: new Date('2026-05-27T00:00:00Z'), completedAt: null, nodes: [{ id: 'run_node_1', nodeId: 'task-1', status: 'QUEUED', taskId: 'task_edit_1', inputJson: {}, outputJson: {}, errorMessage: null, task: { images: [] } }] }),
+      },
+      canvasRunNode: {
+        create: vi.fn().mockResolvedValue({ id: 'run_node_1' }),
+        update: vi.fn().mockResolvedValue({}),
+      },
       canvasProject: {
         findFirst: vi.fn().mockResolvedValue(row),
         update: vi.fn().mockResolvedValue(row),
@@ -63,5 +71,49 @@ describe('CanvasProjectsController', () => {
     }), expect.any(Object));
     expect(tasks.createGenerateTask).not.toHaveBeenCalled();
     expect(result).toMatchObject({ projectId: 'canvas_1', created: [{ nodeId: 'task-1', taskId: 'task_edit_1', status: 'QUEUED' }] });
+    expect(prisma.canvasRun.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ projectId: 'canvas_1', status: 'RUNNING' }) }));
+    expect(prisma.canvasRunNode.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ nodeId: 'task-1', status: 'QUEUED' }) }));
+  });
+
+  it('does not delete graph nodes on metadata-only project updates', async () => {
+    const prisma = {
+      canvasProject: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'canvas_1' }),
+        update: vi.fn().mockResolvedValue({
+          id: 'canvas_1', name: 'Renamed', description: null, isTemplate: false,
+          createdAt: new Date('2026-05-27T00:00:00Z'), updatedAt: new Date('2026-05-27T00:00:00Z'),
+          nodes: [{ id: node.id, type: node.type, positionX: 10, positionY: 20, dataJson: node.data }],
+          edges: [{ id: edge.id, sourceNodeId: edge.source, targetNodeId: edge.target, type: edge.type, dataJson: edge.data }],
+        }),
+      },
+    };
+    const controller = new CanvasProjectsController(prisma as any);
+
+    await controller.update('canvas_1', { name: 'Renamed' });
+
+    expect(prisma.canvasProject.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.not.objectContaining({ nodes: expect.anything(), edges: expect.anything() }),
+    }));
+  });
+
+  it('reconciles canvas run nodes from linked terminal tasks', async () => {
+    const completedTask = { id: 'task_1', status: 'SUCCEEDED', images: [{ id: 'img_1', storageKey: 'local://outputs/img.png', thumbnailKey: 'local://thumbs/img.webp' }] };
+    const run = { id: 'run_1', projectId: 'canvas_1', label: null, status: 'RUNNING', createdAt: new Date('2026-05-27T00:00:00Z'), updatedAt: new Date('2026-05-27T00:00:00Z'), completedAt: null, nodes: [{ id: 'rn_1', nodeId: 'task-1', status: 'RUNNING', taskId: 'task_1', inputJson: {}, outputJson: {}, errorMessage: null, task: completedTask }] };
+    const prisma = {
+      canvasRun: {
+        findMany: vi.fn().mockResolvedValue([run]),
+        update: vi.fn().mockImplementation(({ data }) => Promise.resolve({ ...run, status: data.status, completedAt: data.completedAt, nodes: [{ ...run.nodes[0], status: 'SUCCEEDED', outputJson: { taskId: 'task_1', status: 'SUCCEEDED', images: [{ id: 'img_1', storageKey: 'local://outputs/img.png', thumbnailKey: 'local://thumbs/img.webp' }] }, task: completedTask }] })),
+      },
+      canvasRunNode: {
+        update: vi.fn().mockImplementation(({ data }) => Promise.resolve({ ...run.nodes[0], ...data, task: completedTask })),
+      },
+    };
+    const controller = new CanvasProjectsController(prisma as any);
+
+    const rows = await controller.runs('canvas_1');
+
+    expect(prisma.canvasRunNode.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'SUCCEEDED' }) }));
+    expect(prisma.canvasRun.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'SUCCEEDED' }) }));
+    expect(rows[0]).toMatchObject({ id: 'run_1', status: 'SUCCEEDED', nodes: [{ status: 'SUCCEEDED', images: [{ id: 'img_1' }] }] });
   });
 });

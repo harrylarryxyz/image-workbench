@@ -1,0 +1,54 @@
+name: image-workbench-quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: workbench
+          POSTGRES_PASSWORD: workbench
+          POSTGRES_DB: image_workbench
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql://workbench:workbench@localhost:5432/image_workbench
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      WORKBENCH_ADMIN_TOKEN: ci-token
+      PROVIDER_SECRET_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @image-workbench/api prisma:generate
+      - run: pnpm --filter @image-workbench/api exec prisma validate --schema prisma/schema.prisma
+      - run: pnpm --filter @image-workbench/api test
+      - run: pnpm --filter @image-workbench/api typecheck
+      - run: pnpm --filter @image-workbench/web typecheck
+      - run: pnpm --filter @image-workbench/web test
+      - run: pnpm --filter @image-workbench/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @image-workbench/web test:e2e
+      - run: pnpm --filter @image-workbench/web build
+      - run: node apps/web/api-base.production.test.js
+      - run: bash -n scripts/*.sh

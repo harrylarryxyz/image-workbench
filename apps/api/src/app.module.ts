@@ -16,6 +16,9 @@ import { AuditLogsController } from './auth/audit-logs.controller';
 import { WorkspacesController } from './auth/workspaces.controller';
 import { AuthController } from './auth/auth.controller';
 import { OpsController } from './ops.controller';
+import { HealthController } from './health.controller';
+import { LocalStorageService } from './storage/local-storage.service';
+import { AgentModule } from './agent/agent.module';
 
 @Module({
   imports: [
@@ -28,8 +31,9 @@ import { OpsController } from './ops.controller';
     DiagnosticsModule,
     PromptsModule,
     CanvasModule,
+    AgentModule,
   ],
-  controllers: [AuditLogsController, WorkspacesController, AuthController, OpsController],
-  providers: [PrismaService, AuditService, { provide: APP_GUARD, useClass: AdminTokenGuard }],
+  controllers: [AuditLogsController, WorkspacesController, AuthController, OpsController, HealthController],
+  providers: [PrismaService, AuditService, LocalStorageService, { provide: APP_GUARD, useClass: AdminTokenGuard }],
 })
 export class AppModule {}
