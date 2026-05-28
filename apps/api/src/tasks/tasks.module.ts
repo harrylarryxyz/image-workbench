@@ -9,11 +9,12 @@ import { PrismaService } from '../prisma.service';
 import { ProvidersModule } from '../providers/providers.module';
 import { StorageModule } from '../storage/storage.module';
 import { DiagnosticsModule } from '../diagnostics/diagnostics.module';
+import { AuditService } from '../auth/audit.service';
 
 @Module({
   imports: [BullModule.registerQueue({ name: 'image-generation' }), ProvidersModule, StorageModule, DiagnosticsModule],
   controllers: [TasksController],
-  providers: [TasksService, TaskEventsService, ImageReferenceService, ImageGenerationProcessor, PrismaService],
+  providers: [TasksService, TaskEventsService, ImageReferenceService, ImageGenerationProcessor, PrismaService, AuditService],
   exports: [TasksService],
 })
 export class TasksModule {}

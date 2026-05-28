@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPatch, apiPost } from '../../lib/api';
 
 type Provider = {
   id: string;
@@ -20,6 +20,11 @@ type Provider = {
     multipleRefs: boolean | null;
     maxRefs: number | null;
     recommendedTimeoutSec: number | null;
+    maxOutputCount?: number | null;
+    sizes?: string[] | null;
+    qualities?: string[] | null;
+    formats?: string[] | null;
+    apiModes?: string[] | null;
     source: string;
   };
   editHealth?: {
@@ -31,12 +36,6 @@ type Provider = {
   };
   updatedAt?: string;
 };
-
-async function apiPatch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE ?? '/api'}${path}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status} ${await res.text()}`);
-  return res.json();
-}
 
 export default function ProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -150,6 +149,9 @@ export default function ProvidersPage() {
           <b>Generate</b><span>{provider.capabilities?.generate === true ? 'supported' : provider.capabilities?.generate === false ? 'unsupported' : 'unknown'}</span>
           <b>Edit</b><span>{provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'}</span>
           <b>Edit health</b><span>{provider.editHealth?.status ?? 'untested'}{provider.editHealth?.errorCode ? ` · ${provider.editHealth.errorCode}` : ''}</span>
+          <b>Sizes</b><span>{provider.capabilities?.sizes?.join(', ') ?? 'unknown'}</span>
+          <b>Qualities</b><span>{provider.capabilities?.qualities?.join(', ') ?? 'unknown'}</span>
+          <b>Formats</b><span>{provider.capabilities?.formats?.join(', ') ?? 'unknown'}</span>
         </div>
         {provider.editHealth?.errorMessage ? <pre className="error">{provider.editHealth.errorMessage}</pre> : null}
         <div className="actions">

@@ -15,6 +15,12 @@ export class TasksController {
   @Get('queue/status')
   queueStatus() { return this.tasks.queueStatus(); }
 
+  @Get('failed')
+  failed() { return this.tasks.listFailed(); }
+
+  @Get('metrics/summary')
+  metrics() { return this.tasks.metrics(); }
+
   @Get()
   list() { return this.tasks.listRecent(); }
 

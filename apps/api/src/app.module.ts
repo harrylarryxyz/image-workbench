@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { ProvidersModule } from './providers/providers.module';
@@ -9,6 +10,9 @@ import { DiagnosticsModule } from './diagnostics/diagnostics.module';
 import { PromptsModule } from './prompts/prompts.module';
 import { CanvasModule } from './canvas/canvas.module';
 import { PrismaService } from './prisma.service';
+import { AdminTokenGuard } from './auth/admin-token.guard';
+import { AuditService } from './auth/audit.service';
+import { AuditLogsController } from './auth/audit-logs.controller';
 
 @Module({
   imports: [
@@ -22,6 +26,7 @@ import { PrismaService } from './prisma.service';
     PromptsModule,
     CanvasModule,
   ],
-  providers: [PrismaService],
+  controllers: [AuditLogsController],
+  providers: [PrismaService, AuditService, { provide: APP_GUARD, useClass: AdminTokenGuard }],
 })
 export class AppModule {}

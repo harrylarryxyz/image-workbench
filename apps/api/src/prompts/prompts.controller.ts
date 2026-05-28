@@ -1,5 +1,10 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+
+
+function renderTemplate(content: string, variables: Record<string, unknown>): string {
+  return content.replace(/\[([a-zA-Z0-9_-]+)\]/g, (_, key) => String(variables[key] ?? `[${key}]`));
+}
 
 function parseTags(input: unknown): string[] {
   if (Array.isArray(input)) return input.map(String).map((x) => x.trim()).filter(Boolean);
@@ -40,6 +45,39 @@ export class PromptsController {
       },
     });
     return { id: row.id, title: row.title, content: row.content, tags: row.tags, source: row.source, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+  }
+
+  @Get('history')
+  async history() {
+    const rows = await this.prisma.generationTask.findMany({ orderBy: { createdAt: 'desc' }, take: 80, select: { id: true, prompt: true, model: true, status: true, createdAt: true } });
+    return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  }
+
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() body: any) {
+    const current = await this.prisma.promptPreset.findUnique({ where: { id }, include: { versions: { orderBy: { version: 'desc' }, take: 1 } } });
+    if (!current) throw new BadRequestException('prompt not found');
+    const nextVersion = (current.versions[0]?.version ?? 0) + 1;
+    await this.prisma.promptVersion.create({ data: { promptId: id, version: nextVersion, title: current.title, content: current.content, tags: current.tags } });
+    const row = await this.prisma.promptPreset.update({ where: { id }, data: {
+      title: body?.title !== undefined ? String(body.title).trim() : current.title,
+      content: body?.content !== undefined ? String(body.content).trim() : current.content,
+      tags: body?.tags !== undefined ? parseTags(body.tags) : current.tags,
+    } });
+    return { id: row.id, title: row.title, content: row.content, tags: row.tags, source: row.source, version: nextVersion + 1, updatedAt: row.updatedAt.toISOString() };
+  }
+
+  @Get(':id/versions')
+  async versions(@Param('id') id: string) {
+    const rows = await this.prisma.promptVersion.findMany({ where: { promptId: id }, orderBy: { version: 'desc' }, take: 50 });
+    return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+  }
+
+  @Post(':id/render')
+  async render(@Param('id') id: string, @Body() body: any) {
+    const row = await this.prisma.promptPreset.findUnique({ where: { id } });
+    if (!row) throw new BadRequestException('prompt not found');
+    return { prompt: renderTemplate(row.content, body?.variables ?? {}), source: 'template-render', id };
   }
 
   @Post('enhance')

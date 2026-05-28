@@ -8,6 +8,14 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 ### Added
 
+- Optional `WORKBENCH_ADMIN_TOKEN` protection, browser bearer-token forwarding, and audit log API/page.
+- Provider capability matrix with size, quality, format, API mode, output-limit, and timeout hints.
+- Queue hardening with exponential retries, stale live-task recovery, running-timeout failure, failed-task listing, and usage metrics.
+- Gallery batch selection/delete workflow.
+- Prompt Library 2.0 history, template rendering, update/version history workflow.
+- Executable Canvas workflow runner for saved task nodes with Prompt/Image upstream inputs.
+- Ops page and `scripts/audit-local-assets.sh` for queue, usage, audit, and local-asset footprint checks.
+
 - Operations runbook for backups, restore principles, and low-memory Rabisu copy deployments.
 - `scripts/backup-image-workbench.sh` for timestamped PostgreSQL/upload backups with manifests, checksums, dry-run mode, and retention pruning.
 - `scripts/deploy-rabisu.sh` for locally verified artifact deployment to the low-memory Rabisu VPS, including old-release pruning after successful smoke checks.

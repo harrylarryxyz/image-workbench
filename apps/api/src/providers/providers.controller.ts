@@ -8,6 +8,9 @@ export class ProvidersController {
   @Get()
   list() { return this.providers.list(); }
 
+  @Get('capabilities')
+  capabilities() { return this.providers.capabilities(); }
+
   @Post()
   create(@Body() body: unknown) { return this.providers.create(body); }
 

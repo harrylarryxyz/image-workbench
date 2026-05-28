@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import type { ProviderProfile } from '../lib/shared';
-import { getModelCapability, normalizeBaseUrl } from '../lib/provider-sdk';
+import { getModelCapability, listModelCapabilities, normalizeBaseUrl } from '../lib/provider-sdk';
 import { decryptSecret, encryptSecret, maskSecret } from './secret-box';
+import { AuditService } from '../auth/audit.service';
 
 function maskKey(value: string): string {
   if (!value) return '';
@@ -26,7 +27,7 @@ const TINY_PNG = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCA
 
 @Injectable()
 export class ProvidersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit?: AuditService) {}
 
   async list() {
     const rows = await this.prisma.providerProfile.findMany({ orderBy: [{ enabled: 'desc' }, { updatedAt: 'desc' }] });
@@ -52,8 +53,11 @@ export class ProvidersService {
         enabled: body?.enabled !== false,
       },
     });
+    await this.audit?.log('provider.create', 'provider', row.id, { name, type: row.type, baseUrl });
     return this.serialize(row);
   }
+
+  capabilities() { return listModelCapabilities(); }
 
   async update(id: string, body: any) {
     const data: any = {};
@@ -65,11 +69,13 @@ export class ProvidersService {
     if (body?.enabled !== undefined) data.enabled = Boolean(body.enabled);
     if (body?.apiKey !== undefined && String(body.apiKey).trim()) data.apiKeyEncrypted = encryptSecret(String(body.apiKey).trim());
     const row = await this.prisma.providerProfile.update({ where: { id }, data });
+    await this.audit?.log('provider.update', 'provider', id, { fields: Object.keys(data) });
     return this.serialize(row);
   }
 
   async remove(id: string) {
     await this.prisma.providerProfile.delete({ where: { id } });
+    await this.audit?.log('provider.delete', 'provider', id);
     return { ok: true };
   }
 
@@ -214,6 +220,11 @@ export class ProvidersService {
         multipleRefs: capability?.supportsMultipleRefs ?? null,
         maxRefs: capability?.maxRefs ?? null,
         recommendedTimeoutSec: capability?.recommendedTimeoutSec ?? null,
+        maxOutputCount: capability?.maxOutputCount ?? null,
+        sizes: capability?.sizes ?? null,
+        qualities: capability?.qualities ?? null,
+        formats: capability?.formats ?? null,
+        apiModes: capability?.apiModes ?? null,
         source: capability ? 'builtin-model-profile' : 'unknown-model',
       },
       editHealth,

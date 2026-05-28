@@ -1,6 +1,6 @@
 # Image Workbench
 
-Image Workbench is a private, production-oriented AI image creation workbench for GPT Image 2 and OpenAI-compatible image providers. It replaces the temporary `image-draw-web` FastAPI demo with a TypeScript monorepo, queued generation pipeline, provider management, SSE task diagnostics, gallery, prompt library, mask editing, React Flow canvas workflows, S3-compatible storage-key contracts, and encrypted provider secrets.
+Image Workbench is a private, production-oriented AI image creation workbench for GPT Image 2 and OpenAI-compatible image providers. It replaces the temporary `image-draw-web` FastAPI demo with a TypeScript monorepo, queued generation pipeline, provider management, SSE task diagnostics, gallery, prompt library, mask editing, React Flow canvas workflows, S3-compatible storage-key contracts, and encrypted provider secrets, optional admin-token protection, audit logs, usage metrics, batch gallery actions, prompt versioning, and executable canvas workflows.
 
 ## What it does
 
@@ -104,6 +104,8 @@ STORAGE_DIR=./data/uploads
 STORAGE_BUCKET=image-workbench
 STORAGE_PUBLIC_BASE_URL=
 PROVIDER_SECRET_KEY=64_HEX_CHARS_FOR_AES_256_GCM
+WORKBENCH_ADMIN_TOKEN=optional_admin_token_for_api
+NEXT_PUBLIC_WORKBENCH_TOKEN=optional_admin_token_for_browser
 IMAGE_API_BASE=https://api.example.com/v1
 IMAGE_API_KEY=YOUR_PROVIDER_API_KEY
 IMAGE_MODEL=gpt-image-2
@@ -187,6 +189,7 @@ Default local URLs:
 2. Add Prompt/Image/Task nodes and connect them.
 3. Enter a project name and click `新建保存` or `保存项目`.
 4. Use `加载项目列表` to reopen saved workflows later.
+5. Click `执行画布任务` to run saved Task nodes; connected Prompt/Image nodes become generate/edit task inputs.
 
 ### Migrate legacy provider secrets
 
@@ -218,6 +221,12 @@ Main endpoints:
 - `POST /tasks/:id/retry` — requeue a failed/cancelled task.
 - `POST /tasks/:id/cancel` — cancel a queued task.
 - `GET /tasks/queue/status` — inspect queue and database status counts.
+- `GET /tasks/failed` — list failed/dead-letter style tasks.
+- `GET /tasks/metrics/summary` — usage metrics by status/model and image storage totals.
+- `GET /audit-logs` — recent audit events.
+- `POST /gallery/batch/delete` — batch delete image asset database rows.
+- `GET /prompts/history`, `PATCH /prompts/:id`, `GET /prompts/:id/versions`, `POST /prompts/:id/render` — prompt history, versioning, and template variables.
+- `POST /canvas-projects/:id/run` — execute saved canvas Task nodes and write task ids back to the graph.
 - `GET /gallery` — list recent image assets.
 - `GET /assets/file?key=***` — serve a stored image asset.
 - `POST /assets/upload` — upload a reference image.

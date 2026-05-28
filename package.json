@@ -17,7 +17,8 @@
     "dev:web": "pnpm --filter @image-workbench/web dev",
     "backup": "./scripts/backup-image-workbench.sh",
     "deploy:rabisu": "./scripts/deploy-rabisu.sh",
-    "prune:rabisu-releases": "./scripts/prune-rabisu-releases.sh"
+    "prune:rabisu-releases": "./scripts/prune-rabisu-releases.sh",
+    "assets:audit": "./scripts/audit-local-assets.sh"
   },
   "devDependencies": {
     "turbo": "latest",

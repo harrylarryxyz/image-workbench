@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { apiGet } from '../../lib/api';
+import { GalleryBatchActions } from './gallery-batch-actions';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 const TERMINAL = ['SUCCEEDED', 'FAILED', 'CANCELLED'];
@@ -26,6 +27,7 @@ export default async function GalleryPage({ searchParams }: { searchParams?: Pro
       <div><label>Model</label><input name="model" defaultValue={typeof query?.model === 'string' ? query.model : ''} placeholder="gpt-image-2" /></div>
       <div style={{alignSelf: 'end'}}><button className="pill" type="submit">筛选</button></div>
     </form>
+    {Array.isArray(images) && !images[0]?.error ? <GalleryBatchActions images={images.map((image) => ({ id: image.id, prompt: image.prompt }))} /> : null}
     <div className="gallery" style={{marginTop: 20}}>{images.map((image, i) => {
       const assetUrl = withBase(image.assetUrl ?? (image.storageKey ? `/assets/file?key=${encodeURIComponent(image.storageKey)}` : null));
       const thumbUrl = withBase(image.thumbnailUrl ?? image.assetUrl);

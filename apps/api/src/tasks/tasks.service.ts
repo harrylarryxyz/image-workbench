@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { Response } from 'express';
@@ -7,6 +7,7 @@ import { ProvidersService } from '../providers/providers.service';
 import { GenerateImageRequestSchema } from '../lib/shared';
 import { TaskEventsService } from './task-events.service';
 import { ImageReferenceService } from './image-reference.service';
+import { AuditService } from '../auth/audit.service';
 
 @Injectable()
 export class TasksService {
@@ -16,6 +17,7 @@ export class TasksService {
     @InjectQueue('image-generation') private readonly queue: Queue,
     private readonly events: TaskEventsService,
     private readonly refs: ImageReferenceService,
+    private readonly audit?: AuditService,
   ) {}
 
   async createGenerateTask(input: unknown) {
@@ -32,6 +34,7 @@ export class TasksService {
       },
     });
     await this.enqueueTask(task.id);
+    await this.audit?.log('task.create', 'task', task.id, { type: task.type, model });
     return { id: task.id, status: task.status };
   }
 
@@ -52,6 +55,7 @@ export class TasksService {
       },
     });
     await this.enqueueTask(task.id);
+    await this.audit?.log('task.create', 'task', task.id, { type: task.type, model, refCount: refKeys.length });
     return { id: task.id, status: task.status, type: task.type };
   }
 
@@ -66,6 +70,7 @@ export class TasksService {
       this.queue.getCompletedCount(),
       this.queue.isPaused(),
     ]);
+    await this.failTimedOutRunningTasks();
     const dbCounts = await this.prisma.generationTask.groupBy({ by: ['status'], _count: { status: true } });
     return {
       queue: { waiting, active, delayed, failed, completed, paused },
@@ -88,6 +93,7 @@ export class TasksService {
       },
     });
     await this.enqueueTask(id);
+    await this.audit?.log('task.retry', 'task', id);
     this.notifyTaskChanged(id);
     return { ok: true, id, status: 'QUEUED' };
   }
@@ -101,10 +107,23 @@ export class TasksService {
     }
     if (task.status === 'QUEUED') {
       await this.prisma.generationTask.update({ where: { id }, data: { status: 'CANCELLED', errorCode: 'cancelled', errorMessage: 'Task cancelled before execution.' } });
+      await this.audit?.log('task.cancel', 'task', id);
       this.notifyTaskChanged(id);
       return { ok: true, id, status: 'CANCELLED' };
     }
     return { ok: false, id, status: task.status, error: 'Only queued tasks can be cancelled safely.' };
+  }
+
+  async listFailed() {
+    const rows = await this.prisma.generationTask.findMany({ where: { status: 'FAILED' }, orderBy: { updatedAt: 'desc' }, take: 100, include: { images: true, provider: true } });
+    return rows.map((task) => this.serializeTask(task, true));
+  }
+
+  async metrics() {
+    const byStatus = await this.prisma.generationTask.groupBy({ by: ['status'], _count: { status: true }, _avg: { elapsedMs: true } });
+    const byModel = await this.prisma.generationTask.groupBy({ by: ['model'], _count: { model: true }, _avg: { elapsedMs: true }, orderBy: { _count: { model: 'desc' } }, take: 20 });
+    const images = await this.prisma.imageAsset.aggregate({ _count: { id: true }, _sum: { sizeBytes: true } });
+    return { byStatus, byModel, images: { count: images._count.id, sizeBytes: images._sum.sizeBytes ?? 0 } };
   }
 
   async listRecent() {
@@ -131,7 +150,16 @@ export class TasksService {
   }
 
   private async enqueueTask(taskId: string) {
-    await this.queue.add('generate', { taskId }, { attempts: 1, removeOnComplete: 100, removeOnFail: 100, jobId: `task:${taskId}:${Date.now()}` });
+    await this.queue.add('generate', { taskId }, { attempts: 3, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: 100, removeOnFail: 200, jobId: `task:${taskId}:${Date.now()}` });
+  }
+
+  private async failTimedOutRunningTasks() {
+    const cutoff = new Date(Date.now() - 30 * 60_000);
+    const rows = await this.prisma.generationTask.findMany({ where: { status: 'RUNNING', updatedAt: { lt: cutoff } }, select: { id: true }, take: 50 });
+    for (const row of rows) {
+      await this.prisma.generationTask.update({ where: { id: row.id }, data: { status: 'FAILED', errorCode: 'task_timeout', errorMessage: 'Task exceeded the 30 minute running timeout.' } });
+      this.notifyTaskChanged(row.id);
+    }
   }
 
   private async requeueStaleLiveTasks() {

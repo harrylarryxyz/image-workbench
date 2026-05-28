@@ -83,6 +83,12 @@ export default function CanvasPage() {
   }
 
   async function createTaskFromCanvas() {
+    if (activeProjectId) {
+      await saveProject();
+      const run = await apiPost(`/canvas-projects/${activeProjectId}/run`, {});
+      setResult(run);
+      return;
+    }
     const prompt = promptFromNodes(nodes);
     const created = await apiPost('/tasks/generate', { prompt, model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 });
     setResult(created);
@@ -90,12 +96,12 @@ export default function CanvasPage() {
   }
 
   return <section>
-    <div className="hero"><p className="eyebrow">Canvas Workflow</p><h1>节点画布</h1><p className="sub">React Flow 画布：Prompt / Image / Task 节点、引用边、JSON 导入导出、项目持久化，并可直接从 Prompt 节点创建生成任务。</p></div>
+    <div className="hero"><p className="eyebrow">Canvas Workflow</p><h1>节点画布</h1><p className="sub">React Flow 画布：Prompt / Image / Task 节点、引用边、JSON 导入导出、项目持久化，并可保存后按连线执行 Task 节点，自动创建 Generate/Edit 任务并回写 taskId。</p></div>
     <div className="actions" style={{ marginTop: 16 }}>
       <button className="pill" type="button" onClick={addPromptNode}>添加 Prompt 节点</button>
       <button className="pill" type="button" onClick={addImageNode}>添加 Image 节点</button>
       <button className="pill" type="button" onClick={addTaskNode}>添加 Task 节点</button>
-      <button className="pill" type="button" onClick={createTaskFromCanvas}>从画布创建任务</button>
+      <button className="pill" type="button" onClick={createTaskFromCanvas}>执行画布任务</button>
     </div>
     <div className="grid two" style={{ marginTop: 16 }}>
       <div className="card">

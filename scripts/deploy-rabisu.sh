@@ -117,6 +117,7 @@ ln -sfn "${APP_ROOT}/shared/uploads" "$RELEASE/data"
 cd "$RELEASE"
 /usr/local/bin/pnpm install --frozen-lockfile
 /usr/local/bin/pnpm --filter @image-workbench/api prisma:generate
+(cd apps/api && /usr/local/bin/pnpm exec prisma migrate deploy)
 /usr/local/bin/pnpm --filter @image-workbench/web test -- api-base.production.test.js
 
 if [[ "$SKIP_RESTART" == "1" ]]; then

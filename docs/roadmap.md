@@ -17,6 +17,14 @@
 - Legacy plaintext provider keys can be migrated with `pnpm --filter @image-workbench/api provider-secrets:migrate` after setting a stable `PROVIDER_SECRET_KEY`.
 - Browser E2E smoke coverage is available through Playwright for core pages and Canvas interactions.
 
+- Optional admin-token API protection and recent audit-log viewing are implemented.
+- Provider capability metadata now includes sizes, qualities, formats, API modes, output limits, and timeout hints.
+- Queue reliability includes retries with exponential backoff, stale live-task requeue, running timeout failure, failed-task listing, and metrics summary.
+- Gallery supports batch selection/delete actions.
+- Prompt Library 2.0 supports task prompt history, template variable rendering, prompt updates, and version history.
+- Canvas projects can execute saved task nodes from connected Prompt/Image nodes and write task ids back into node data.
+- Ops page exposes queue, usage metrics, and audit logs; `scripts/audit-local-assets.sh` summarizes local asset footprint.
+
 ## Deferred until resources exist
 
 - Attach a real S3 SDK adapter for remote object read/write in deployments that set `STORAGE_BACKEND=s3|r2|minio`.

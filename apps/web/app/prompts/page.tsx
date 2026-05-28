@@ -1,9 +1,13 @@
 import Link from 'next/link';
 import { apiGet } from '../../lib/api';
 import { PromptEnhancer } from './prompt-enhancer';
+import { PromptActions } from './prompt-actions';
 
 export default async function PromptsPage() {
-  const prompts = await apiGet<any[]>('/prompts').catch((error) => [{ error: String(error) }]);
+  const [prompts, history] = await Promise.all([
+    apiGet<any[]>('/prompts').catch((error) => [{ error: String(error) }]),
+    apiGet<any[]>('/prompts/history').catch(() => []),
+  ]);
   return <section>
     <div className="hero">
       <p className="eyebrow">Prompt Library</p>
@@ -25,6 +29,7 @@ export default async function PromptsPage() {
         <button className="btn" type="submit">保存 Prompt</button>
       </form>
       <PromptEnhancer />
+      <div className="card"><p className="eyebrow">History</p><p className="muted">最近成功/失败任务 prompt，可复制沉淀为模板。</p>{history.slice(0, 8).map((item) => <p key={item.id}><b>{item.status}</b> · {item.prompt}</p>)}</div>
       <div className="gallery">
         {prompts.map((prompt, i) => {
           const reuseHref = `/?prompt=${encodeURIComponent(prompt.content ?? '')}`;
@@ -35,6 +40,7 @@ export default async function PromptsPage() {
               <Link className="pill" href={reuseHref}>套用</Link>
               {prompt.tags?.map((tag: string) => <span className="pill" key={tag}>{tag}</span>)}
             </div>
+            {prompt.id ? <PromptActions prompt={prompt} /> : null}
             <div className="muted">{prompt.source ?? 'manual'} · {prompt.updatedAt ? new Date(prompt.updatedAt).toLocaleString() : ''}</div>
           </div>;
         })}

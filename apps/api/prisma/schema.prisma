@@ -42,6 +42,15 @@ model ProviderProfile {
   tasks           GenerationTask[]
 }
 
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  targetType String?
+  targetId   String?
+  metadataJson Json?
+  createdAt DateTime @default(now())
+}
+
 model GenerationTask {
   id              String @id @default(cuid())
   type            String @default("image.generate")
@@ -118,4 +127,16 @@ model PromptPreset {
   source    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  versions  PromptVersion[]
+}
+
+model PromptVersion {
+  id        String @id @default(cuid())
+  promptId  String
+  prompt    PromptPreset @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  version   Int
+  title     String
+  content   String
+  tags      String[]
+  createdAt DateTime @default(now())
 }

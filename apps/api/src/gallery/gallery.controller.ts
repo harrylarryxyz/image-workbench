@@ -1,9 +1,10 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { AuditService } from '../auth/audit.service';
 
 @Controller('gallery')
 export class GalleryController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit?: AuditService) {}
 
   @Get()
   async list(@Query() query: any = {}) {
@@ -33,5 +34,14 @@ export class GalleryController {
         createdAt: image.createdAt.toISOString(),
       };
     });
+  }
+
+  @Post('batch/delete')
+  async batchDelete(@Body() body: any) {
+    const ids = Array.isArray(body?.ids) ? body.ids.map(String).filter(Boolean).slice(0, 200) : [];
+    if (!ids.length) return { deleted: 0, ids: [] };
+    const result = await this.prisma.imageAsset.deleteMany({ where: { id: { in: ids } } });
+    await this.audit?.log('gallery.batch_delete', 'image', undefined, { ids, deleted: result.count });
+    return { deleted: result.count, ids };
   }
 }

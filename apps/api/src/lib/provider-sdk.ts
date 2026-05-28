@@ -1,5 +1,7 @@
 import type { ApiMode, GenerateImageRequest } from './shared';
 
+export type ModelCapability = { model: string; supportsGenerate: boolean; supportsEdit: boolean; supportsMask: boolean; supportsTransparent: boolean; supportsMultipleRefs: boolean; maxRefs?: number; maxOutputCount?: number; recommendedTimeoutSec?: number; sizes?: string[]; qualities?: string[]; formats?: string[]; apiModes?: ApiMode[] };
+
 export type RouteMetadata = {
   requestedModel: string;
   resolvedModel: string;
@@ -9,17 +11,25 @@ export type RouteMetadata = {
   fallbackReason: string | null;
 };
 
-const BUILTIN_MODEL_CAPABILITIES: Record<string, { model: string; supportsGenerate: boolean; supportsEdit: boolean; supportsMask: boolean; supportsTransparent: boolean; supportsMultipleRefs: boolean; maxRefs?: number; recommendedTimeoutSec?: number }> = {
-  'gpt-image-2': { model: 'gpt-image-2', supportsGenerate: true, supportsEdit: true, supportsMask: true, supportsTransparent: false, supportsMultipleRefs: true, maxRefs: 4, recommendedTimeoutSec: 600 },
-  'gpt-image-1.5': { model: 'gpt-image-1.5', supportsGenerate: true, supportsEdit: true, supportsMask: true, supportsTransparent: true, supportsMultipleRefs: true, maxRefs: 4, recommendedTimeoutSec: 300 },
+const DEFAULT_SIZES = ['1024x1024', '1536x1024', '1024x1536', 'auto'];
+const DEFAULT_QUALITIES = ['low', 'medium', 'high', 'auto'];
+const DEFAULT_FORMATS = ['png', 'jpeg', 'webp'];
+
+const BUILTIN_MODEL_CAPABILITIES: Record<string, ModelCapability> = {
+  'gpt-image-2': { model: 'gpt-image-2', supportsGenerate: true, supportsEdit: true, supportsMask: true, supportsTransparent: false, supportsMultipleRefs: true, maxRefs: 4, maxOutputCount: 1, recommendedTimeoutSec: 600, sizes: DEFAULT_SIZES, qualities: DEFAULT_QUALITIES, formats: DEFAULT_FORMATS, apiModes: ['auto', 'images', 'responses'] },
+  'gpt-image-1.5': { model: 'gpt-image-1.5', supportsGenerate: true, supportsEdit: true, supportsMask: true, supportsTransparent: true, supportsMultipleRefs: true, maxRefs: 4, maxOutputCount: 4, recommendedTimeoutSec: 300, sizes: DEFAULT_SIZES, qualities: DEFAULT_QUALITIES, formats: DEFAULT_FORMATS, apiModes: ['auto', 'images'] },
 };
 
 export function canonicalModel(model: string): string {
   return model.trim().toLowerCase().split('/').at(-1) ?? model.trim().toLowerCase();
 }
 
-export function getModelCapability(model: string) {
+export function getModelCapability(model: string): ModelCapability | undefined {
   return BUILTIN_MODEL_CAPABILITIES[canonicalModel(model)];
+}
+
+export function listModelCapabilities(): ModelCapability[] {
+  return Object.values(BUILTIN_MODEL_CAPABILITIES);
 }
 
 export function assertModelRequestSupported(request: GenerateImageRequest, model: string): void {
@@ -27,6 +37,18 @@ export function assertModelRequestSupported(request: GenerateImageRequest, model
   if (!capability) return;
   if (request.background === 'transparent' && !capability.supportsTransparent) {
     throw new Error(`${capability.model} does not support transparent background; use gpt-image-1.5 or remove transparent background.`);
+  }
+  if (capability.maxOutputCount && request.count > capability.maxOutputCount) {
+    throw new Error(`${capability.model} supports at most ${capability.maxOutputCount} output image(s) per task.`);
+  }
+  if (capability.sizes && !capability.sizes.includes(request.size)) {
+    throw new Error(`${capability.model} does not support size ${request.size}.`);
+  }
+  if (capability.qualities && !capability.qualities.includes(request.quality)) {
+    throw new Error(`${capability.model} does not support quality ${request.quality}.`);
+  }
+  if (capability.formats && !capability.formats.includes(request.format)) {
+    throw new Error(`${capability.model} does not support format ${request.format}.`);
   }
 }
 
