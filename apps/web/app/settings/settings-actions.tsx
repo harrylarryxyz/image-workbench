@@ -1,6 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { apiPost } from '../../lib/api';
 
 type TokenRow = { id: string; label?: string | null; role: string; tokenHashMasked?: string; createdAt?: string; lastSeenAt?: string | null; revokedAt?: string | null };
@@ -65,33 +71,41 @@ export function SettingsActions({ tokens }: { tokens: TokenRow[] }) {
   const absoluteInvite = created?.inviteUrl ? `${window.location.origin}${created.inviteUrl}` : '';
 
   return (
-    <section className="card stack">
-      <h2>登录、Invite 与 Token 管理</h2>
-      <div className="notice">生产推荐使用 Cookie session + CSRF；localStorage token 只保留为兼容入口。viewer 只读，operator 可创作，admin 管理 provider，owner 可跨 workspace。</div>
-      <label>Token<input value={token} onChange={(event) => setToken(event.target.value)} placeholder="WORKBENCH_ADMIN_TOKEN 或 session token" /></label>
-      <label>Workspace ID<input value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} /></label>
-      <div className="actions">
-        <button type="button" className="pill" onClick={loginWithCookie}>Cookie 登录</button>
-        <button type="button" className="pill" onClick={logout}>退出</button>
-        <button type="button" className="pill" onClick={saveLocalToken}>保存到浏览器</button>
-      </div>
-      <div className="grid three">
-        <label>Invite 标签<input value={label} onChange={(event) => setLabel(event.target.value)} /></label>
-        <label>角色<select value={role} onChange={(event) => setRole(event.target.value)}><option value="viewer">viewer</option><option value="operator">operator</option><option value="admin">admin</option><option value="owner">owner</option></select></label>
-        <label>过期时间<input value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} placeholder="2026-12-31T00:00:00Z" /></label>
-      </div>
-      <button className="btn" type="button" onClick={createToken}>生成 Invite / Session Token</button>
-      {created ? <div className="card compact">
-        <p className="eyebrow">One-time secret</p>
-        <pre className="debug-json">{created.token}</pre>
-        <div className="actions"><button className="pill" type="button" onClick={() => copy(created.token)}>复制 Token</button><button className="pill" type="button" onClick={() => copy(absoluteInvite)}>复制 Invite Link</button></div>
-        {absoluteInvite ? <p className="fine-print">{absoluteInvite}</p> : null}
-      </div> : null}
-      {message ? <p className="muted">{message}</p> : null}
-      <h3>当前 Workspace Sessions</h3>
-      <div className="stack small">
-        {tokens.map((item) => <div key={item.id} className="card compact"><strong>{item.label ?? 'unnamed'}</strong><p className="muted">{item.role} · {item.tokenHashMasked} · last seen {item.lastSeenAt ?? 'never'} {item.revokedAt ? `· revoked ${item.revokedAt}` : ''}</p><button type="button" className="pill" onClick={() => revoke(item.id)} disabled={Boolean(item.revokedAt)}>撤销</button></div>)}
-      </div>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>登录、Invite 与 Token 管理</CardTitle>
+        <CardDescription>生产推荐使用 Cookie session + CSRF；localStorage token 只保留为兼容入口。viewer 只读，operator 可创作，admin 管理 provider，owner 可跨 workspace。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2"><Label htmlFor="settings-token">Token</Label><Input id="settings-token" value={token} onChange={(event) => setToken(event.target.value)} placeholder="WORKBENCH_ADMIN_TOKEN 或 session token" /></div>
+          <div className="space-y-2"><Label htmlFor="settings-workspace">Workspace ID</Label><Input id="settings-workspace" value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} /></div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={loginWithCookie}>Cookie 登录</Button>
+          <Button type="button" variant="outline" onClick={logout}>退出</Button>
+          <Button type="button" variant="outline" onClick={saveLocalToken}>保存到浏览器</Button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2"><Label htmlFor="invite-label">Invite 标签</Label><Input id="invite-label" value={label} onChange={(event) => setLabel(event.target.value)} /></div>
+          <div className="space-y-2"><Label htmlFor="invite-role">角色</Label><NativeSelect id="invite-role" value={role} onChange={(event) => setRole(event.target.value)}><option value="viewer">viewer</option><option value="operator">operator</option><option value="admin">admin</option><option value="owner">owner</option></NativeSelect></div>
+          <div className="space-y-2"><Label htmlFor="invite-expires">过期时间</Label><Input id="invite-expires" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} placeholder="2026-12-31T00:00:00Z" /></div>
+        </div>
+        <Button type="button" onClick={createToken}>生成 Invite / Session Token</Button>
+        {created ? <Card className="bg-muted/30">
+          <CardContent className="space-y-3 pt-6">
+            <p className="eyebrow">One-time secret</p>
+            <pre className="debug-json">{created.token}</pre>
+            <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" type="button" onClick={() => copy(created.token)}>复制 Token</Button><Button size="sm" variant="outline" type="button" onClick={() => copy(absoluteInvite)}>复制 Invite Link</Button></div>
+            {absoluteInvite ? <p className="fine-print">{absoluteInvite}</p> : null}
+          </CardContent>
+        </Card> : null}
+        {message ? <p className="muted">{message}</p> : null}
+        <h3>当前 Workspace Sessions</h3>
+        <div className="stack small">
+          {tokens.map((item) => <Card key={item.id}><CardContent className="space-y-3 pt-6"><div className="task-head"><strong>{item.label ?? 'unnamed'}</strong><Badge variant={item.revokedAt ? 'destructive' : 'secondary'}>{item.role}</Badge></div><p className="muted">{item.tokenHashMasked} · last seen {item.lastSeenAt ?? 'never'} {item.revokedAt ? `· revoked ${item.revokedAt}` : ''}</p><Button type="button" size="sm" variant="outline" onClick={() => revoke(item.id)} disabled={Boolean(item.revokedAt)}>撤销</Button></CardContent></Card>)}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

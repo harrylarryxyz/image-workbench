@@ -1,16 +1,18 @@
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiGet } from '../../lib/api';
 
 type Task = { id?: string; status?: string; model?: string; prompt?: string; error?: string; errorMessage?: string; images?: unknown[]; elapsedMs?: number | null; createdAt?: string };
 type QueueStatus = { queue?: Record<string, number>; database?: unknown; error?: string };
 
-function statusClass(status?: string) {
+function statusVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const normalized = (status ?? '').toLowerCase();
-  if (normalized === 'succeeded') return 'status ok';
-  if (normalized === 'failed' || normalized === 'cancelled') return 'status bad';
-  if (normalized === 'running') return 'status run';
-  if (normalized === 'queued' || normalized === 'pending') return 'status wait';
-  return 'status neutral';
+  if (normalized === 'succeeded') return 'default';
+  if (normalized === 'failed' || normalized === 'cancelled') return 'destructive';
+  if (normalized === 'running') return 'secondary';
+  return 'outline';
 }
 
 export default async function TasksPage() {
@@ -27,27 +29,35 @@ export default async function TasksPage() {
       <p className="sub">任务列表只展示创作决策：状态、模型、耗时和缩略摘要；数据库/队列原始响应放在 Diagnostics。</p>
     </div>
 
-    <div className="card" style={{ marginTop: 20 }}>
-      <div className="task-head"><div><p className="eyebrow">Queue Status</p><h2>队列状态</h2></div><Link className="pill" href="/ops">打开 Ops</Link></div>
-      <div className="queue-grid">
-        {queueEntries.length ? queueEntries.map(([key, value]) => <div className="metric" key={key}><b>{String(value)}</b><span>{key}</span></div>) : <div className="notice">No queue metrics available.</div>}
-      </div>
-      <details className="diagnostics">
-        <summary>Diagnostics · queue/database</summary>
-        <pre className="debug-json">{JSON.stringify(queue, null, 2)}</pre>
-      </details>
-    </div>
+    <Card className="mt-5">
+      <CardHeader>
+        <div className="task-head"><div><p className="eyebrow">Queue Status</p><CardTitle>队列状态</CardTitle></div><Button asChild variant="outline"><Link href="/ops">打开 Ops</Link></Button></div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="queue-grid">
+          {queueEntries.length ? queueEntries.map(([key, value]) => <div className="metric" key={key}><b>{String(value)}</b><span>{key}</span></div>) : <Card className="border-border/70 bg-muted/30"><CardContent className="pt-6 text-sm text-muted-foreground">No queue metrics available.</CardContent></Card>}
+        </div>
+        <details className="diagnostics">
+          <summary>Diagnostics · queue/database</summary>
+          <pre className="debug-json">{JSON.stringify(queue, null, 2)}</pre>
+        </details>
+      </CardContent>
+    </Card>
 
     <div className="task-list">
-      {tasks.map((task, i) => <Link className="task-card" href={task.id ? `/tasks/${task.id}` : '/tasks'} key={task.id ?? i}>
-        <div className="task-head">
-          <span className={statusClass(task.status)}>{task.status ?? 'UNKNOWN'}</span>
-          <span className="muted">{task.createdAt ? new Date(task.createdAt).toLocaleString() : ''}</span>
-        </div>
-        <h3>{task.model ?? 'Task'}</h3>
-        <p>{task.prompt ?? task.error}</p>
-        {task.errorMessage ? <div className="notice error">{task.errorMessage}</div> : null}
-        <div className="muted">{task.images?.length ?? 0} image(s) · {task.elapsedMs ? `${task.elapsedMs}ms` : 'pending'}</div>
+      {tasks.map((task, i) => <Link className="block" href={task.id ? `/tasks/${task.id}` : '/tasks'} key={task.id ?? i}>
+        <Card>
+          <CardContent className="space-y-3 pt-6">
+            <div className="task-head">
+              <Badge variant={statusVariant(task.status)}>{task.status ?? 'UNKNOWN'}</Badge>
+              <span className="muted">{task.createdAt ? new Date(task.createdAt).toLocaleString() : ''}</span>
+            </div>
+            <h3>{task.model ?? 'Task'}</h3>
+            <p>{task.prompt ?? task.error}</p>
+            {task.errorMessage ? <Card className="border-destructive/40 bg-destructive/10"><CardContent className="pt-6 text-sm text-destructive-foreground">{task.errorMessage}</CardContent></Card> : null}
+            <div className="muted">{task.images?.length ?? 0} image(s) · {task.elapsedMs ? `${task.elapsedMs}ms` : 'pending'}</div>
+          </CardContent>
+        </Card>
       </Link>)}
     </div>
   </section>;

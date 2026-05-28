@@ -113,3 +113,22 @@ test('canvas and app shell refactor batch uses shadcn primitives for workflow co
     assert.doesNotMatch(text, /<(button|input|textarea|select|label)\b(?![^>]*data-slot)/, `${relative} should use design-system form/action primitives instead of naked controls`);
   }
 });
+
+test('final app surfaces use shadcn primitives instead of legacy controls and cards', () => {
+  const files = [
+    'agent/page.tsx',
+    'prompts/page.tsx',
+    'tasks/page.tsx',
+    'tasks/[id]/page.tsx',
+    'ops/page.tsx',
+    'settings/page.tsx',
+    'settings/settings-actions.tsx',
+  ];
+
+  for (const relative of files) {
+    const text = readPage(relative);
+    assert.match(text, /@\/components\/ui\/(button|input|textarea|card|label|badge|native-select)/, `${relative} should import shadcn ui primitives`);
+    assert.doesNotMatch(text, /className="(?:btn|pill|card|task-card|studio-panel|notice|status)(?:\s|"|$)/, `${relative} should not use legacy visual component classes`);
+    assert.doesNotMatch(text, /<(button|input|textarea|select|label)\b(?![^>]*data-slot)/, `${relative} should use design-system form/action primitives instead of naked controls`);
+  }
+});
