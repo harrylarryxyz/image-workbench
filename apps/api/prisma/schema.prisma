@@ -51,6 +51,8 @@ model UserSession {
   role        String @default("admin")
   createdAt   DateTime @default(now())
   lastSeenAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
 }
 
 model ProviderProfile {
@@ -70,12 +72,18 @@ model ProviderProfile {
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  action    String
-  targetType String?
-  targetId   String?
+  id           String   @id @default(cuid())
+  action       String
+  targetType   String?
+  targetId     String?
   metadataJson Json?
-  createdAt DateTime @default(now())
+  workspaceId  String?
+  tokenHash    String?
+  actorLabel   String?
+  actorRole    String?
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
 }
 
 model GenerationTask {

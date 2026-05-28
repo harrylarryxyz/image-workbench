@@ -1,53 +1,56 @@
-import { Body, Controller, Get, Param, Post, Res, Sse } from '@nestjs/common';
-import type { Response } from 'express';
+import { Body, Controller, Get, Param, Post, Req, Res, Sse } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { TasksService } from './tasks.service';
+import { getRequestContext } from '../auth/request-context';
 
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasks: TasksService) {}
 
   @Post('generate')
-  generate(@Body() body: unknown) { return this.tasks.createGenerateTask(body); }
+  generate(@Body() body: unknown, @Req() req: Request = {} as any) { return this.tasks.createGenerateTask(body, getRequestContext(req)); }
 
   @Post('edit')
-  edit(@Body() body: unknown) { return this.tasks.createEditTask(body); }
+  edit(@Body() body: unknown, @Req() req: Request = {} as any) { return this.tasks.createEditTask(body, getRequestContext(req)); }
 
   @Get('queue/status')
-  queueStatus() { return this.tasks.queueStatus(); }
+  queueStatus(@Req() req: Request = {} as any) { return this.tasks.queueStatus(getRequestContext(req)); }
 
   @Get('failed')
-  failed() { return this.tasks.listFailed(); }
+  failed(@Req() req: Request = {} as any) { return this.tasks.listFailed(getRequestContext(req)); }
 
   @Get('metrics/summary')
-  metrics() { return this.tasks.metrics(); }
+  metrics(@Req() req: Request = {} as any) { return this.tasks.metrics(getRequestContext(req)); }
 
   @Get()
-  list() { return this.tasks.listRecent(); }
+  list(@Req() req: Request = {} as any) { return this.tasks.listRecent(getRequestContext(req)); }
 
   @Get(':id')
-  get(@Param('id') id: string) { return this.tasks.getTask(id); }
+  get(@Param('id') id: string, @Req() req: Request = {} as any) { return this.tasks.getTask(id, getRequestContext(req)); }
 
   @Sse(':id/events')
-  async events(@Param('id') id: string, @Res({ passthrough: true }) res: Response) {
+  async events(@Param('id') id: string, @Req() reqOrRes: Request | Response = {} as any, @Res({ passthrough: true }) maybeRes?: Response) {
+    const res = (maybeRes ?? reqOrRes) as Response;
+    const req = maybeRes ? reqOrRes as Request : {} as Request;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
-    return this.tasks.streamTaskEvents(id, res);
+    return this.tasks.streamTaskEvents(id, res, getRequestContext(req));
   }
 
   @Post('bulk/retry-failed')
-  bulkRetry(@Body() body: any) { return this.tasks.bulkRetryFailed(body ?? {}); }
+  bulkRetry(@Body() body: any, @Req() req: Request = {} as any) { return this.tasks.bulkRetryFailed(body ?? {}, getRequestContext(req)); }
 
   @Post(':id/retry')
-  retry(@Param('id') id: string, @Body() body: any) { return this.tasks.retryTask(id, body ?? {}); }
+  retry(@Param('id') id: string, @Body() body: any, @Req() req: Request = {} as any) { return this.tasks.retryTask(id, body ?? {}, getRequestContext(req)); }
 
   @Post(':id/force-stop')
-  forceStop(@Param('id') id: string) { return this.tasks.forceStopTask(id); }
+  forceStop(@Param('id') id: string, @Req() req: Request = {} as any) { return this.tasks.forceStopTask(id, getRequestContext(req)); }
 
   @Get(':id/diagnostic-package')
-  diagnostics(@Param('id') id: string) { return this.tasks.diagnosticPackage(id); }
+  diagnostics(@Param('id') id: string, @Req() req: Request = {} as any) { return this.tasks.diagnosticPackage(id, getRequestContext(req)); }
 
   @Post(':id/cancel')
-  cancel(@Param('id') id: string) { return this.tasks.cancelTask(id); }
+  cancel(@Param('id') id: string, @Req() req: Request = {} as any) { return this.tasks.cancelTask(id, getRequestContext(req)); }
 }

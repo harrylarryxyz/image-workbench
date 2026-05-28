@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/prompts">Prompts</Link>
               <Link href="/canvas">Canvas</Link>
               <Link href="/ops">Ops</Link>
+              <Link href="/settings">Settings</Link>
             </nav>
           </aside>
           <main className="main">{children}</main>

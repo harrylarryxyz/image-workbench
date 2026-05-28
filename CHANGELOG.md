@@ -8,6 +8,10 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 ### Added
 
+- v0.8 team hardening: bootstrap/session login endpoints, HTTP-only cookie support, session-token creation/list/revoke flows, role-based access for owner/admin/operator/viewer, and Settings page token management.
+- Workspace isolation for providers, tasks, gallery assets, prompts, canvas projects, ops metrics, and audit-log reads.
+- Security hardening for audit metadata, per-token/IP rate limiting, workspace-scoped uploads, and read-only viewer sessions.
+
 - P0-P4 expansion: richer task diagnostics, forced stop, bulk retry, retry overrides, Gallery metadata, Canvas snapshots/templates/DAG ordering, workspaces/sessions, ops alerts, cost/quality metrics, and real S3-compatible storage adapter.
 - Local-to-remote asset migration and orphan asset cleanup scripts.
 

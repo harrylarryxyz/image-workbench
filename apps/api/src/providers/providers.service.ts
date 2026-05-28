@@ -4,6 +4,7 @@ import type { ProviderProfile } from '../lib/shared';
 import { getModelCapability, listModelCapabilities, normalizeBaseUrl } from '../lib/provider-sdk';
 import { decryptSecret, encryptSecret, maskSecret } from './secret-box';
 import { AuditService } from '../auth/audit.service';
+import type { RequestContext } from '../auth/request-context';
 
 function maskKey(value: string): string {
   if (!value) return '';
@@ -29,12 +30,12 @@ const TINY_PNG = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCA
 export class ProvidersService {
   constructor(private readonly prisma: PrismaService, private readonly audit?: AuditService) {}
 
-  async list() {
-    const rows = await this.prisma.providerProfile.findMany({ orderBy: [{ enabled: 'desc' }, { updatedAt: 'desc' }] });
+  async list(ctx?: RequestContext) {
+    const rows = await this.prisma.providerProfile.findMany({ where: ctx ? { workspaceId: ctx.workspaceId } : undefined, orderBy: [{ enabled: 'desc' }, { updatedAt: 'desc' }] });
     return Promise.all(rows.map((row) => this.serialize(row, true)));
   }
 
-  async create(body: any) {
+  async create(body: any, ctx?: RequestContext) {
     const name = String(body?.name ?? '').trim();
     const baseUrl = String(body?.baseUrl ?? '').trim().replace(/\/+$/, '');
     const apiKey = String(body?.apiKey ?? '').trim();
@@ -51,15 +52,16 @@ export class ProvidersService {
         defaultModel,
         apiMode: toApiMode(body?.apiMode),
         enabled: body?.enabled !== false,
+        workspaceId: ctx?.workspaceId,
       },
     });
-    await this.audit?.log('provider.create', 'provider', row.id, { name, type: row.type, baseUrl });
+    await this.audit?.log('provider.create', 'provider', row.id, { name, type: row.type, baseUrl }, ctx);
     return this.serialize(row);
   }
 
   capabilities() { return listModelCapabilities(); }
 
-  async update(id: string, body: any) {
+  async update(id: string, body: any, ctx?: RequestContext) {
     const data: any = {};
     if (body?.name !== undefined) data.name = String(body.name).trim();
     if (body?.type !== undefined) data.type = toType(body.type);
@@ -68,19 +70,23 @@ export class ProvidersService {
     if (body?.apiMode !== undefined) data.apiMode = toApiMode(body.apiMode);
     if (body?.enabled !== undefined) data.enabled = Boolean(body.enabled);
     if (body?.apiKey !== undefined && String(body.apiKey).trim()) data.apiKeyEncrypted = encryptSecret(String(body.apiKey).trim());
-    const row = await this.prisma.providerProfile.update({ where: { id }, data });
-    await this.audit?.log('provider.update', 'provider', id, { fields: Object.keys(data) });
+    const existing = await this.prisma.providerProfile.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
+    if (!existing) throw new BadRequestException('provider not found');
+    const row = await this.prisma.providerProfile.update({ where: { id: existing.id }, data });
+    await this.audit?.log('provider.update', 'provider', id, { fields: Object.keys(data) }, ctx);
     return this.serialize(row);
   }
 
-  async remove(id: string) {
-    await this.prisma.providerProfile.delete({ where: { id } });
-    await this.audit?.log('provider.delete', 'provider', id);
+  async remove(id: string, ctx?: RequestContext) {
+    const existing = await this.prisma.providerProfile.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
+    if (!existing) throw new BadRequestException('provider not found');
+    await this.prisma.providerProfile.delete({ where: { id: existing.id } });
+    await this.audit?.log('provider.delete', 'provider', id, undefined, ctx);
     return { ok: true };
   }
 
-  async test(id: string) {
-    const row = await this.prisma.providerProfile.findUnique({ where: { id } });
+  async test(id: string, ctx?: RequestContext) {
+    const row = await this.prisma.providerProfile.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
     if (!row) return { ok: false, error: 'provider not found' };
     const started = Date.now();
     try {
@@ -109,8 +115,8 @@ export class ProvidersService {
   }
 
 
-  async testEdit(id: string) {
-    const row = await this.prisma.providerProfile.findUnique({ where: { id } });
+  async testEdit(id: string, ctx?: RequestContext) {
+    const row = await this.prisma.providerProfile.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
     if (!row) return { ok: false, supported: false, error: 'provider not found' };
     const started = Date.now();
     const { baseUrl } = normalizeBaseUrl(row.baseUrl);
@@ -152,8 +158,8 @@ export class ProvidersService {
     }
   }
 
-  async getDefault() {
-    const configured = await this.prisma.providerProfile.findFirst({ where: { enabled: true }, orderBy: { updatedAt: 'desc' } });
+  async getDefault(ctx?: RequestContext) {
+    const configured = await this.prisma.providerProfile.findFirst({ where: { enabled: true, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) }, orderBy: { updatedAt: 'desc' } });
     if (configured) return configured;
     const baseUrl = process.env.IMAGE_API_BASE;
     const apiKey = process.env.IMAGE_API_KEY;
@@ -165,15 +171,16 @@ export class ProvidersService {
         apiKeyEncrypted: encryptSecret(apiKey),
         defaultModel: process.env.IMAGE_MODEL ?? 'gpt-image-2',
         apiMode: 'AUTO',
+        workspaceId: ctx?.workspaceId,
       },
     });
   }
 
-  async seedEnvironmentProvider(name = 'Environment provider') {
+  async seedEnvironmentProvider(name = 'Environment provider', ctx?: RequestContext) {
     const baseUrl = process.env.IMAGE_API_BASE;
     const apiKey = process.env.IMAGE_API_KEY;
     if (!baseUrl || !apiKey) throw new Error('IMAGE_API_BASE and IMAGE_API_KEY are required');
-    const existing = await this.prisma.providerProfile.findFirst({ where: { name } });
+    const existing = await this.prisma.providerProfile.findFirst({ where: { name, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
     const data = {
       name,
       baseUrl,
@@ -181,6 +188,7 @@ export class ProvidersService {
       defaultModel: process.env.IMAGE_MODEL ?? 'gpt-image-2',
       apiMode: 'AUTO' as const,
       enabled: true,
+      workspaceId: ctx?.workspaceId,
     };
     const row = existing
       ? await this.prisma.providerProfile.update({ where: { id: existing.id }, data })
@@ -191,7 +199,7 @@ export class ProvidersService {
   private async serialize(row: any, includeHealth = false) {
     const capability = getModelCapability(row.defaultModel);
     const lastEditTask = includeHealth ? await this.prisma.generationTask.findFirst({
-      where: { providerId: row.id, type: 'image.edit' },
+      where: { providerId: row.id, type: 'image.edit', ...(row.workspaceId ? { workspaceId: row.workspaceId } : {}) },
       orderBy: { updatedAt: 'desc' },
       select: { status: true, errorCode: true, errorMessage: true, updatedAt: true },
     }) : null;

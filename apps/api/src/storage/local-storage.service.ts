@@ -71,11 +71,12 @@ export class LocalStorageService {
     }
   }
 
-  async putImage(bytes: Uint8Array): Promise<StoredImage> {
+  async putImage(bytes: Uint8Array, namespace = ''): Promise<StoredImage> {
     const sha256 = createHash('sha256').update(bytes).digest('hex');
     const format = detectImageFormat(bytes);
     const ext = format === 'unknown' ? 'png' : format;
-    const objectKey = `${sha256.slice(0, 2)}/${sha256}.${ext}`;
+    const safeNamespace = namespace.split('/').filter((part) => part && part !== '..').join('/');
+    const objectKey = `${safeNamespace ? `${safeNamespace}/` : ''}${sha256.slice(0, 2)}/${sha256}.${ext}`;
     const storageKey = this.backend === 'local' ? `local://${objectKey}` : `${this.backend}://${this.bucket}/${objectKey}`;
     let thumbnailKey: string | undefined;
     let thumbnailSizeBytes: number | undefined;
@@ -85,16 +86,17 @@ export class LocalStorageService {
       await writeFile(join(this.root, objectKey), bytes);
       const thumbnail = await this.createThumbnail(bytes);
       if (thumbnail) {
-        thumbnailKey = `local://thumbs/${sha256.slice(0, 2)}/${sha256}.webp`;
+        const thumbObjectKey = `thumbs/${safeNamespace ? `${safeNamespace}/` : ''}${sha256.slice(0, 2)}/${sha256}.webp`;
+        thumbnailKey = `local://${thumbObjectKey}`;
         thumbnailSizeBytes = thumbnail.byteLength;
-        await mkdir(join(this.root, 'thumbs', sha256.slice(0, 2)), { recursive: true });
-        await writeFile(join(this.root, 'thumbs', sha256.slice(0, 2), `${sha256}.webp`), thumbnail);
+        await mkdir(join(this.root, ...thumbObjectKey.split('/').slice(0, -1)), { recursive: true });
+        await writeFile(join(this.root, thumbObjectKey), thumbnail);
       }
     } else {
       await this.putRemoteObject(objectKey, bytes, ext);
       const thumbnail = await this.createThumbnail(bytes);
       if (thumbnail) {
-        const thumbObjectKey = `thumbs/${sha256.slice(0, 2)}/${sha256}.webp`;
+        const thumbObjectKey = `thumbs/${safeNamespace ? `${safeNamespace}/` : ''}${sha256.slice(0, 2)}/${sha256}.webp`;
         await this.putRemoteObject(thumbObjectKey, thumbnail, 'webp');
         thumbnailKey = `${this.backend}://${this.bucket}/${thumbObjectKey}`;
         thumbnailSizeBytes = thumbnail.byteLength;

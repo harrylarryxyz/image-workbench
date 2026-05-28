@@ -32,6 +32,7 @@ describe('CanvasProjectsController', () => {
   it('updates projects by replacing graph children atomically', async () => {
     const prisma = {
       canvasProject: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'canvas_1' }),
         update: vi.fn().mockResolvedValue({
           id: 'canvas_1', name: 'Updated', description: null, createdAt: new Date('2026-05-27T00:00:00Z'), updatedAt: new Date('2026-05-27T00:00:01Z'),
           nodes: [{ id: node.id, type: node.type, positionX: 10, positionY: 20, dataJson: node.data }],

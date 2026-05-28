@@ -14,6 +14,7 @@ import { AdminTokenGuard } from './auth/admin-token.guard';
 import { AuditService } from './auth/audit.service';
 import { AuditLogsController } from './auth/audit-logs.controller';
 import { WorkspacesController } from './auth/workspaces.controller';
+import { AuthController } from './auth/auth.controller';
 import { OpsController } from './ops.controller';
 
 @Module({
@@ -28,7 +29,7 @@ import { OpsController } from './ops.controller';
     PromptsModule,
     CanvasModule,
   ],
-  controllers: [AuditLogsController, WorkspacesController, OpsController],
+  controllers: [AuditLogsController, WorkspacesController, AuthController, OpsController],
   providers: [PrismaService, AuditService, { provide: APP_GUARD, useClass: AdminTokenGuard }],
 })
 export class AppModule {}

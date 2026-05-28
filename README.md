@@ -109,7 +109,9 @@ S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
 PROVIDER_SECRET_KEY=64_HEX_CHARS_FOR_AES_256_GCM
 WORKBENCH_ADMIN_TOKEN=optional_admin_token_for_api
+WORKBENCH_RATE_LIMIT_PER_MINUTE=240
 NEXT_PUBLIC_WORKBENCH_TOKEN=optional_admin_token_for_browser
+NEXT_PUBLIC_WORKSPACE_ID=default
 IMAGE_API_BASE=https://api.example.com/v1
 IMAGE_API_KEY=YOUR_PROVIDER_API_KEY
 IMAGE_MODEL=gpt-image-2
@@ -120,7 +122,9 @@ Notes:
 - Keep API keys server-side only. Do not expose provider keys to the browser.
 - `.env.local` is ignored by Git.
 - Provider records created in the UI are stored in the database. New and updated provider keys are encrypted-at-rest with AES-256-GCM and stored with an `enc:v1:` prefix; legacy plaintext values remain readable for migration compatibility.
-- Until S3/R2/MinIO resources are available, keep `STORAGE_BACKEND=local` and back up `STORAGE_DIR`. This is the recommended low-cost production mode for a single VPS.
+- Use `WORKBENCH_ADMIN_TOKEN` as the bootstrap owner token. Create narrower session tokens from `Settings` or `POST /auth/tokens`.
+- Open `Settings` to inspect the current auth context, save a browser token, and manage workspace session tokens.
+- Keep `STORAGE_BACKEND=local` on a single VPS unless R2/S3/MinIO credentials are ready; remote storage can be enabled through the S3-compatible variables above.
 
 ## Local development
 
@@ -226,8 +230,11 @@ Main endpoints:
 - `POST /tasks/:id/cancel` — cancel a queued task.
 - `GET /tasks/queue/status` — inspect queue and database status counts.
 - `GET /tasks/failed` — list failed/dead-letter style tasks.
+- `GET /auth/me`, `POST /auth/login`, `POST /auth/logout` — inspect/login/logout with bootstrap or session tokens.
+- `GET /auth/tokens`, `POST /auth/tokens`, `POST /auth/tokens/:id/revoke` — manage workspace session tokens.
+- `GET /workspaces`, `GET /workspaces/me`, `POST /workspaces` — inspect and create workspaces.
 - `GET /tasks/metrics/summary` — usage metrics by status/model and image storage totals.
-- `GET /audit-logs` — recent audit events.
+- `GET /audit-logs` — recent workspace-scoped audit events.
 - `POST /gallery/batch/delete` — batch delete image asset database rows.
 - `GET /prompts/history`, `PATCH /prompts/:id`, `GET /prompts/:id/versions`, `POST /prompts/:id/render` — prompt history, versioning, and template variables.
 - `POST /canvas-projects/:id/run` — execute saved canvas Task nodes and write task ids back to the graph.
@@ -289,6 +296,9 @@ Deployment note: when frontend source changes, sync both `apps/web/lib/*` and a 
 - Set a stable `PROVIDER_SECRET_KEY` before production writes; changing it makes existing `enc:v1:` keys undecryptable.
 - Generated assets are stored under `STORAGE_DIR` for `STORAGE_BACKEND=local`; back this directory up if image outputs are important.
 - Long-running tasks depend on Redis and the BullMQ worker being online.
+- Session roles are `owner`, `admin`, `operator`, and `viewer`; viewers are read-only, operators can run normal workflows, and admin/owner roles manage providers, workspaces, tokens, and deletes.
+- Workspace-scoped API requests use bearer tokens plus optional `x-workspace-id`; generated tasks/assets/prompts/canvases inherit the resolved workspace context.
+- Audit logs include workspace, actor label/role, token hash, IP, and user agent for high-risk operations.
 
 ## Documentation
 

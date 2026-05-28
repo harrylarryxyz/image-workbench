@@ -25,15 +25,11 @@
 - Canvas projects can execute saved task nodes from connected Prompt/Image nodes and write task ids back into node data.
 - Ops page exposes queue, usage metrics, and audit logs; `scripts/audit-local-assets.sh` summarizes local asset footprint.
 
-## Deferred until resources exist
-
-- Attach a real S3 SDK adapter for remote object read/write in deployments that set `STORAGE_BACKEND=s3|r2|minio`.
-
 ## Suggested near-term operating model
 
-- Keep `STORAGE_BACKEND=local` on the single VPS deployment.
+- Keep `STORAGE_BACKEND=local` on the single VPS deployment unless R2/S3/MinIO credentials are ready.
 - Back up `STORAGE_DIR` regularly together with PostgreSQL.
-- Use the S3/R2/MinIO key contract as a future migration seam, not a current dependency.
+- Switch to `STORAGE_BACKEND=s3|r2|minio` when image volume or disk pressure justifies remote storage.
 
 
 ## Completed in the v0.3-v0.7 P0-P4 expansion
@@ -43,3 +39,21 @@
 - P2 team groundwork: Workspace and UserSession tables, token-derived session tracking, and workspace API surfaces.
 - P3 operations: cost/quality summary metrics and alert endpoint for queue backlog, high failure rate, and storage pressure.
 - P4 storage: real S3-compatible write/read/signed-url path for S3/R2/MinIO, plus migration and orphan cleanup scripts.
+
+
+## Completed in v0.8 team hardening
+
+- Public login endpoint for bootstrap/admin tokens and persisted session tokens.
+- Session token management: create, list, revoke, label, role, expiry metadata.
+- Role model: owner/admin/operator/viewer with viewer read-only behavior and admin-only high-risk operations.
+- Workspace isolation across providers, tasks, gallery assets, prompts, canvas projects, ops metrics, and audit logs.
+- Audit metadata now captures workspace, actor role/label, token hash, IP, and user agent.
+- Upload/reference assets are namespaced by workspace to prevent accidental cross-workspace preview access.
+- Settings page exposes current auth context, workspace list, browser token save, and session-token management.
+
+## Next recommended slice: v0.9 Canvas professional workflow
+
+- Persist Canvas run records and node-level execution state.
+- Add partial node rerun and run replay/copy workflows.
+- Expand built-in Canvas templates and make template-to-project creation first-class.
+- Show live node progress and result thumbnails directly on the Canvas.

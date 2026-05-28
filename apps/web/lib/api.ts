@@ -6,8 +6,18 @@ function apiBase(): string {
 }
 
 export function authHeaders(): Record<string, string> {
-  const token = process.env.NEXT_PUBLIC_WORKBENCH_TOKEN;
-  return token ? { authorization: `Bearer ${token}` } : {};
+  const headers: Record<string, string> = {};
+  const envToken = process.env.NEXT_PUBLIC_WORKBENCH_TOKEN;
+  const envWorkspace = process.env.NEXT_PUBLIC_WORKSPACE_ID;
+  if (envToken) headers.authorization = `Bearer ${envToken}`;
+  if (envWorkspace) headers['x-workspace-id'] = envWorkspace;
+  if (typeof window !== 'undefined') {
+    const token = window.localStorage.getItem('workbench_token');
+    const workspace = window.localStorage.getItem('workbench_workspace_id');
+    if (token) headers.authorization = `Bearer ${token}`;
+    if (workspace) headers['x-workspace-id'] = workspace;
+  }
+  return headers;
 }
 
 export async function apiGet<T>(path: string): Promise<T> {

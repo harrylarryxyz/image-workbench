@@ -8,6 +8,7 @@ import { GenerateImageRequestSchema } from '../lib/shared';
 import { TaskEventsService } from './task-events.service';
 import { ImageReferenceService } from './image-reference.service';
 import { AuditService } from '../auth/audit.service';
+import type { RequestContext } from '../auth/request-context';
 
 @Injectable()
 export class TasksService {
@@ -20,9 +21,9 @@ export class TasksService {
     private readonly audit?: AuditService,
   ) {}
 
-  async createGenerateTask(input: unknown) {
+  async createGenerateTask(input: unknown, ctx?: RequestContext) {
     const request = GenerateImageRequestSchema.parse(input);
-    const provider = await this.providers.getDefault();
+    const provider = await this.providers.getDefault(ctx);
     const model = request.model || provider.defaultModel;
     const task = await this.prisma.generationTask.create({
       data: {
@@ -31,17 +32,18 @@ export class TasksService {
         prompt: request.prompt,
         paramsJson: request,
         status: 'QUEUED',
+        workspaceId: ctx?.workspaceId,
       },
     });
     await this.enqueueTask(task.id);
-    await this.audit?.log('task.create', 'task', task.id, { type: task.type, model });
+    await this.audit?.log('task.create', 'task', task.id, { type: task.type, model }, ctx);
     return { id: task.id, status: task.status };
   }
 
-  async createEditTask(input: any) {
+  async createEditTask(input: any, ctx?: RequestContext) {
     const request = GenerateImageRequestSchema.parse(input);
-    const refKeys = await this.refs.assertExistingStorageKeys(Array.isArray(input?.refKeys) ? input.refKeys.map(String) : []);
-    const provider = await this.providers.getDefault();
+    const refKeys = await this.refs.assertExistingStorageKeys(Array.isArray(input?.refKeys) ? input.refKeys.map(String) : [], ctx);
+    const provider = await this.providers.getDefault(ctx);
     const model = request.model || provider.defaultModel;
     const params = { ...request, refKeys, maskKey: typeof input?.maskKey === 'string' ? input.maskKey : undefined, editMode: 'reference' };
     const task = await this.prisma.generationTask.create({
@@ -52,14 +54,15 @@ export class TasksService {
         prompt: request.prompt,
         paramsJson: params,
         status: 'QUEUED',
+        workspaceId: ctx?.workspaceId,
       },
     });
     await this.enqueueTask(task.id);
-    await this.audit?.log('task.create', 'task', task.id, { type: task.type, model, refCount: refKeys.length });
+    await this.audit?.log('task.create', 'task', task.id, { type: task.type, model, refCount: refKeys.length }, ctx);
     return { id: task.id, status: task.status, type: task.type };
   }
 
-  async queueStatus() {
+  async queueStatus(ctx?: RequestContext) {
     await this.reconcileRunningTasksWithImages();
     await this.requeueStaleLiveTasks();
     const [waiting, active, delayed, failed, completed, paused] = await Promise.all([
@@ -71,15 +74,15 @@ export class TasksService {
       this.queue.isPaused(),
     ]);
     await this.failTimedOutRunningTasks();
-    const dbCounts = await this.prisma.generationTask.groupBy({ by: ['status'], _count: { status: true } });
+    const dbCounts = await this.prisma.generationTask.groupBy({ by: ['status'], where: ctx ? { workspaceId: ctx.workspaceId } : undefined, _count: { status: true } });
     return {
       queue: { waiting, active, delayed, failed, completed, paused },
       database: Object.fromEntries(dbCounts.map((row) => [row.status, row._count.status])),
     };
   }
 
-  async retryTask(id: string, overrides: any = {}) {
-    const task = await this.prisma.generationTask.findUnique({ where: { id } });
+  async retryTask(id: string, overrides: any = {}, ctx?: RequestContext) {
+    const task = await this.prisma.generationTask.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
     if (!task) return { ok: false, error: 'task not found' };
     await this.prisma.generationTask.update({
       where: { id },
@@ -96,29 +99,31 @@ export class TasksService {
       },
     });
     await this.enqueueTask(id);
-    await this.audit?.log('task.retry', 'task', id);
+    await this.audit?.log('task.retry', 'task', id, undefined, ctx);
     this.notifyTaskChanged(id);
     return { ok: true, id, status: 'QUEUED' };
   }
 
-  async bulkRetryFailed(overrides: any = {}) {
-    const rows = await this.prisma.generationTask.findMany({ where: { status: 'FAILED' }, select: { id: true }, take: 100 });
+  async bulkRetryFailed(overrides: any = {}, ctx?: RequestContext) {
+    const rows = await this.prisma.generationTask.findMany({ where: { status: 'FAILED', ...(ctx ? { workspaceId: ctx.workspaceId } : {}) }, select: { id: true }, take: 100 });
     const retried = [];
-    for (const row of rows) retried.push(await this.retryTask(row.id, overrides));
+    for (const row of rows) retried.push(await this.retryTask(row.id, overrides, ctx));
     return { retried: retried.length, ids: retried.map((x: any) => x.id) };
   }
 
-  async forceStopTask(id: string) {
+  async forceStopTask(id: string, ctx?: RequestContext) {
+    const task = await this.prisma.generationTask.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
+    if (!task) return { ok: false, error: 'task not found' };
     const jobs = await this.queue.getJobs(['waiting', 'active', 'delayed', 'prioritized']);
     for (const job of jobs) if (job.data?.taskId === id) await job.remove().catch(() => undefined);
-    await this.prisma.generationTask.update({ where: { id }, data: { status: 'FAILED', errorCode: 'force_stopped', errorMessage: 'Task force-stopped by operator.' } });
-    await this.audit?.log('task.force_stop', 'task', id);
+    await this.prisma.generationTask.update({ where: { id: task.id }, data: { status: 'FAILED', errorCode: 'force_stopped', errorMessage: 'Task force-stopped by operator.' } });
+    await this.audit?.log('task.force_stop', 'task', id, undefined, ctx);
     this.notifyTaskChanged(id);
     return { ok: true, id, status: 'FAILED' };
   }
 
-  async diagnosticPackage(id: string) {
-    const task = await this.getTask(id);
+  async diagnosticPackage(id: string, ctx?: RequestContext) {
+    const task = await this.getTask(id, ctx);
     if (!task) return null;
     const suggestion = this.suggestFix(task);
     return { task, suggestion, copiedAt: new Date().toISOString() };
@@ -133,8 +138,8 @@ export class TasksService {
     return '查看 route/diagnostics，优先确认模型能力、API mode、size/quality/format 是否匹配。';
   }
 
-  async cancelTask(id: string) {
-    const task = await this.prisma.generationTask.findUnique({ where: { id } });
+  async cancelTask(id: string, ctx?: RequestContext) {
+    const task = await this.prisma.generationTask.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) } });
     if (!task) return { ok: false, error: 'task not found' };
     const jobs = await this.queue.getJobs(['waiting', 'delayed', 'prioritized']);
     for (const job of jobs) {
@@ -142,30 +147,32 @@ export class TasksService {
     }
     if (task.status === 'QUEUED') {
       await this.prisma.generationTask.update({ where: { id }, data: { status: 'CANCELLED', errorCode: 'cancelled', errorMessage: 'Task cancelled before execution.' } });
-      await this.audit?.log('task.cancel', 'task', id);
+      await this.audit?.log('task.cancel', 'task', id, undefined, ctx);
       this.notifyTaskChanged(id);
       return { ok: true, id, status: 'CANCELLED' };
     }
     return { ok: false, id, status: task.status, error: 'Only queued tasks can be cancelled safely.' };
   }
 
-  async listFailed() {
-    const rows = await this.prisma.generationTask.findMany({ where: { status: 'FAILED' }, orderBy: { updatedAt: 'desc' }, take: 100, include: { images: true, provider: true } });
+  async listFailed(ctx?: RequestContext) {
+    const rows = await this.prisma.generationTask.findMany({ where: { status: 'FAILED', ...(ctx ? { workspaceId: ctx.workspaceId } : {}) }, orderBy: { updatedAt: 'desc' }, take: 100, include: { images: true, provider: true } });
     return rows.map((task) => this.serializeTask(task, true));
   }
 
-  async metrics() {
-    const byStatus = await this.prisma.generationTask.groupBy({ by: ['status'], _count: { status: true }, _avg: { elapsedMs: true } });
-    const byModel = await this.prisma.generationTask.groupBy({ by: ['model'], _count: { model: true }, _avg: { elapsedMs: true }, orderBy: { _count: { model: 'desc' } }, take: 20 });
-    const images = await this.prisma.imageAsset.aggregate({ _count: { id: true }, _sum: { sizeBytes: true } });
+  async metrics(ctx?: RequestContext) {
+    const where = ctx ? { workspaceId: ctx.workspaceId } : undefined;
+    const byStatus = await this.prisma.generationTask.groupBy({ by: ['status'], where, _count: { status: true }, _avg: { elapsedMs: true } });
+    const byModel = await this.prisma.generationTask.groupBy({ by: ['model'], where, _count: { model: true }, _avg: { elapsedMs: true }, orderBy: { _count: { model: 'desc' } }, take: 20 });
+    const images = await this.prisma.imageAsset.aggregate({ where, _count: { id: true }, _sum: { sizeBytes: true } });
     const failed = byStatus.find((row) => row.status === 'FAILED')?._count.status ?? 0;
     const total = byStatus.reduce((sum, row) => sum + row._count.status, 0);
     return { byStatus, byModel, images: { count: images._count.id, sizeBytes: images._sum.sizeBytes ?? 0 }, cost: { estimatedUsd: byStatus.reduce((sum, row) => sum + (row.status === 'SUCCEEDED' ? row._count.status * 0.04 : 0), 0) }, quality: { failureRate: total ? failed / total : 0 } };
   }
 
-  async listRecent() {
+  async listRecent(ctx?: RequestContext) {
     await this.reconcileRunningTasksWithImages();
     const rows = await this.prisma.generationTask.findMany({
+      where: ctx ? { workspaceId: ctx.workspaceId } : undefined,
       orderBy: { createdAt: 'desc' },
       take: 80,
       include: { images: true, provider: true },
@@ -173,13 +180,13 @@ export class TasksService {
     return rows.map((task) => this.serializeTask(task));
   }
 
-  async getTask(id: string) {
-    const task = await this.prisma.generationTask.findUnique({ where: { id }, include: { images: true, provider: true } });
+  async getTask(id: string, ctx?: RequestContext) {
+    const task = await this.prisma.generationTask.findFirst({ where: { id, ...(ctx ? { workspaceId: ctx.workspaceId } : {}) }, include: { images: true, provider: true } });
     return task ? this.serializeTask(task, true) : null;
   }
 
-  streamTaskEvents(id: string, res: Response) {
-    return this.events.stream(id, () => this.getTask(id), this.events.closeSignal(res));
+  streamTaskEvents(id: string, res: Response, ctx?: RequestContext) {
+    return this.events.stream(id, () => this.getTask(id, ctx), this.events.closeSignal(res));
   }
 
   notifyTaskChanged(id: string) {

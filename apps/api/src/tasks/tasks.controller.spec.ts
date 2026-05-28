@@ -17,6 +17,6 @@ describe('TasksController SSE events contract', () => {
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-cache, no-transform');
     expect(res.setHeader).toHaveBeenCalledWith('Connection', 'keep-alive');
-    expect(tasks.streamTaskEvents).toHaveBeenCalledWith('task_123', res);
+    expect(tasks.streamTaskEvents).toHaveBeenCalledWith('task_123', res, expect.objectContaining({ workspaceId: 'default' }));
   });
 });

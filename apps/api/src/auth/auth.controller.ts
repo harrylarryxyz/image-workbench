@@ -1,0 +1,74 @@
+import { Body, Controller, Get, Param, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { randomBytes } from 'node:crypto';
+import { PrismaService } from '../prisma.service';
+import { Public } from './public.decorator';
+import { getRequestContext, resolveRequestContext, tokenHash, type WorkbenchRole } from './request-context';
+
+function newToken() { return `iwb_${randomBytes(24).toString('base64url')}`; }
+function maskedHash(hash: string) { return `${hash.slice(0, 10)}…${hash.slice(-6)}`; }
+function cookieOptions() { return { httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/' }; }
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Public()
+  @Post('login')
+  async login(@Body() body: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token = String(body?.token ?? '').trim();
+    if (!token) throw new UnauthorizedException('token is required');
+    const adminToken = process.env.WORKBENCH_ADMIN_TOKEN;
+    const workspaceId = String(body?.workspaceId ?? req.headers['x-workspace-id'] ?? 'default');
+    await this.prisma.workspace.upsert({ where: { id: workspaceId }, update: {}, create: { id: workspaceId, slug: workspaceId, name: workspaceId === 'default' ? 'Default Workspace' : workspaceId } });
+
+    if (adminToken && token === adminToken) {
+      const hash = tokenHash(token);
+      await this.prisma.userSession.upsert({
+        where: { tokenHash: hash },
+        update: { workspaceId, role: 'owner', label: 'bootstrap-admin-token', lastSeenAt: new Date(), revokedAt: null },
+        create: { workspaceId, tokenHash: hash, role: 'owner', label: 'bootstrap-admin-token', lastSeenAt: new Date() },
+      });
+      res.cookie('workbench_token', token, cookieOptions());
+      return { ok: true, workspaceId, role: 'owner', label: 'bootstrap-admin-token' };
+    }
+
+    const session = await this.prisma.userSession.findUnique({ where: { tokenHash: tokenHash(token) } });
+    if (!session || session.revokedAt || (session.expiresAt && session.expiresAt < new Date())) throw new UnauthorizedException('invalid session token');
+    res.cookie('workbench_token', token, cookieOptions());
+    return { ok: true, workspaceId: session.workspaceId, role: session.role, label: session.label };
+  }
+
+  @Get('me')
+  async me(@Req() req: Request) { return getRequestContext(req); }
+
+  @Post('logout')
+  async logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('workbench_token', cookieOptions());
+    return { ok: true };
+  }
+
+  @Get('tokens')
+  async tokens(@Req() req: Request) {
+    const ctx = getRequestContext(req);
+    const rows = await this.prisma.userSession.findMany({ where: { workspaceId: ctx.workspaceId }, orderBy: { createdAt: 'desc' }, take: 100 });
+    return rows.map((row) => ({ id: row.id, label: row.label, role: row.role, tokenHashMasked: maskedHash(row.tokenHash), createdAt: row.createdAt.toISOString(), lastSeenAt: row.lastSeenAt?.toISOString?.() ?? null, expiresAt: row.expiresAt?.toISOString?.() ?? null, revokedAt: row.revokedAt?.toISOString?.() ?? null }));
+  }
+
+  @Post('tokens')
+  async createToken(@Body() body: any, @Req() req: Request) {
+    const ctx = getRequestContext(req);
+    const role = String(body?.role ?? 'operator').toLowerCase() as WorkbenchRole;
+    const token = newToken();
+    const row = await this.prisma.userSession.create({ data: { workspaceId: String(body?.workspaceId ?? ctx.workspaceId), tokenHash: tokenHash(token), label: body?.label ? String(body.label) : 'generated token', role, expiresAt: body?.expiresAt ? new Date(String(body.expiresAt)) : null } });
+    return { id: row.id, token, label: row.label, role: row.role, workspaceId: row.workspaceId };
+  }
+
+  @Post('tokens/:id/revoke')
+  async revokeToken(@Param('id') id: string, @Req() req: Request) {
+    const ctx = getRequestContext(req);
+    const row = await this.prisma.userSession.update({ where: { id }, data: { revokedAt: new Date() } });
+    if (row.workspaceId !== ctx.workspaceId && ctx.role !== 'owner') throw new UnauthorizedException('cross-workspace revoke denied');
+    return { ok: true, id };
+  }
+}
