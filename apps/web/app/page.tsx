@@ -2,6 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import { apiPost } from '../lib/api';
 import { pollTaskUntilTerminal, subscribeTaskEvents } from '../lib/task-events';
 
@@ -23,13 +30,12 @@ type Variant = { id?: string; title?: string; content: string; payloadJson?: { p
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 
-function statusClass(status?: string) {
+function statusVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const normalized = (status ?? '').toLowerCase();
-  if (normalized === 'succeeded') return 'status ok';
-  if (normalized === 'failed' || normalized === 'cancelled') return 'status bad';
-  if (normalized === 'running') return 'status run';
-  if (normalized === 'queued' || normalized === 'pending') return 'status wait';
-  return 'status neutral';
+  if (normalized === 'succeeded') return 'default';
+  if (normalized === 'failed' || normalized === 'cancelled') return 'destructive';
+  if (normalized === 'running') return 'secondary';
+  return 'outline';
 }
 
 function imageUrl(image?: TaskImage | null) {
@@ -154,43 +160,61 @@ export default function GeneratePage() {
     </section>
 
     <div className="studio-shell">
-      <section className="studio-panel control-stack">
-        <div>
+      <Card className="gap-5 bg-card/85">
+        <CardHeader>
           <p className="eyebrow">Prompt</p>
-          <h2>描述你要生成或修改的画面</h2>
-          <p className="muted">支持 `@image(storageKey)` 或右侧参考图字段；有参考图时自动走 edit workflow。</p>
-        </div>
-        <div>
-          <label>Prompt</label>
-          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-        </div>
-        <div className="actions">
-          <button className="pill" type="button" onClick={makeVariants}>生成 3 个 Prompt 变体</button>
-          <Link className="pill" href="/prompts">打开 Prompt Library</Link>
-          <Link className="pill" href="/gallery">从 Asset Library 选择图</Link>
-        </div>
-        {variants.length ? <div className="version-strip">
-          {variants.map((variant, index) => <button className="notice variant-card" type="button" key={variant.id ?? index} onClick={() => setPrompt(variant.payloadJson?.prompt ?? variant.content)}>
-            <b>{variant.title ?? `Variant ${index + 1}`}</b><span>{variant.content}</span>
-          </button>)}
-        </div> : null}
-        <div className="form-grid">
-          <div><label>Reference Storage Key</label><input value={referenceKey} onChange={(e) => setReferenceKey(e.target.value)} placeholder="可留空；或 @image(local://uploads/...)" /></div>
-          <div><label>Mask Key</label><input value={maskKey} onChange={(e) => setMaskKey(e.target.value)} placeholder="Edit Mask 上传后得到的 key" /></div>
-          <div><label>Model</label><input value={model} onChange={(e) => setModel(e.target.value)} /></div>
-          <div><label>Size</label><select value={size} onChange={(e) => setSize(e.target.value)}><option>1024x1024</option><option>1536x1024</option><option>1024x1536</option><option>auto</option></select></div>
-          <div><label>Quality</label><select value={quality} onChange={(e) => setQuality(e.target.value)}><option>low</option><option>medium</option><option>high</option><option>auto</option></select></div>
-          <div><label>Format</label><select value={format} onChange={(e) => setFormat(e.target.value)}><option>png</option><option>jpeg</option><option>webp</option></select></div>
-          <div><label>Background</label><select value={background} onChange={(e) => setBackground(e.target.value)}><option>auto</option><option>opaque</option><option>transparent</option></select></div>
-          <div><label>API Mode</label><select value={apiMode} onChange={(e) => setApiMode(e.target.value)}><option>auto</option><option>images</option><option>responses</option></select></div>
-        </div>
-        <button className="btn" disabled={loading} onClick={submit}>{loading ? '生成中，等待实时状态…' : referenceKey.trim() ? '创建参考图编辑任务' : '提交生成任务'}</button>
-        <div className="actions">
-          <Link className="pill" href="/edit">打开 Mask / Edit 工作区</Link>
-          <Link className="pill" href={`/canvas?prompt=${encodeURIComponent(prompt)}${referenceKey ? `&image=${encodeURIComponent(referenceKey)}` : ''}`}>发送当前设定到 Canvas</Link>
-          <Link className="pill" href="/agent">打开创作 Agent</Link>
-        </div>
-      </section>
+          <CardTitle>描述你要生成或修改的画面</CardTitle>
+          <CardDescription>支持 `@image(storageKey)` 或右侧参考图字段；有参考图时自动走 edit workflow。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="prompt">Prompt</Label>
+            <Textarea id="prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} className="min-h-40" />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={makeVariants}>生成 3 个 Prompt 变体</Button>
+            <Button asChild type="button" variant="outline"><Link href="/prompts">打开 Prompt Library</Link></Button>
+            <Button asChild type="button" variant="outline"><Link href="/gallery">从 Asset Library 选择图</Link></Button>
+          </div>
+
+          {variants.length ? <div className="grid gap-3 md:grid-cols-3">
+            {variants.map((variant, index) => <Button
+              className="h-auto justify-start whitespace-normal rounded-xl border-border/70 p-4 text-left"
+              type="button"
+              variant="outline"
+              key={variant.id ?? index}
+              onClick={() => setPrompt(variant.payloadJson?.prompt ?? variant.content)}
+            >
+              <span className="grid gap-1">
+                <b>{variant.title ?? `Variant ${index + 1}`}</b>
+                <span className="text-muted-foreground line-clamp-3 text-xs leading-5">{variant.content}</span>
+              </span>
+            </Button>)}
+          </div> : null}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2"><Label htmlFor="reference-key">Reference Storage Key</Label><Input id="reference-key" value={referenceKey} onChange={(e) => setReferenceKey(e.target.value)} placeholder="可留空；或 @image(local://uploads/...)" /></div>
+            <div className="space-y-2"><Label htmlFor="mask-key">Mask Key</Label><Input id="mask-key" value={maskKey} onChange={(e) => setMaskKey(e.target.value)} placeholder="Edit Mask 上传后得到的 key" /></div>
+            <div className="space-y-2"><Label htmlFor="model">Model</Label><Input id="model" value={model} onChange={(e) => setModel(e.target.value)} /></div>
+            <div className="space-y-2"><Label htmlFor="size">Size</Label><NativeSelect id="size" value={size} onChange={(e) => setSize(e.target.value)}><option>1024x1024</option><option>1536x1024</option><option>1024x1536</option><option>auto</option></NativeSelect></div>
+            <div className="space-y-2"><Label htmlFor="quality">Quality</Label><NativeSelect id="quality" value={quality} onChange={(e) => setQuality(e.target.value)}><option>low</option><option>medium</option><option>high</option><option>auto</option></NativeSelect></div>
+            <div className="space-y-2"><Label htmlFor="format">Format</Label><NativeSelect id="format" value={format} onChange={(e) => setFormat(e.target.value)}><option>png</option><option>jpeg</option><option>webp</option></NativeSelect></div>
+            <div className="space-y-2"><Label htmlFor="background">Background</Label><NativeSelect id="background" value={background} onChange={(e) => setBackground(e.target.value)}><option>auto</option><option>opaque</option><option>transparent</option></NativeSelect></div>
+            <div className="space-y-2"><Label htmlFor="api-mode">API Mode</Label><NativeSelect id="api-mode" value={apiMode} onChange={(e) => setApiMode(e.target.value)}><option>auto</option><option>images</option><option>responses</option></NativeSelect></div>
+          </div>
+
+          <Button className="w-full" disabled={loading} onClick={submit}>
+            {loading ? '生成中，等待实时状态…' : referenceKey.trim() ? '创建参考图编辑任务' : '提交生成任务'}
+          </Button>
+
+          <div className="flex flex-wrap gap-2">
+            <Button asChild type="button" variant="outline"><Link href="/edit">打开 Mask / Edit 工作区</Link></Button>
+            <Button asChild type="button" variant="outline"><Link href={`/canvas?prompt=${encodeURIComponent(prompt)}${referenceKey ? `&image=${encodeURIComponent(referenceKey)}` : ''}`}>发送当前设定到 Canvas</Link></Button>
+            <Button asChild type="button" variant="outline"><Link href="/agent">打开创作 Agent</Link></Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <section className="preview-stage" aria-label="PreviewStage">
         <div className="task-head">
@@ -198,7 +222,7 @@ export default function GeneratePage() {
             <p className="eyebrow">PreviewStage</p>
             <h2>{result?.id ? `Task ${result.id.slice(0, 8)}` : '等待第一张作品'}</h2>
           </div>
-          <span className={statusClass(primaryStatus)}>{primaryStatus}</span>
+          <Badge variant={statusVariant(primaryStatus)}>{primaryStatus}</Badge>
         </div>
         <div className={referencePreview && previewUrl ? 'compare-stage' : 'preview-frame'}>
           {referencePreview && previewUrl ? <>
@@ -211,16 +235,16 @@ export default function GeneratePage() {
             {metrics.map(([label, value]) => <div className="metric" key={label}><b>{value}</b><span>{label}</span></div>)}
           </div>
           <div className="image-action-toolbar">
-            {previewUrl ? <a className="pill" href={previewUrl} target="_blank" rel="noreferrer" download>下载原图</a> : null}
-            {firstImage?.storageKey ? <Link className="pill" href={`/edit?ref=${encodeURIComponent(firstImage.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>作为参考图继续编辑</Link> : null}
-            {firstImage?.storageKey ? <Link className="pill" href={`/canvas?image=${encodeURIComponent(firstImage.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>发送到 Canvas</Link> : null}
-            {result?.id ? <Link className="pill" href={`/tasks/${result.id}`}>任务详情</Link> : null}
-            <span className="pill">{streaming ? 'SSE 实时更新' : 'SSE / fallback ready'}</span>
+            {previewUrl ? <Button asChild type="button" size="sm" variant="outline"><a href={previewUrl} target="_blank" rel="noreferrer" download>下载原图</a></Button> : null}
+            {firstImage?.storageKey ? <Button asChild type="button" size="sm" variant="outline"><Link href={`/edit?ref=${encodeURIComponent(firstImage.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>作为参考图继续编辑</Link></Button> : null}
+            {firstImage?.storageKey ? <Button asChild type="button" size="sm" variant="outline"><Link href={`/canvas?image=${encodeURIComponent(firstImage.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>发送到 Canvas</Link></Button> : null}
+            {result?.id ? <Button asChild type="button" size="sm" variant="outline"><Link href={`/tasks/${result.id}`}>任务详情</Link></Button> : null}
+            <Badge variant="outline">{streaming ? 'SSE 实时更新' : 'SSE / fallback ready'}</Badge>
           </div>
           {versionChain.length ? <div className="version-strip">
-            {versionChain.map((task) => <Link className="pill" key={task.id ?? Math.random()} href={task.id ? `/tasks/${task.id}` : '#'}>{task.type ?? 'task'} · {task.status ?? 'created'} · {task.id?.slice(0, 8)}</Link>)}
+            {versionChain.map((task) => <Button asChild type="button" size="sm" variant="outline" key={task.id ?? Math.random()}><Link href={task.id ? `/tasks/${task.id}` : '#'}>{task.type ?? 'task'} · {task.status ?? 'created'} · {task.id?.slice(0, 8)}</Link></Button>)}
           </div> : null}
-          {result?.error || result?.errorMessage ? <div className="notice error">{result.errorMessage ?? result.error}</div> : null}
+          {result?.error || result?.errorMessage ? <Card className="mt-4 border-destructive/40 bg-destructive/10"><CardContent className="pt-6 text-sm text-destructive">{result.errorMessage ?? result.error}</CardContent></Card> : null}
           <details className="diagnostics">
             <summary>Diagnostics · 原始任务响应</summary>
             <pre className="debug-json">{JSON.stringify(result ?? { hint: 'Submit a task to see task id.' }, null, 2)}</pre>

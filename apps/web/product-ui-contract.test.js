@@ -87,3 +87,18 @@ test('first refactor batch uses shadcn primitives instead of legacy button form 
     assert.doesNotMatch(text, /<button(?![^>]*asChild)/, `${relative} should use Button instead of naked button tags`);
   }
 });
+
+test('generate and gallery refactor batch uses shadcn primitives for actions forms and cards', () => {
+  const files = [
+    'page.tsx',
+    'gallery/page.tsx',
+    'gallery/gallery-batch-actions.tsx',
+  ];
+
+  for (const relative of files) {
+    const text = readPage(relative);
+    assert.match(text, /@\/components\/ui\/(button|input|textarea|card|label|badge|select|native-select)/, `${relative} should import shadcn ui primitives`);
+    assert.doesNotMatch(text, /className="(?:btn|pill|card|task-card|studio-panel|notice|status)(?:\s|"|$)/, `${relative} should not use legacy visual component classes`);
+    assert.doesNotMatch(text, /<(button|input|textarea|select|label)\b(?![^>]*data-slot)/, `${relative} should use design-system form/action primitives instead of naked controls`);
+  }
+});
