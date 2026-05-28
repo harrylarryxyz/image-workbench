@@ -43,7 +43,7 @@ export default async function OpsPage() {
     <div className="studio-hero"><p className="eyebrow">Operations 2.0</p><h1>运营、健康与恢复</h1><p className="sub">队列、状态分布、Provider 健康、存储压力、备份状态、审计导出和生产 readiness 集中在一个运营面板。</p></div>
 
     <div className="grid gap-4 md:grid-cols-3 mt-5">
-      <Card><CardContent className="space-y-3 pt-6"><p className="eyebrow">Health</p><h2>{health.status ?? 'unknown'}</h2><p className="muted">commit {version.commit ?? 'unknown'} · build {version.buildTime ?? 'runtime'}</p><details className="diagnostics"><summary>Health JSON</summary><pre className="debug-json">{JSON.stringify({ health, version }, null, 2)}</pre></details></CardContent></Card>
+      <Card><CardContent className="space-y-3 pt-6"><p className="eyebrow">Health</p><h2>{health.status ?? 'unknown'}</h2><p className="muted">commit {version.commit ?? 'unknown'} · build {version.buildTime ?? 'runtime'}</p></CardContent></Card>
       <Card><CardContent className="space-y-3 pt-6"><p className="eyebrow">Storage</p><h2>{storage.backend ?? 'unknown'}</h2><p className="muted">{storage.images?.count ?? 0} assets · {bytesLabel(storage.images?.sizeBytes)}</p><p className="fine-print">migration: {storage.migration?.status ?? 'unknown'}</p></CardContent></Card>
       <Card><CardContent className="space-y-3 pt-6"><p className="eyebrow">Backup</p><h2>{backup.configured ? 'configured' : 'runbook ready'}</h2><p className="muted">{backup.manifestPath ?? 'latest manifest pending'}</p><Button asChild size="sm" variant="outline"><Link href="/api/ops/backup/status">查看状态 JSON</Link></Button></CardContent></Card>
     </div>
@@ -91,9 +91,5 @@ export default async function OpsPage() {
       </CardContent>
     </Card>
 
-    <details className="diagnostics mt-5">
-      <summary>Diagnostics · ops raw payloads</summary>
-      <pre className="debug-json">{JSON.stringify({ queue, metrics, health, version, alerts, storage, providers, backup }, null, 2)}</pre>
-    </details>
   </section>;
 }

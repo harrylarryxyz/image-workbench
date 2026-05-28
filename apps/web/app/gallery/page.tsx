@@ -114,7 +114,7 @@ export default async function GalleryPage({ searchParams }: { searchParams?: Pro
             {selected.storageKey ? <Button asChild size="sm" variant="outline"><Link href={`/?prompt=${encodeURIComponent(`@image(${selected.storageKey}) ${selected.prompt ?? ''}`)}`}>@image 引用</Link></Button> : null}
           </div>
           <div className="flex flex-wrap gap-2">{selected.tags?.map((tag) => <Button asChild size="sm" variant="secondary" key={tag}><Link href={`/gallery?tag=${encodeURIComponent(tag)}`}>#{tag}</Link></Button>)}</div>
-          {selected.sourceAsset || selected.derivatives?.length ? <details className="diagnostics" open><summary>Lineage</summary><pre className="debug-json">{JSON.stringify({ sourceAsset: selected.sourceAsset, derivatives: selected.derivatives }, null, 2)}</pre></details> : null}
+          {selected.sourceAsset || selected.derivatives?.length ? <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">这张图包含来源链路或派生版本，可通过上方动作继续复用。</div> : null}
         </div>
         {assetUrls(selected).assetUrl ? <a href={assetUrls(selected).assetUrl ?? '#'} target="_blank" rel="noreferrer"><img className="lightbox-image" src={assetUrls(selected).assetUrl ?? ''} alt={selected.prompt ?? 'asset'} /></a> : null}
       </CardContent>
@@ -126,14 +126,9 @@ export default async function GalleryPage({ searchParams }: { searchParams?: Pro
       <CardHeader>
         <p className="eyebrow">Empty state</p>
         <CardTitle>还没有可展示的资产</CardTitle>
-        <CardDescription>先从 Create Studio 生成图片，或在 Edit 上传参考图。错误信息可在下方 Diagnostics 查看。</CardDescription>
+        <CardDescription>先从 Create Studio 生成图片，或在 Edit 上传参考图；素材会自动出现在这里。</CardDescription>
       </CardHeader>
-      <CardContent>
-        <details className="diagnostics" open={Boolean(images[0]?.error)}>
-          <summary>Diagnostics</summary>
-          <pre className="debug-json">{JSON.stringify(images, null, 2)}</pre>
-        </details>
-      </CardContent>
+      {images[0]?.error ? <CardContent><div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">素材加载失败，请稍后重试。</div></CardContent> : null}
     </Card> : null}
 
     <div className="masonry-grid mt-5">{hasImages ? images.map((image, i) => {
@@ -160,10 +155,6 @@ export default async function GalleryPage({ searchParams }: { searchParams?: Pro
           </div>
           <div className="fine-print">{image.model ?? 'model unknown'} · {image.width && image.height ? `${image.width}×${image.height}` : image.format} · {image.sizeBytes ? `${Math.round(image.sizeBytes / 1024)} KB` : 'size pending'}</div>
           <div className="flex flex-wrap gap-2">{image.tags?.slice(0, 4).map((tag) => <Button asChild size="sm" variant="outline" key={tag}><Link href={`/gallery?tag=${encodeURIComponent(tag)}`}>#{tag}</Link></Button>)}</div>
-          <details className="diagnostics">
-            <summary>Diagnostics</summary>
-            <pre className="debug-json">{JSON.stringify({ id: image.id, taskId: image.taskId, storageKey: image.storageKey, params: image.params, collections: image.collections }, null, 2)}</pre>
-          </details>
         </div>
       </article>;
     }) : null}</div>

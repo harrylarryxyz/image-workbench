@@ -59,7 +59,7 @@ export function GalleryBatchActions({ images }: { images: Array<{ id: string; pr
         <div className="flex items-end"><Button type="button" onClick={createCollection} disabled={!selected.length}>加入新 Collection</Button></div>
       </div>
 
-      {message ? <pre className="debug-json">{message}</pre> : null}
+      {message ? <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">{message}</div> : null}
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {images.map((image) => {

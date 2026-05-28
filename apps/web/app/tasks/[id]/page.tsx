@@ -7,7 +7,7 @@ import { apiGet } from '../../../lib/api';
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? '';
 
 type TaskImage = { id?: string; assetUrl?: string; storageKey?: string; format?: string; sizeBytes?: number; width?: number | null; height?: number | null };
-type TaskDetail = { id: string; status?: string; model?: string; prompt?: string; type?: string; params?: Record<string, unknown>; route?: unknown; diagnostics?: unknown; images?: TaskImage[]; error?: string; errorMessage?: string; elapsedMs?: number | null; createdAt?: string };
+type TaskDetail = { id: string; status?: string; model?: string; prompt?: string; type?: string; params?: Record<string, unknown>; route?: unknown; images?: TaskImage[]; error?: string; errorMessage?: string; elapsedMs?: number | null; createdAt?: string };
 
 function statusVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const normalized = (status ?? '').toLowerCase();
@@ -53,8 +53,8 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
 
     <Card>
       <CardHeader>
-        <p className="eyebrow">Diagnostics</p>
-        <CardTitle>请求详情</CardTitle>
+        <p className="eyebrow">Task detail</p>
+        <CardTitle>任务详情</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="kv">
@@ -63,10 +63,6 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           <b>Elapsed</b><span>{task.elapsedMs ? `${task.elapsedMs}ms` : 'pending'}</span>
           <b>Created</b><span>{task.createdAt ? new Date(task.createdAt).toLocaleString() : '-'}</span>
         </div>
-        <details className="diagnostics" open>
-          <summary>Route / Params / Images</summary>
-          <pre className="debug-json">{JSON.stringify({ route: task.route ?? {}, params: task.params ?? {}, diagnostics: task.diagnostics ?? {}, images: task.images ?? [] }, null, 2)}</pre>
-        </details>
       </CardContent>
     </Card>
   </section>;

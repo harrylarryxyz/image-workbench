@@ -94,8 +94,8 @@ export function SettingsActions({ tokens }: { tokens: TokenRow[] }) {
         <Button type="button" onClick={createToken}>生成 Invite / Session Token</Button>
         {created ? <Card className="bg-muted/30">
           <CardContent className="space-y-3 pt-6">
-            <p className="eyebrow">One-time secret</p>
-            <pre className="debug-json">{created.token}</pre>
+            <p className="eyebrow">Invite token</p>
+            <div className="rounded-lg border bg-muted/20 p-3 font-mono text-sm break-all">{created.token}</div>
             <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" type="button" onClick={() => copy(created.token)}>复制 Token</Button><Button size="sm" variant="outline" type="button" onClick={() => copy(absoluteInvite)}>复制 Invite Link</Button></div>
             {absoluteInvite ? <p className="fine-print">{absoluteInvite}</p> : null}
           </CardContent>

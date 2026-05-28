@@ -270,6 +270,36 @@ input:focus, textarea:focus, select:focus { border-color: rgba(113,112,255,.72);
 .notice.error { border-color: rgba(255,107,122,.28); background: rgba(255,107,122,.08); color: #ffc5cc; }
 .notice.success { border-color: rgba(56,217,150,.24); background: rgba(56,217,150,.08); }
 
+
+.lovart-shell { display: grid; gap: 18px; }
+.lovart-hero {
+  min-height: 260px;
+  display: grid;
+  align-content: center;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(139,138,255,.34), transparent 35%),
+    radial-gradient(circle at 82% 20%, rgba(115,213,255,.18), transparent 28%),
+    linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.025));
+}
+.lovart-hero .sub { margin: 0 auto; }
+.lovart-workbench { grid-template-columns: minmax(360px, 520px) minmax(0, 1fr); }
+.composer-card { border-radius: 28px; }
+.reference-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px dashed rgba(255,255,255,.22);
+  border-radius: 22px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(113,112,255,.12), rgba(255,255,255,.035));
+}
+.reference-dropzone b { display: block; margin-bottom: 4px; }
+.reference-dropzone p { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+.reference-dropzone span { display: inline-flex; margin-top: 8px; color: var(--text-secondary); font-size: 12px; }
+.support-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+
 .preview-stage {
   position: sticky;
   top: 24px;
@@ -406,7 +436,7 @@ pre.error { border: 1px solid rgba(255,107,122,.22); border-radius: 14px; color:
   .sidebar-footer { position: static; margin-top: 16px; }
   .nav { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
   .main { padding-top: 18px; }
-  .studio-shell, .grid.two, .canvas-workbench, .lightbox-panel { grid-template-columns: 1fr; }
+  .studio-shell, .lovart-workbench, .grid.two, .canvas-workbench, .lightbox-panel, .support-grid { grid-template-columns: 1fr; }
   .preview-stage { position: static; min-height: auto; }
   .canvas-inspector { min-height: auto; }
 }

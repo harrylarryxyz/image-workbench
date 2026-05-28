@@ -162,14 +162,8 @@ export default function ProvidersPage() {
         <CardHeader>
           <div className="flex items-center justify-between gap-3"><CardDescription>Command Center</CardDescription><Badge variant={messageBadge(message.kind)}>{message.kind}</Badge></div>
           <CardTitle>{message.text}</CardTitle>
-          <CardDescription>测试结果和 provider 原始响应收在 Diagnostics，避免主界面变成 API 调试台。</CardDescription>
+          <CardDescription>这里显示最近一次保存、启用或连通性检测结果。</CardDescription>
         </CardHeader>
-        <CardContent>
-          <details className="diagnostics" open={Boolean(message.detail)}>
-            <summary>Diagnostics</summary>
-            <pre className="debug-json">{JSON.stringify(message.detail ?? message, null, 2)}</pre>
-          </details>
-        </CardContent>
       </Card>
     </div>
 

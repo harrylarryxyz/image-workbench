@@ -12,16 +12,57 @@ test('primary product surfaces use studio/library/canvas language instead of deb
   const gallery = readPage('gallery/page.tsx');
   const canvas = readPage('canvas/page.tsx');
 
-  assert.match(generate, /Create Studio|创作工作台|PreviewStage|ImageActionToolbar/, 'generate home should present a productized create studio');
+  assert.match(generate, /Create Studio|创作工作台|预览画布|上传参考图/, 'generate home should present a productized create studio');
   assert.match(gallery, /Asset Library|素材库|Lightbox|masonry|image-card/, 'gallery should present an asset library, not a basic list');
   assert.match(canvas, /Canvas Dock|bottom dock|画布工具栏|canvas-dock/, 'canvas should expose a canvas-style dock workflow');
 });
 
-test('create and edit surfaces hide raw JSON behind diagnostics details', () => {
+test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
+  const files = [
+    'page.tsx',
+    'gallery/page.tsx',
+    'gallery/gallery-batch-actions.tsx',
+    'edit/page.tsx',
+    'canvas/page.tsx',
+    'prompts/prompt-actions.tsx',
+    'settings/page.tsx',
+    'settings/settings-actions.tsx',
+    'layout.tsx',
+  ];
+  const forbidden = /ImageActionToolbar ready|SSE(?:\s|\/| 实时| ready| unavailable)|fallback ready|Diagnostics|diagnostics|debug-json|原始任务响应|Provider readiness|Storage Key|Reference Storage Key|Mask ready|One-time secret|JSON\.stringify\([^)]*,\s*null,\s*2\)/i;
+
+  for (const relative of files) {
+    const text = readPage(relative);
+    assert.doesNotMatch(text, forbidden, `${relative} should not expose debug or engineering status copy`);
+    assert.doesNotMatch(text, /<details\b/, `${relative} should not render public diagnostics details`);
+  }
+});
+
+test('create studio keeps advanced generation options collapsed and replaces reference key input with upload UX', () => {
+  const generate = readPage('page.tsx');
+
+  assert.match(generate, /高级设置/, 'create form should group model, size, quality and format in an advanced settings accordion');
+  assert.match(generate, /advancedOpen/, 'advanced settings should be controlled and default closed');
+  assert.doesNotMatch(generate, /<Label htmlFor="reference-key">Reference Storage Key<\/Label>/, 'raw reference storage key input must not be user-facing');
+  assert.doesNotMatch(generate, /id="reference-key"/, 'reference key field should not be exposed as a normal text input');
+  assert.match(generate, /上传参考图|拖拽|Drop/, 'reference image should be selected through an upload/drop affordance');
+  assert.match(generate, /apiFormPost<Uploaded>\('\/assets\/upload'/, 'create studio should upload reference files through the assets API');
+});
+
+test('create studio follows lovart-style hierarchy with prompt composer first, image stage second, and supporting modules below', () => {
+  const generate = readPage('page.tsx');
+
+  for (const marker of ['lovart-shell', 'composer-card', 'reference-dropzone', 'preview-stage', 'support-grid']) {
+    assert.match(generate, new RegExp(marker), `generate page missing ${marker}`);
+  }
+  assert.match(generate, /What shall we create together\?|你想创作什么/, 'composer should ask for the user creative intent first');
+});
+
+test('create and edit surfaces keep raw JSON out of the public interface', () => {
   for (const relative of ['page.tsx', 'edit/page.tsx', 'canvas/page.tsx']) {
     const text = readPage(relative);
     assert.doesNotMatch(text, /<pre>\{JSON\.stringify/, `${relative} must not render raw JSON as the main interface`);
-    assert.match(text, /diagnostics|诊断|debug-details/i, `${relative} should keep technical output in a diagnostics details panel`);
+    assert.doesNotMatch(text, /JSON\.stringify\([^)]*,\s*null,\s*2\)/, `${relative} must not render raw JSON diagnostics`);
   }
 });
 

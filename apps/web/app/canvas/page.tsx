@@ -33,7 +33,7 @@ function withApi(url?: string | null) {
 
 function labelForNode(id: string, data: Record<string, unknown>) {
   if (id.startsWith('prompt')) return `Text\n${String(data.prompt ?? '').trim() || 'Describe your subject here'}`;
-  if (id.startsWith('image')) return `Image\n${String(data.storageKey ?? '').trim() || 'Paste storage key from Gallery/Edit upload'}`;
+  if (id.startsWith('image')) return `Image\n${String(data.storageKey ?? '').trim() || '从素材库或编辑工作区选择图片'}`;
   if (id.startsWith('task')) return `Generation\n${data.taskId ?? data.model ?? 'gpt-image-2'} · ${data.size ?? '1024x1024'}`;
   return String(data.label ?? id);
 }
@@ -66,7 +66,7 @@ export default function CanvasPage() {
   const [projectName, setProjectName] = useState('Untitled canvas');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>('prompt-1');
   const [message, setMessage] = useState('');
-  const exported = useMemo(() => JSON.stringify({ nodes, edges } satisfies CanvasExport, null, 2), [nodes, edges]);
+  const exported = useMemo(() => JSON.stringify({ nodes, edges } satisfies CanvasExport), [nodes, edges]);
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null;
 
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function CanvasPage() {
 
   function addImageNode() {
     const id = `image-${Date.now()}`;
-    setNodes((prev) => [...prev, { id, type: 'default', position: { x: 260, y: 240 + prev.length * 20 }, data: { label: 'Image\nPaste storage key from Gallery/Edit upload', storageKey: '' } }]);
+    setNodes((prev) => [...prev, { id, type: 'default', position: { x: 260, y: 240 + prev.length * 20 }, data: { label: 'Image\n从素材库或编辑工作区选择图片', storageKey: '' } }]);
     setSelectedNodeId(id);
   }
 
@@ -279,8 +279,8 @@ export default function CanvasPage() {
               <Textarea id="canvas-node-prompt" value={String(selectedNode.data?.prompt ?? String(selectedNode.data?.label ?? '').split('\n').slice(1).join('\n'))} onChange={(event) => patchSelectedData({ prompt: event.target.value })} />
             </div> : null}
             {selectedNode.id.startsWith('image') ? <div className="space-y-2">
-              <Label htmlFor="canvas-storage-key">Storage Key</Label>
-              <Input id="canvas-storage-key" placeholder="local://uploads/default/... 或图库 storageKey" value={String(selectedNode.data?.storageKey ?? '')} onChange={(event) => patchSelectedData({ storageKey: event.target.value })} />
+              <Label htmlFor="canvas-image-ref">图片引用</Label>
+              <Input id="canvas-image-ref" placeholder="local://uploads/default/... 或从素材库发送" value={String(selectedNode.data?.storageKey ?? '')} onChange={(event) => patchSelectedData({ storageKey: event.target.value })} />
               <p className="muted">可从 Asset Library 的“Canvas”动作或 Edit 上传结果传入。</p>
             </div> : null}
             {selectedNode.id.startsWith('task') ? <div className="space-y-3">
@@ -288,7 +288,7 @@ export default function CanvasPage() {
               <div className="space-y-2"><Label htmlFor="canvas-task-model">Model</Label><Input id="canvas-task-model" value={String(selectedNode.data?.model ?? 'gpt-image-2')} onChange={(event) => patchSelectedData({ model: event.target.value })} /></div>
               <div className="space-y-2"><Label htmlFor="canvas-task-size">Size</Label><Input id="canvas-task-size" value={String(selectedNode.data?.size ?? '1024x1024')} onChange={(event) => patchSelectedData({ size: event.target.value })} /></div>
               <div className="space-y-2"><Label htmlFor="canvas-task-quality">Quality</Label><NativeSelect id="canvas-task-quality" value={String(selectedNode.data?.quality ?? 'low')} onChange={(event) => patchSelectedData({ quality: event.target.value })}><option>low</option><option>medium</option><option>high</option></NativeSelect></div>
-              <div className="space-y-2"><Label htmlFor="canvas-task-mask">Mask Key</Label><Input id="canvas-task-mask" value={String(selectedNode.data?.maskKey ?? '')} onChange={(event) => patchSelectedData({ maskKey: event.target.value })} placeholder="可选：Mask 上传后得到的 storageKey" /></div>
+              <div className="space-y-2"><Label htmlFor="canvas-task-mask">Mask</Label><Input id="canvas-task-mask" value={String(selectedNode.data?.maskKey ?? '')} onChange={(event) => patchSelectedData({ maskKey: event.target.value })} placeholder="可选：从 Edit 工作区生成" /></div>
             </div> : null}
           </div> : <p className="muted">点击画布节点后编辑。</p>}
 
@@ -329,10 +329,6 @@ export default function CanvasPage() {
               </CardContent>
             </Card>))}
           </div>
-          <details className="diagnostics">
-            <summary>Diagnostics · run result</summary>
-            <pre className="debug-json">{JSON.stringify(result ?? { hint: 'Create a task from canvas.' }, null, 2)}</pre>
-          </details>
         </CardContent>
       </Card>
 
@@ -344,11 +340,11 @@ export default function CanvasPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={importCanvas}>
-            <details className="diagnostics" data-testid="canvas-json-panel">
-              <summary>打开 Import / Export JSON</summary>
-              <Textarea data-testid="canvas-json" value={importText || exported} onChange={(e) => setImportText(e.target.value)} className="min-h-72 font-mono" />
+            <div className="rounded-2xl border bg-muted/20 p-4" data-testid="canvas-json-panel">
+              <Label htmlFor="canvas-json">打开 Import / Export JSON</Label>
+              <Textarea id="canvas-json" data-testid="canvas-json" value={importText || exported} onChange={(e) => setImportText(e.target.value)} className="min-h-72 font-mono" />
               <div className="mt-3 flex flex-wrap gap-2"><Button type="submit">导入 JSON</Button><Button variant="outline" type="button" onClick={() => navigator.clipboard?.writeText(exported)}>复制 JSON</Button></div>
-            </details>
+            </div>
           </form>
         </CardContent>
       </Card>

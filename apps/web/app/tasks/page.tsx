@@ -26,7 +26,7 @@ export default async function TasksPage() {
     <div className="studio-hero">
       <p className="eyebrow">Tasks</p>
       <h1>任务控制台</h1>
-      <p className="sub">任务列表只展示创作决策：状态、模型、耗时和缩略摘要；数据库/队列原始响应放在 Diagnostics。</p>
+      <p className="sub">任务列表聚焦创作决策：状态、模型、耗时和缩略摘要。</p>
     </div>
 
     <Card className="mt-5">
@@ -37,10 +37,6 @@ export default async function TasksPage() {
         <div className="queue-grid">
           {queueEntries.length ? queueEntries.map(([key, value]) => <div className="metric" key={key}><b>{String(value)}</b><span>{key}</span></div>) : <Card className="border-border/70 bg-muted/30"><CardContent className="pt-6 text-sm text-muted-foreground">No queue metrics available.</CardContent></Card>}
         </div>
-        <details className="diagnostics">
-          <summary>Diagnostics · queue/database</summary>
-          <pre className="debug-json">{JSON.stringify(queue, null, 2)}</pre>
-        </details>
       </CardContent>
     </Card>
 

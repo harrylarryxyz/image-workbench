@@ -98,7 +98,6 @@ export default function AgentPage() {
                   <Button size="sm" variant="outline" type="button" onClick={() => apply(item.id, 'create-task')}>转为生成任务</Button>
                   <Button size="sm" variant="outline" type="button" onClick={() => apply(item.id, 'ack')}>标记已采纳</Button>
                 </div>
-                <details className="diagnostics"><summary>Payload</summary><pre className="debug-json">{JSON.stringify(item.payloadJson ?? {}, null, 2)}</pre></details>
               </CardContent>
             </Card>)}
           </div>

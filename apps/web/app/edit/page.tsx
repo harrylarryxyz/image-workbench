@@ -162,8 +162,8 @@ export default function EditPage() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-lg border bg-muted/30 p-3">
-            <b className="block text-sm">Provider readiness</b>
-            <p className="mt-1 text-sm text-muted-foreground">{provider ? `${provider.name} · edit ${provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'} · health ${provider.editHealth?.status ?? 'untested'}` : 'Provider capability loading…'}</p>
+            <b className="block text-sm">编辑能力</b>
+            <p className="mt-1 text-sm text-muted-foreground">{provider?.capabilities?.edit === false ? '当前 Provider 暂不支持参考图编辑，请切换后再试。' : '可上传参考图并按需绘制局部编辑区域。'}</p>
           </div>
           <form className="space-y-3" onSubmit={upload}>
             <Label htmlFor="reference-image">Reference Image</Label>
@@ -177,7 +177,7 @@ export default function EditPage() {
           <div className="space-y-3">
             <div><h3 className="text-base font-semibold">Mask 编辑器</h3><p className="text-sm text-muted-foreground">在第一张参考图上绘制白色区域，支持 mask 的 provider 会只编辑选中区域。</p></div>
             <MaskEditor imageUrl={assetSrc(uploads[0]?.assetUrl)} onMaskReady={uploadMask} />
-            {mask ? <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">Mask ready: {mask.originalName ?? mask.storageKey.split('/').pop()}</div> : <p className="text-xs text-muted-foreground">Mask optional；不需要局部修改时可留空。</p>}
+            {mask ? <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">局部编辑区域已保存</div> : <p className="text-xs text-muted-foreground">Mask optional；不需要局部修改时可留空。</p>}
           </div>
           <Button disabled={submitting || uploads.length === 0} onClick={submitEdit}>{submitting ? '提交中…' : '创建编辑任务'}</Button>
         </CardContent>
@@ -196,7 +196,6 @@ export default function EditPage() {
           {firstOutput?.storageKey ? <Button asChild variant="secondary"><Link href={`/edit?ref=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>继续编辑输出</Link></Button> : null}
           {firstOutput?.storageKey ? <Button asChild variant="outline"><Link href={`/canvas?image=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>发送到 Canvas</Link></Button> : null}
           {task?.id ? <Button asChild variant="outline"><Link href={`/tasks/${task.id}`}>任务详情</Link></Button> : null}
-          <Badge variant="outline">{activeTaskId ? 'SSE 实时更新中…' : 'Ready'}</Badge>
         </div>
         <div className="reference-strip">
           {uploads.map((item) => <Card key={item.storageKey} className="overflow-hidden p-0">
@@ -205,10 +204,6 @@ export default function EditPage() {
           </Card>)}
         </div>
         {task?.errorMessage ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-red-100">{task.errorMessage}</div> : null}
-        <details className="diagnostics">
-          <summary>Diagnostics · 上传与编辑任务响应</summary>
-          <pre className="debug-json">{JSON.stringify(result ?? { hint: 'Upload reference images, then create edit task.' }, null, 2)}</pre>
-        </details>
       </section>
     </div>
   </>;

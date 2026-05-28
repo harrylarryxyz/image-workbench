@@ -81,7 +81,7 @@ test('mask editor overlay aligns to the reference image and submits painted-area
   await maskCanvas.click({ position: { x: 8, y: 8 } });
   await expect(page.getByRole('button', { name: '保存 Mask' })).toBeEnabled();
   await page.getByRole('button', { name: '保存 Mask' }).click();
-  await expect(page.getByText(/Mask ready/)).toBeVisible();
+  await expect(page.getByText(/局部编辑区域已保存/)).toBeVisible();
   await page.getByRole('button', { name: '创建编辑任务' }).click();
   await expect(page.getByRole('heading', { name: 'task_mask_e2e' })).toBeVisible();
 });
@@ -97,7 +97,7 @@ test('canvas can add nodes, edit an image reference, export JSON and run the sav
 
   await page.goto('/canvas');
   await page.getByRole('button', { name: '添加 Image 节点' }).click();
-  await page.getByPlaceholder('local://uploads/default/... 或图库 storageKey').fill('local://uploads/default/ref.png');
+  await page.getByPlaceholder('local://uploads/default/... 或从素材库发送').fill('local://uploads/default/ref.png');
   await page.getByText('打开 Import / Export JSON').click();
   await expect(page.getByTestId('canvas-json')).toContainText('local://uploads/default/ref.png');
   await page.getByRole('button', { name: '执行画布任务' }).click();
