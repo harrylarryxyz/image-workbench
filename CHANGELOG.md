@@ -7,7 +7,8 @@ All notable changes to Image Workbench are documented here. The format follows [
 ### Fixed
 
 - Root App Router layout imports `globals.css` again, restoring compiled styles on every production Web route and preventing unstyled/misaligned pages after the responsive studio shell refactor.
-- UI contract tests now guard the required root stylesheet import so future shell refactors cannot silently ship pages without global CSS.
+- Hidden reference upload inputs and mobile Canvas panels no longer widen the document, preventing desktop and phone layouts from gaining accidental horizontal scroll.
+- UI contract tests now guard the required root stylesheet import plus responsive overflow protections so future shell refactors cannot silently ship pages without global CSS or mobile-safe shrink constraints.
 - Edit masks are resized to the first reference image dimensions before provider upload, preventing `Invalid mask image format - mask size does not match image size` failures from display-sized mask canvases.
 - Browser-painted edit masks now keep the preview canvas aligned with the reference image and convert painted regions to provider-transparent edit regions, so edits apply to the brushed area instead of the inverse area.
 

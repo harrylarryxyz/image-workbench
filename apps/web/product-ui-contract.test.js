@@ -77,6 +77,25 @@ test('shared visual language includes premium dark app shell and image-first com
   assert.match(layout, /Studio|Gallery|Canvas|Ops/, 'navigation should use concise product sections');
 });
 
+test('responsive layout guards prevent hidden inputs and canvas panels from widening pages', () => {
+  const referenceDropzone = readPage('ReferenceDropzone.tsx');
+  const productSurfaces = readPage('styles/product-surfaces.css');
+  const opsCanvas = readPage('styles/ops-canvas.css');
+  const card = readWeb('components/ui/card.tsx');
+  const textarea = readWeb('components/ui/textarea.tsx');
+
+  assert.match(referenceDropzone, /reference-file-input\s+sr-only|sr-only\s+reference-file-input/, 'reference upload input needs a dedicated clipped class in addition to sr-only');
+  for (const marker of ['.reference-file-input', 'position: absolute !important', 'overflow: hidden !important', 'clip-path: inset(50%) !important', 'white-space: nowrap !important']) {
+    assert.match(productSurfaces, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `reference upload CSS missing ${marker}`);
+  }
+  assert.match(opsCanvas, /\.canvas-secondary-panels > \* \{ min-width: 0; \}/, 'canvas secondary grid children must be allowed to shrink');
+  assert.match(opsCanvas, /grid-template-columns:\s*minmax\(0,\s*1fr\)/, 'mobile canvas grid should use minmax(0, 1fr) instead of bare 1fr');
+  assert.match(opsCanvas, /\.canvas-dock \{ contain: layout paint; max-width: calc\(100% - 20px\); \}/, 'mobile canvas dock should be contained and width-limited');
+  assert.match(card, /flex min-w-0 flex-col/, 'Card root should not force flex/grid overflow');
+  assert.match(card, /min-w-0 px-6/, 'Card content should shrink inside narrow grids');
+  assert.match(textarea, /w-full min-w-0 rounded-md/, 'Textarea should shrink inside cards and panels');
+});
+
 test('ops dashboard matches the metrics API response contract', () => {
   const ops = readPage('ops/page.tsx');
   for (const marker of ['byStatus', 'byModel', 'images', 'sizeBytes']) {

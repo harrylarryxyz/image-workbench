@@ -19,7 +19,7 @@ export function ReferenceDropzone({ fileInputRef, uploadingReference, referenceN
     tabIndex={0}
     onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click(); }}
   >
-    <Input ref={fileInputRef} className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={onReferenceFileChange} />
+    <Input ref={fileInputRef} className="reference-file-input sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={onReferenceFileChange} />
     <div>
       <b>上传参考图</b>
       <p>点击上传或拖拽图片到这里；选择后自动用于参考图编辑。</p>

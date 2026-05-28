@@ -32,6 +32,18 @@
 .reference-dropzone b { display: block; margin-bottom: 4px; }
 .reference-dropzone p { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
 .reference-dropzone span { display: inline-flex; margin-top: 8px; color: var(--text-secondary); font-size: 12px; }
+.reference-file-input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
 .support-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 
 .preview-stage {
