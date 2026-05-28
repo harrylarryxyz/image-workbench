@@ -78,7 +78,7 @@ export class TasksService {
     };
   }
 
-  async retryTask(id: string) {
+  async retryTask(id: string, overrides: any = {}) {
     const task = await this.prisma.generationTask.findUnique({ where: { id } });
     if (!task) return { ok: false, error: 'task not found' };
     await this.prisma.generationTask.update({
@@ -90,12 +90,47 @@ export class TasksService {
         diagnosticsJson: undefined,
         routeJson: undefined,
         elapsedMs: null,
+        paramsJson: Object.keys(overrides ?? {}).length ? { ...((task.paramsJson as any) ?? {}), ...overrides } : task.paramsJson,
+        prompt: overrides?.prompt ? String(overrides.prompt) : task.prompt,
+        model: overrides?.model ? String(overrides.model) : task.model,
       },
     });
     await this.enqueueTask(id);
     await this.audit?.log('task.retry', 'task', id);
     this.notifyTaskChanged(id);
     return { ok: true, id, status: 'QUEUED' };
+  }
+
+  async bulkRetryFailed(overrides: any = {}) {
+    const rows = await this.prisma.generationTask.findMany({ where: { status: 'FAILED' }, select: { id: true }, take: 100 });
+    const retried = [];
+    for (const row of rows) retried.push(await this.retryTask(row.id, overrides));
+    return { retried: retried.length, ids: retried.map((x: any) => x.id) };
+  }
+
+  async forceStopTask(id: string) {
+    const jobs = await this.queue.getJobs(['waiting', 'active', 'delayed', 'prioritized']);
+    for (const job of jobs) if (job.data?.taskId === id) await job.remove().catch(() => undefined);
+    await this.prisma.generationTask.update({ where: { id }, data: { status: 'FAILED', errorCode: 'force_stopped', errorMessage: 'Task force-stopped by operator.' } });
+    await this.audit?.log('task.force_stop', 'task', id);
+    this.notifyTaskChanged(id);
+    return { ok: true, id, status: 'FAILED' };
+  }
+
+  async diagnosticPackage(id: string) {
+    const task = await this.getTask(id);
+    if (!task) return null;
+    const suggestion = this.suggestFix(task);
+    return { task, suggestion, copiedAt: new Date().toISOString() };
+  }
+
+  private suggestFix(task: any) {
+    const msg = `${task.errorCode ?? ''} ${task.errorMessage ?? ''}`.toLowerCase();
+    if (msg.includes('auth') || msg.includes('401')) return '检查 provider API key、baseUrl 和 WORKBENCH_ADMIN_TOKEN。';
+    if (msg.includes('timeout')) return '降低 quality/size/count 或提高 timeoutSec 后重试。';
+    if (msg.includes('transparent')) return '该模型不支持 transparent background，切换 gpt-image-1.5 或改为 auto。';
+    if (msg.includes('rate') || msg.includes('429')) return 'Provider 限流，等待后重试或切换 provider。';
+    return '查看 route/diagnostics，优先确认模型能力、API mode、size/quality/format 是否匹配。';
   }
 
   async cancelTask(id: string) {
@@ -123,7 +158,9 @@ export class TasksService {
     const byStatus = await this.prisma.generationTask.groupBy({ by: ['status'], _count: { status: true }, _avg: { elapsedMs: true } });
     const byModel = await this.prisma.generationTask.groupBy({ by: ['model'], _count: { model: true }, _avg: { elapsedMs: true }, orderBy: { _count: { model: 'desc' } }, take: 20 });
     const images = await this.prisma.imageAsset.aggregate({ _count: { id: true }, _sum: { sizeBytes: true } });
-    return { byStatus, byModel, images: { count: images._count.id, sizeBytes: images._sum.sizeBytes ?? 0 } };
+    const failed = byStatus.find((row) => row.status === 'FAILED')?._count.status ?? 0;
+    const total = byStatus.reduce((sum, row) => sum + row._count.status, 0);
+    return { byStatus, byModel, images: { count: images._count.id, sizeBytes: images._sum.sizeBytes ?? 0 }, cost: { estimatedUsd: byStatus.reduce((sum, row) => sum + (row.status === 'SUCCEEDED' ? row._count.status * 0.04 : 0), 0) }, quality: { failureRate: total ? failed / total : 0 } };
   }
 
   async listRecent() {

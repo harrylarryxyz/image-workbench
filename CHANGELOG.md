@@ -8,6 +8,9 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 ### Added
 
+- P0-P4 expansion: richer task diagnostics, forced stop, bulk retry, retry overrides, Gallery metadata, Canvas snapshots/templates/DAG ordering, workspaces/sessions, ops alerts, cost/quality metrics, and real S3-compatible storage adapter.
+- Local-to-remote asset migration and orphan asset cleanup scripts.
+
 - Optional `WORKBENCH_ADMIN_TOKEN` protection, browser bearer-token forwarding, and audit log API/page.
 - Provider capability matrix with size, quality, format, API mode, output-limit, and timeout hints.
 - Queue hardening with exponential retries, stale live-task recovery, running-timeout failure, failed-task listing, and usage metrics.

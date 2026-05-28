@@ -54,9 +54,34 @@ function serializeProject(row: any) {
 
 const includeGraph = { nodes: { orderBy: { createdAt: 'asc' as const } }, edges: { orderBy: { id: 'asc' as const } } };
 
+function topoTaskNodes(nodes: Array<{ id: string; data?: any }>, edges: Array<{ source: string; target: string }>) {
+  const taskIds = new Set(nodes.filter((node) => node.id.startsWith('task') || String(node.data?.label ?? '').toLowerCase().startsWith('task')).map((node) => node.id));
+  if (!taskIds.size) for (const node of nodes.filter((node) => node.id.startsWith('prompt')).slice(0, 1)) taskIds.add(node.id);
+  const indegree = new Map<string, number>();
+  for (const id of taskIds) indegree.set(id, 0);
+  for (const edge of edges) if (taskIds.has(edge.target) && taskIds.has(edge.source)) indegree.set(edge.target, (indegree.get(edge.target) ?? 0) + 1);
+  const queue = [...indegree.entries()].filter(([, degree]) => degree === 0).map(([id]) => id);
+  const ordered: string[] = [];
+  while (queue.length) {
+    const id = queue.shift()!;
+    ordered.push(id);
+    for (const edge of edges.filter((item) => item.source === id && taskIds.has(item.target))) {
+      indegree.set(edge.target, (indegree.get(edge.target) ?? 0) - 1);
+      if (indegree.get(edge.target) === 0) queue.push(edge.target);
+    }
+  }
+  return ordered.length ? ordered.map((id) => nodes.find((node) => node.id === id)!).filter(Boolean) : nodes.filter((node) => taskIds.has(node.id));
+}
+
 @Controller('canvas-projects')
 export class CanvasProjectsController {
   constructor(private readonly prisma: PrismaService, private readonly tasks?: TasksService) {}
+
+  @Get('templates')
+  async templates() {
+    const rows = await this.prisma.canvasProject.findMany({ where: { isTemplate: true }, orderBy: { updatedAt: 'desc' }, include: includeGraph });
+    return rows.map(serializeProject);
+  }
 
   @Get()
   async list() {
@@ -77,6 +102,7 @@ export class CanvasProjectsController {
       data: {
         name: String(body.name ?? 'Untitled canvas').trim() || 'Untitled canvas',
         description: body.description ?? null,
+        isTemplate: Boolean((body as any).isTemplate),
         nodes: { create: (body.nodes ?? []).map(toNodeCreate) },
         edges: { create: (body.edges ?? []).map(toEdgeCreate) },
       },
@@ -97,6 +123,19 @@ export class CanvasProjectsController {
   }
 
 
+  @Post(':id/snapshots')
+  async snapshot(@Param('id') id: string, @Body() body: any) {
+    const row = await this.prisma.canvasProject.findUnique({ where: { id }, include: includeGraph });
+    if (!row) throw new NotFoundException('canvas project not found');
+    const serialized = serializeProject(row);
+    return this.prisma.canvasSnapshot.create({ data: { projectId: id, label: body?.label ? String(body.label) : null, nodesJson: serialized.nodes as any, edgesJson: serialized.edges as any } });
+  }
+
+  @Get(':id/snapshots')
+  async snapshots(@Param('id') id: string) {
+    return this.prisma.canvasSnapshot.findMany({ where: { projectId: id }, orderBy: { createdAt: 'desc' }, take: 50 });
+  }
+
   @Post(':id/run')
   async run(@Param('id') id: string) {
     const row = await this.prisma.canvasProject.findUnique({ where: { id }, include: includeGraph });
@@ -105,18 +144,22 @@ export class CanvasProjectsController {
     const serialized = serializeProject(row);
     const nodes = serialized.nodes as Array<{ id: string; data?: any }>;
     const edges = serialized.edges as Array<{ source: string; target: string }>;
-    const taskNodes = nodes.filter((node) => node.id.startsWith('task') || String(node.data?.label ?? '').toLowerCase().startsWith('task'));
+    const taskNodes = topoTaskNodes(nodes, edges);
     const created: Array<{ nodeId: string; taskId: string; status: string }> = [];
-    for (const taskNode of taskNodes.length ? taskNodes : nodes.filter((node) => node.id.startsWith('prompt')).slice(0, 1)) {
+    const nodeOutputRefs = new Map<string, string>();
+    for (const taskNode of taskNodes) {
       const upstream = edges.filter((edge) => edge.target === taskNode.id).map((edge) => nodes.find((node) => node.id === edge.source)).filter(Boolean) as any[];
       const promptNode = upstream.find((node) => String(node.id).startsWith('prompt')) ?? nodes.find((node) => String(node.id).startsWith('prompt')) ?? taskNode;
-      const imageRefs = upstream.filter((node) => String(node.id).startsWith('image')).map((node) => String(node.data?.storageKey ?? String(node.data?.label ?? '').split('\n').at(-1) ?? '').trim()).filter((x) => x.startsWith('local://'));
+      const explicitRefs = upstream.filter((node) => String(node.id).startsWith('image')).map((node) => String(node.data?.storageKey ?? String(node.data?.label ?? '').split('\n').at(-1) ?? '').trim()).filter((x) => x.includes('://'));
+      const generatedRefs = upstream.map((node) => nodeOutputRefs.get(node.id)).filter(Boolean) as string[];
+      const imageRefs = [...explicitRefs, ...generatedRefs];
       const label = String(promptNode.data?.prompt ?? promptNode.data?.label ?? '');
       const prompt = label.split('\n').slice(1).join('\n').trim() || label || 'Canvas generated image';
       const createdTask = imageRefs.length
         ? await this.tasks.createEditTask({ prompt, refKeys: imageRefs, model: taskNode.data?.model ?? 'gpt-image-2', size: taskNode.data?.size ?? '1024x1024', quality: taskNode.data?.quality ?? 'low', format: taskNode.data?.format ?? 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 })
         : await this.tasks.createGenerateTask({ prompt, model: taskNode.data?.model ?? 'gpt-image-2', size: taskNode.data?.size ?? '1024x1024', quality: taskNode.data?.quality ?? 'low', format: taskNode.data?.format ?? 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 });
       created.push({ nodeId: taskNode.id, taskId: createdTask.id, status: createdTask.status });
+      nodeOutputRefs.set(taskNode.id, `task://${createdTask.id}`);
     }
     const nextNodes = serialized.nodes.map((node: any) => {
       const match = created.find((item) => item.nodeId === node.id);

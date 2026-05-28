@@ -18,7 +18,9 @@
     "backup": "./scripts/backup-image-workbench.sh",
     "deploy:rabisu": "./scripts/deploy-rabisu.sh",
     "prune:rabisu-releases": "./scripts/prune-rabisu-releases.sh",
-    "assets:audit": "./scripts/audit-local-assets.sh"
+    "assets:audit": "./scripts/audit-local-assets.sh",
+    "assets:migrate-remote": "pnpm --filter @image-workbench/api exec ts-node ../../scripts/migrate-local-assets-to-remote.ts",
+    "assets:cleanup-orphans": "pnpm --filter @image-workbench/api exec ts-node ../../scripts/cleanup-orphan-assets.ts"
   },
   "devDependencies": {
     "turbo": "latest",

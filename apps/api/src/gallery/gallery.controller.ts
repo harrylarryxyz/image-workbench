@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../auth/audit.service';
 
@@ -31,9 +32,32 @@ export class GalleryController {
         taskStatus: image.task?.status,
         model: image.task?.model,
         params: image.task?.paramsJson,
+        favorite: image.favorite,
+        rating: image.rating,
+        tags: image.tags,
         createdAt: image.createdAt.toISOString(),
       };
     });
+  }
+
+  @Get('batch/manifest')
+  async manifest(@Query('ids') idsCsv: string, @Res() res: Response) {
+    const ids = String(idsCsv ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 200);
+    const rows = await this.prisma.imageAsset.findMany({ where: { id: { in: ids } }, include: { task: true } });
+    res.setHeader('content-type', 'application/json');
+    res.setHeader('content-disposition', 'attachment; filename=gallery-manifest.json');
+    res.send(JSON.stringify(rows.map((image) => ({ id: image.id, storageKey: image.storageKey, prompt: image.prompt, taskId: image.taskId, model: image.task?.model })), null, 2));
+  }
+
+  @Patch(':id')
+  async updateMeta(@Param('id') id: string, @Body() body: any) {
+    const row = await this.prisma.imageAsset.update({ where: { id }, data: {
+      favorite: body?.favorite === undefined ? undefined : Boolean(body.favorite),
+      rating: body?.rating === undefined ? undefined : Number(body.rating),
+      tags: Array.isArray(body?.tags) ? body.tags.map(String).filter(Boolean) : undefined,
+    } });
+    await this.audit?.log('gallery.update_meta', 'image', id);
+    return row;
   }
 
   @Post('batch/delete')

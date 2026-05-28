@@ -15,7 +15,7 @@ Image Workbench is a private, production-oriented AI image creation workbench fo
 
 ## Current status
 
-This project is in active `0.2.x` development. The core generate/edit pipeline, SSE status updates, Gallery 2.0 with generated thumbnails, prompt workflows, mask editing, persisted Canvas projects, backend-prefixed storage keys, provider secret encryption, one-shot legacy key migration, and browser E2E smoke tests are implemented. The only deferred production-hardening item is attaching a real remote-object adapter for S3/R2/MinIO deployments when object-storage resources are available.
+This project is in active `0.2.x` development. The core generate/edit pipeline, SSE status updates, Gallery 2.0 with generated thumbnails, prompt workflows, mask editing, persisted Canvas projects, backend-prefixed storage keys, provider secret encryption, one-shot legacy key migration, and browser E2E smoke tests are implemented. S3/R2/MinIO remote-object adapters are implemented and configurable; single-VPS deployments can continue using local storage until object-storage credentials are configured.
 
 Implemented:
 
@@ -30,7 +30,7 @@ Implemented:
 
 Planned:
 
-- Remote object SDK adapter for `STORAGE_BACKEND=s3|r2|minio` deployments once object-storage resources are available.
+- Multi-user hardening beyond workspace/session groundwork, if public team access is required.
 
 ## Architecture
 
@@ -103,6 +103,10 @@ STORAGE_BACKEND=local
 STORAGE_DIR=./data/uploads
 STORAGE_BUCKET=image-workbench
 STORAGE_PUBLIC_BASE_URL=
+S3_ENDPOINT=
+S3_REGION=auto
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
 PROVIDER_SECRET_KEY=64_HEX_CHARS_FOR_AES_256_GCM
 WORKBENCH_ADMIN_TOKEN=optional_admin_token_for_api
 NEXT_PUBLIC_WORKBENCH_TOKEN=optional_admin_token_for_browser

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LocalStorageService } from './local-storage.service';
 
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l3kG7wAAAABJRU5ErkJggg==', 'base64');
@@ -48,7 +48,9 @@ describe('LocalStorageService backend compatibility', () => {
   });
 
   it('exposes remote-object metadata and rejects local path resolution for s3-compatible backends', async () => {
-    const service = new LocalStorageService({ backend: 's3', bucket: 'image-workbench', publicBaseUrl: 'https://cdn.example.com/assets' });
+    const service = new LocalStorageService({ backend: 's3', bucket: 'image-workbench', publicBaseUrl: 'https://cdn.example.com/assets', accessKeyId: 'test', secretAccessKey: 'test', endpoint: 'https://s3.example.com' });
+    const send = vi.fn().mockResolvedValue({});
+    (service as any).s3 = { send };
 
     const saved = await service.putImage(tinyPng);
 
@@ -56,5 +58,6 @@ describe('LocalStorageService backend compatibility', () => {
     expect(saved.storageKey).toMatch(/^s3:\/\/image-workbench\//);
     expect(service.publicUrl(saved.storageKey)).toMatch(/^https:\/\/cdn\.example\.com\/assets\//);
     await expect(service.resolveExistingPath(saved.storageKey)).resolves.toBeNull();
+    expect(send).toHaveBeenCalled();
   });
 });

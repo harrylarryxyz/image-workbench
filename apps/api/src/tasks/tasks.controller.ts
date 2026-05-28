@@ -36,8 +36,17 @@ export class TasksController {
     return this.tasks.streamTaskEvents(id, res);
   }
 
+  @Post('bulk/retry-failed')
+  bulkRetry(@Body() body: any) { return this.tasks.bulkRetryFailed(body ?? {}); }
+
   @Post(':id/retry')
-  retry(@Param('id') id: string) { return this.tasks.retryTask(id); }
+  retry(@Param('id') id: string, @Body() body: any) { return this.tasks.retryTask(id, body ?? {}); }
+
+  @Post(':id/force-stop')
+  forceStop(@Param('id') id: string) { return this.tasks.forceStopTask(id); }
+
+  @Get(':id/diagnostic-package')
+  diagnostics(@Param('id') id: string) { return this.tasks.diagnosticPackage(id); }
 
   @Post(':id/cancel')
   cancel(@Param('id') id: string) { return this.tasks.cancelTask(id); }

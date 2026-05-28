@@ -28,6 +28,31 @@ enum TaskStatus {
   RETRYING
 }
 
+model Workspace {
+  id        String @id @default(cuid())
+  slug      String @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     UserSession[]
+  providers ProviderProfile[]
+  tasks     GenerationTask[]
+  assets    ImageAsset[]
+  prompts   PromptPreset[]
+  canvases  CanvasProject[]
+}
+
+model UserSession {
+  id          String @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tokenHash   String @unique
+  label       String?
+  role        String @default("admin")
+  createdAt   DateTime @default(now())
+  lastSeenAt  DateTime?
+}
+
 model ProviderProfile {
   id              String   @id @default(cuid())
   name            String
@@ -40,6 +65,8 @@ model ProviderProfile {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   tasks           GenerationTask[]
+  workspaceId     String?
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id])
 }
 
 model AuditLog {
@@ -68,6 +95,9 @@ model GenerationTask {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   images          ImageAsset[]
+  workspaceId     String?
+  workspace       Workspace? @relation(fields: [workspaceId], references: [id])
+  estimatedCostUsd Decimal? @db.Decimal(10, 6)
 }
 
 model ImageAsset {
@@ -85,6 +115,11 @@ model ImageAsset {
   revisedPrompt  String?
   metadataJson   Json?
   createdAt      DateTime @default(now())
+  workspaceId    String?
+  workspace      Workspace? @relation(fields: [workspaceId], references: [id])
+  favorite       Boolean @default(false)
+  rating         Int?
+  tags           String[]
 }
 
 model CanvasProject {
@@ -95,6 +130,10 @@ model CanvasProject {
   updatedAt   DateTime @updatedAt
   nodes       CanvasNode[]
   edges       CanvasEdge[]
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  snapshots   CanvasSnapshot[]
+  isTemplate  Boolean @default(false)
 }
 
 model CanvasNode {
@@ -128,6 +167,8 @@ model PromptPreset {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   versions  PromptVersion[]
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
 }
 
 model PromptVersion {
@@ -138,5 +179,16 @@ model PromptVersion {
   title     String
   content   String
   tags      String[]
+  createdAt DateTime @default(now())
+}
+
+
+model CanvasSnapshot {
+  id        String @id @default(cuid())
+  projectId String
+  project   CanvasProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label     String?
+  nodesJson Json
+  edgesJson Json
   createdAt DateTime @default(now())
 }

@@ -34,3 +34,12 @@
 - Keep `STORAGE_BACKEND=local` on the single VPS deployment.
 - Back up `STORAGE_DIR` regularly together with PostgreSQL.
 - Use the S3/R2/MinIO key contract as a future migration seam, not a current dependency.
+
+
+## Completed in the v0.3-v0.7 P0-P4 expansion
+
+- P0 reliability UX: diagnostic packages, retry overrides, bulk retry, force-stop, Gallery favorites/tags/ratings, and save-from-task prompts.
+- P1 Canvas engine: snapshots, templates, DAG task ordering, and upstream output reference propagation.
+- P2 team groundwork: Workspace and UserSession tables, token-derived session tracking, and workspace API surfaces.
+- P3 operations: cost/quality summary metrics and alert endpoint for queue backlog, high failure rate, and storage pressure.
+- P4 storage: real S3-compatible write/read/signed-url path for S3/R2/MinIO, plus migration and orphan cleanup scripts.

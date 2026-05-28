@@ -13,6 +13,8 @@ import { PrismaService } from './prisma.service';
 import { AdminTokenGuard } from './auth/admin-token.guard';
 import { AuditService } from './auth/audit.service';
 import { AuditLogsController } from './auth/audit-logs.controller';
+import { WorkspacesController } from './auth/workspaces.controller';
+import { OpsController } from './ops.controller';
 
 @Module({
   imports: [
@@ -26,7 +28,7 @@ import { AuditLogsController } from './auth/audit-logs.controller';
     PromptsModule,
     CanvasModule,
   ],
-  controllers: [AuditLogsController],
+  controllers: [AuditLogsController, WorkspacesController, OpsController],
   providers: [PrismaService, AuditService, { provide: APP_GUARD, useClass: AdminTokenGuard }],
 })
 export class AppModule {}

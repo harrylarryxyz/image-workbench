@@ -80,6 +80,14 @@ export class PromptsController {
     return { prompt: renderTemplate(row.content, body?.variables ?? {}), source: 'template-render', id };
   }
 
+  @Post('from-task/:taskId')
+  async fromTask(@Param('taskId') taskId: string) {
+    const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
+    if (!task) throw new BadRequestException('task not found');
+    const row = await this.prisma.promptPreset.create({ data: { title: `Task ${task.id.slice(0, 8)}`, content: task.prompt, tags: ['task-history', task.model], source: `task:${task.id}` } });
+    return { id: row.id, title: row.title, content: row.content, tags: row.tags, source: row.source };
+  }
+
   @Post('enhance')
   enhance(@Body() body: any) {
     const subject = String(body?.subject ?? body?.prompt ?? '').trim();
