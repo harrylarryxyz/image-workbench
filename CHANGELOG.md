@@ -4,7 +4,9 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 ## [Unreleased]
 
-- No unreleased changes.
+### Fixed
+
+- Edit masks are resized to the first reference image dimensions before provider upload, preventing `Invalid mask image format - mask size does not match image size` failures from display-sized mask canvases.
 
 ## [0.2.0] - 2026-05-28
 

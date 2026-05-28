@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
+import sharp from 'sharp';
 import { PrismaService } from '../prisma.service';
 import { LocalStorageService } from '../storage/local-storage.service';
 import { DiagnosticsService } from '../diagnostics/diagnostics.service';
@@ -95,15 +96,20 @@ export class ImageGenerationProcessor extends WorkerHost {
     form.set('size', request.size ?? '1024x1024');
     form.set('quality', request.quality ?? 'low');
     form.set('response_format', 'b64_json');
+    let firstReferenceBytes: Uint8Array | null = null;
     for (const key of refKeys) {
       const bytes = await this.storage.readImage(key);
+      firstReferenceBytes ??= bytes;
       const ext = key.split('.').pop()?.toLowerCase() || 'png';
       const type = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
       form.append('image', new Blob([Buffer.from(bytes)], { type }), key.split('/').pop() || `reference.${ext}`);
     }
     if (maskKey) {
       const maskBytes = await this.storage.readImage(maskKey);
-      form.set('mask', new Blob([Buffer.from(maskBytes)], { type: 'image/png' }), maskKey.split('/').pop() || 'mask.png');
+      const normalizedMask = firstReferenceBytes ? await this.normalizeMaskForReference(maskBytes, firstReferenceBytes) : Buffer.from(maskBytes);
+      const maskPart = new Uint8Array(normalizedMask.byteLength);
+      maskPart.set(normalizedMask);
+      form.set('mask', new Blob([maskPart], { type: 'image/png' }), maskKey.split('/').pop() || 'mask.png');
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Number(request.timeoutSec ?? 300) * 1000);
@@ -118,6 +124,23 @@ export class ImageGenerationProcessor extends WorkerHost {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  private async normalizeMaskForReference(maskBytes: Uint8Array, referenceBytes: Uint8Array): Promise<Buffer> {
+    const [maskMeta, referenceMeta] = await Promise.all([
+      sharp(Buffer.from(maskBytes), { failOn: 'none' }).metadata(),
+      sharp(Buffer.from(referenceBytes), { failOn: 'none' }).metadata(),
+    ]);
+    const width = referenceMeta.width;
+    const height = referenceMeta.height;
+    if (!width || !height) return Buffer.from(maskBytes);
+    if (maskMeta.width === width && maskMeta.height === height && maskMeta.format === 'png') return Buffer.from(maskBytes);
+    return sharp(Buffer.from(maskBytes), { failOn: 'none' })
+      .rotate()
+      .ensureAlpha()
+      .resize({ width, height, fit: 'fill' })
+      .png()
+      .toBuffer();
   }
 
 

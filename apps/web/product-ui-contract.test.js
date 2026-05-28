@@ -40,3 +40,10 @@ test('ops dashboard matches the metrics API response contract', () => {
     assert.match(ops, new RegExp(marker), `ops dashboard should read metrics.${marker}`);
   }
 });
+
+test('mask editor exports natural-size masks instead of fixed preview-size canvases', () => {
+  const maskEditor = readPage('edit/mask-editor.tsx');
+  assert.match(maskEditor, /naturalWidth/, 'mask editor should load the reference natural width');
+  assert.match(maskEditor, /naturalHeight/, 'mask editor should load the reference natural height');
+  assert.doesNotMatch(maskEditor, /width=\{360\}\s+height=\{260\}/, 'mask editor must not export the fixed preview canvas size as the provider mask');
+});

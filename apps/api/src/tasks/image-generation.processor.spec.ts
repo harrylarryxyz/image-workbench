@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import sharp from 'sharp';
 import { ImageGenerationProcessor } from './image-generation.processor';
 
 const tinyPngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
@@ -84,4 +85,42 @@ describe('ImageGenerationProcessor persistence', () => {
     expect(imageCreate).not.toHaveProperty('thumbnailUrl');
     vi.unstubAllGlobals();
   });
+
+
+  it('resizes edit masks to match the first reference image before provider upload', async () => {
+    const refBytes = await sharp({ create: { width: 2, height: 3, channels: 4, background: { r: 20, g: 20, b: 20, alpha: 1 } } }).png().toBuffer();
+    const maskBytes = await sharp({ create: { width: 1, height: 1, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } }).png().toBuffer();
+    const updates: any[] = [];
+    const prisma = {
+      generationTask: {
+        findUnique: vi.fn().mockResolvedValue(makeTask({
+          type: 'image.edit',
+          model: 'gpt-image-2',
+          paramsJson: { prompt: 'paint only the masked area', count: 1, size: '1024x1024', quality: 'low', format: 'png', timeoutSec: 30, apiMode: 'images', refKeys: ['local://ref.png'], maskKey: 'local://mask.png' },
+        })),
+        update: vi.fn().mockImplementation(async (args) => { updates.push(args); return args; }),
+      },
+      imageAsset: { findFirst: vi.fn().mockResolvedValue(null) },
+    } as any;
+    const storage = {
+      readImage: vi.fn(async (key: string) => key.includes('mask') ? maskBytes : refBytes),
+      putImage: vi.fn().mockResolvedValue({ storageKey: 'local://out.png', format: 'png', sizeBytes: 123, sha256: 'abcdef' }),
+    } as any;
+    const diagnostics = { classify: vi.fn() } as any;
+    const processor = new ImageGenerationProcessor(prisma, storage, diagnostics);
+    let sentMask: { width?: number; height?: number } = {};
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url, init: any) => {
+      const mask = init.body.get('mask') as Blob;
+      sentMask = await sharp(Buffer.from(await mask.arrayBuffer())).metadata();
+      return { ok: true, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ data: [{ b64_json: tinyPngB64 }] }) };
+    }));
+
+    await processor.process({ data: { taskId: 'task_1' } } as any);
+
+    expect(sentMask.width).toBe(2);
+    expect(sentMask.height).toBe(3);
+    expect(updates.some((args) => args.data?.status === 'SUCCEEDED')).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
 });
