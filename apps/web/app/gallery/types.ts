@@ -1,0 +1,26 @@
+export type Collection = { id: string; name: string; count?: number; preview?: GalleryImage[] };
+export type GalleryImage = {
+  id?: string;
+  prompt?: string;
+  error?: string;
+  storageKey?: string;
+  assetUrl?: string;
+  thumbnailUrl?: string;
+  taskId?: string;
+  taskType?: string;
+  taskStatus?: string;
+  model?: string;
+  params?: { size?: string; quality?: string };
+  format?: string;
+  width?: number | null;
+  height?: number | null;
+  sizeBytes?: number | null;
+  favorite?: boolean;
+  rating?: number | null;
+  tags?: string[];
+  collections?: Array<{ id: string; name: string }>;
+  derivatives?: Array<{ id: string; storageKey: string; thumbnailUrl?: string }>;
+  sourceAsset?: GalleryImage | null;
+  sourceAssetId?: string | null;
+  createdAt?: string;
+};
