@@ -7,6 +7,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 ### Fixed
 
 - Edit masks are resized to the first reference image dimensions before provider upload, preventing `Invalid mask image format - mask size does not match image size` failures from display-sized mask canvases.
+- Browser-painted edit masks now keep the preview canvas aligned with the reference image and convert painted regions to provider-transparent edit regions, so edits apply to the brushed area instead of the inverse area.
 
 ## [0.2.0] - 2026-05-28
 

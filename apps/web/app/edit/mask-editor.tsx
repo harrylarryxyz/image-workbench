@@ -13,7 +13,7 @@ type Stroke = { points: number[] };
 type Dimensions = { naturalWidth: number; naturalHeight: number; displayWidth: number; displayHeight: number };
 
 function fitDimensions(naturalWidth: number, naturalHeight: number): Dimensions {
-  const maxWidth = 420;
+  const maxWidth = 360;
   const maxHeight = 360;
   const scale = Math.min(maxWidth / naturalWidth, maxHeight / naturalHeight, 1) || 1;
   return {
@@ -97,19 +97,40 @@ function MaskEditorInner({ imageUrl, onMaskReady }: MaskEditorProps) {
   }
 
   return <div>
-    <div className="muted">在画布上涂白色区域作为 mask；保存后会按参考图原始尺寸导出 mask.png，避免 provider 因尺寸不一致拒绝。</div>
+    <div className="muted">在画布上涂白色区域作为 mask；保存后会按参考图原始尺寸导出 mask.png，提交时会转换为 provider 要求的透明编辑区域。</div>
     {imageUrl && dimensions ? <div
-      className="thumb"
+      className="mask-editor-canvas"
       style={{
-        backgroundImage: `url(${imageUrl})`,
-        backgroundSize: '100% 100%',
-        backgroundPosition: 'center',
+        position: 'relative',
         width: dimensions.displayWidth,
         height: dimensions.displayHeight,
         minHeight: dimensions.displayHeight,
+        padding: 0,
+        display: 'block',
+        overflow: 'hidden',
+        borderRadius: 12,
+        background: '#0b0d14',
+        touchAction: 'none',
       }}
     >
-      <Stage ref={stageRef} width={dimensions.displayWidth} height={dimensions.displayHeight} onMouseDown={start} onTouchStart={start} onMouseMove={move as any} onTouchMove={move as any} onMouseUp={() => setDrawing(false)} onTouchEnd={() => setDrawing(false)}>
+      <img
+        src={imageUrl}
+        alt="mask reference"
+        style={{ width: dimensions.displayWidth, height: dimensions.displayHeight, display: 'block', objectFit: 'fill' }}
+      />
+      <Stage
+        ref={stageRef}
+        width={dimensions.displayWidth}
+        height={dimensions.displayHeight}
+        style={{ position: 'absolute', left: 0, top: 0 }}
+        onMouseDown={start}
+        onTouchStart={start}
+        onMouseMove={move as any}
+        onTouchMove={move as any}
+        onMouseUp={() => setDrawing(false)}
+        onMouseLeave={() => setDrawing(false)}
+        onTouchEnd={() => setDrawing(false)}
+      >
         <Layer>
           {strokes.map((stroke, index) => <Line key={index} points={stroke.points} stroke="white" strokeWidth={28} lineCap="round" lineJoin="round" globalCompositeOperation="source-over" />)}
         </Layer>

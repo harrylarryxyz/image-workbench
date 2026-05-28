@@ -89,6 +89,7 @@ export class ImageGenerationProcessor extends WorkerHost {
   private async callImagesEdit(baseUrl: string, apiKey: string, model: string, request: any, params: any): Promise<string | null> {
     const refKeys = Array.isArray(params?.refKeys) ? params.refKeys.slice(0, 4) : [];
     const maskKey = typeof params?.maskKey === 'string' && params.maskKey ? params.maskKey : null;
+    const maskMode = params?.maskMode === 'provider-transparent-edit' ? 'provider-transparent-edit' : 'painted-area';
     if (!refKeys.length) throw new Error('at least one reference image is required');
     const form = new FormData();
     form.set('model', model);
@@ -106,7 +107,7 @@ export class ImageGenerationProcessor extends WorkerHost {
     }
     if (maskKey) {
       const maskBytes = await this.storage.readImage(maskKey);
-      const normalizedMask = firstReferenceBytes ? await this.normalizeMaskForReference(maskBytes, firstReferenceBytes) : Buffer.from(maskBytes);
+      const normalizedMask = firstReferenceBytes ? await this.normalizeMaskForReference(maskBytes, firstReferenceBytes, maskMode) : Buffer.from(maskBytes);
       const maskPart = new Uint8Array(normalizedMask.byteLength);
       maskPart.set(normalizedMask);
       form.set('mask', new Blob([maskPart], { type: 'image/png' }), maskKey.split('/').pop() || 'mask.png');
@@ -126,7 +127,7 @@ export class ImageGenerationProcessor extends WorkerHost {
     }
   }
 
-  private async normalizeMaskForReference(maskBytes: Uint8Array, referenceBytes: Uint8Array): Promise<Buffer> {
+  private async normalizeMaskForReference(maskBytes: Uint8Array, referenceBytes: Uint8Array, maskMode: 'painted-area' | 'provider-transparent-edit'): Promise<Buffer> {
     const [maskMeta, referenceMeta] = await Promise.all([
       sharp(Buffer.from(maskBytes), { failOn: 'none' }).metadata(),
       sharp(Buffer.from(referenceBytes), { failOn: 'none' }).metadata(),
@@ -134,13 +135,27 @@ export class ImageGenerationProcessor extends WorkerHost {
     const width = referenceMeta.width;
     const height = referenceMeta.height;
     if (!width || !height) return Buffer.from(maskBytes);
-    if (maskMeta.width === width && maskMeta.height === height && maskMeta.format === 'png') return Buffer.from(maskBytes);
-    return sharp(Buffer.from(maskBytes), { failOn: 'none' })
+    const normalized = maskMeta.width === width && maskMeta.height === height && maskMeta.format === 'png'
+      ? Buffer.from(maskBytes)
+      : await sharp(Buffer.from(maskBytes), { failOn: 'none' })
       .rotate()
       .ensureAlpha()
       .resize({ width, height, fit: 'fill' })
       .png()
       .toBuffer();
+    if (maskMode === 'provider-transparent-edit') return normalized;
+    return this.convertPaintedSelectionToProviderMask(normalized, width, height);
+  }
+
+  private async convertPaintedSelectionToProviderMask(maskBytes: Uint8Array, width: number, height: number): Promise<Buffer> {
+    const { data } = await sharp(Buffer.from(maskBytes), { failOn: 'none' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    for (let index = 0; index < data.length; index += 4) {
+      data[index] = 0;
+      data[index + 1] = 0;
+      data[index + 2] = 0;
+      data[index + 3] = 255 - data[index + 3];
+    }
+    return sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
   }
 
 

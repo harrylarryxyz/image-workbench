@@ -43,7 +43,10 @@ test('ops dashboard matches the metrics API response contract', () => {
 
 test('mask editor exports natural-size masks instead of fixed preview-size canvases', () => {
   const maskEditor = readPage('edit/mask-editor.tsx');
+  const editPage = readPage('edit/page.tsx');
   assert.match(maskEditor, /naturalWidth/, 'mask editor should load the reference natural width');
   assert.match(maskEditor, /naturalHeight/, 'mask editor should load the reference natural height');
+  assert.match(maskEditor, /padding:\s*0/, 'mask editor overlay must not inherit padded thumb layout that offsets the stage from the image');
+  assert.match(editPage, /maskMode:\s*mask\s*\?\s*'painted-area'/, 'edit tasks should label browser-painted masks so the API can normalize provider polarity');
   assert.doesNotMatch(maskEditor, /width=\{360\}\s+height=\{260\}/, 'mask editor must not export the fixed preview canvas size as the provider mask');
 });

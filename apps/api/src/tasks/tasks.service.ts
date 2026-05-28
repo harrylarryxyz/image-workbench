@@ -46,7 +46,8 @@ export class TasksService {
     const maskKey = typeof input?.maskKey === 'string' && input.maskKey.trim() ? (await this.refs.assertExistingStorageKeys([input.maskKey], ctx))[0] : undefined;
     const provider = await this.providers.getDefault(ctx);
     const model = request.model || provider.defaultModel;
-    const params = { ...request, refKeys, maskKey, editMode: 'reference' };
+    const maskMode = input?.maskMode === 'provider-transparent-edit' ? 'provider-transparent-edit' : input?.maskMode === 'painted-area' ? 'painted-area' : undefined;
+    const params = { ...request, refKeys, maskKey, maskMode, editMode: 'reference' };
     const task = await this.prisma.generationTask.create({
       data: {
         type: 'image.edit',

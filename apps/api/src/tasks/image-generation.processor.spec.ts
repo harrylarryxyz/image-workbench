@@ -108,10 +108,19 @@ describe('ImageGenerationProcessor persistence', () => {
     } as any;
     const diagnostics = { classify: vi.fn() } as any;
     const processor = new ImageGenerationProcessor(prisma, storage, diagnostics);
-    let sentMask: { width?: number; height?: number } = {};
+    let sentMask: { width?: number; height?: number; alpha0?: number; alpha255?: number } = {};
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url, init: any) => {
       const mask = init.body.get('mask') as Blob;
-      sentMask = await sharp(Buffer.from(await mask.arrayBuffer())).metadata();
+      const maskBuffer = Buffer.from(await mask.arrayBuffer());
+      const meta = await sharp(maskBuffer).metadata();
+      const raw = await sharp(maskBuffer).ensureAlpha().raw().toBuffer();
+      let alpha0 = 0;
+      let alpha255 = 0;
+      for (let index = 3; index < raw.length; index += 4) {
+        if (raw[index] === 0) alpha0 += 1;
+        if (raw[index] === 255) alpha255 += 1;
+      }
+      sentMask = { width: meta.width, height: meta.height, alpha0, alpha255 };
       return { ok: true, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ data: [{ b64_json: tinyPngB64 }] }) };
     }));
 
@@ -119,6 +128,8 @@ describe('ImageGenerationProcessor persistence', () => {
 
     expect(sentMask.width).toBe(2);
     expect(sentMask.height).toBe(3);
+    expect(sentMask.alpha0).toBe(6);
+    expect(sentMask.alpha255).toBe(0);
     expect(updates.some((args) => args.data?.status === 'SUCCEEDED')).toBe(true);
     vi.unstubAllGlobals();
   });

@@ -127,6 +127,7 @@ export default function EditPage() {
         timeoutSec: 600,
         refKeys: uploads.map((x) => x.storageKey),
         maskKey: mask?.storageKey,
+        maskMode: mask ? 'painted-area' : undefined,
       });
       setTask(created);
       setResult(created);
