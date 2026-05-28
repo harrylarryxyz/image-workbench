@@ -60,15 +60,17 @@ export class AuthController {
     const ctx = getRequestContext(req);
     const role = String(body?.role ?? 'operator').toLowerCase() as WorkbenchRole;
     const token = newToken();
-    const row = await this.prisma.userSession.create({ data: { workspaceId: String(body?.workspaceId ?? ctx.workspaceId), tokenHash: tokenHash(token), label: body?.label ? String(body.label) : 'generated token', role, expiresAt: body?.expiresAt ? new Date(String(body.expiresAt)) : null } });
+    const workspaceId = ctx.role === 'owner' && body?.workspaceId ? String(body.workspaceId) : ctx.workspaceId;
+    const row = await this.prisma.userSession.create({ data: { workspaceId, tokenHash: tokenHash(token), label: body?.label ? String(body.label) : 'generated token', role, expiresAt: body?.expiresAt ? new Date(String(body.expiresAt)) : null } });
     return { id: row.id, token, label: row.label, role: row.role, workspaceId: row.workspaceId };
   }
 
   @Post('tokens/:id/revoke')
   async revokeToken(@Param('id') id: string, @Req() req: Request) {
     const ctx = getRequestContext(req);
-    const row = await this.prisma.userSession.update({ where: { id }, data: { revokedAt: new Date() } });
-    if (row.workspaceId !== ctx.workspaceId && ctx.role !== 'owner') throw new UnauthorizedException('cross-workspace revoke denied');
+    const row = await this.prisma.userSession.findFirst({ where: { id, ...(ctx.role === 'owner' ? {} : { workspaceId: ctx.workspaceId }) } });
+    if (!row) throw new UnauthorizedException('cross-workspace revoke denied');
+    await this.prisma.userSession.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
     return { ok: true, id };
   }
 }

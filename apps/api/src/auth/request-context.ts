@@ -78,7 +78,7 @@ export async function resolveRequestContext(prisma: any, req?: Request | any): P
   }
   await prisma.userSession.update({ where: { tokenHash: hash }, data: { lastSeenAt: now } }).catch(() => undefined);
   return {
-    workspaceId: explicitWorkspace || session.workspaceId || DEFAULT_WORKSPACE_ID,
+    workspaceId: session.workspaceId || DEFAULT_WORKSPACE_ID,
     tokenHash: hash,
     label: session.label,
     role: normalizeRole(session.role),

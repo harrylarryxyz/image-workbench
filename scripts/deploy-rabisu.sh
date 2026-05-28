@@ -136,7 +136,11 @@ systemctl restart image-workbench-api image-workbench-web
 sleep 5
 systemctl is-active --quiet image-workbench-api
 systemctl is-active --quiet image-workbench-web
-API_JSON=$(curl -fsS http://127.0.0.1:3100/tasks/queue/status)
+AUTH_ARGS=()
+if [[ -n "${WORKBENCH_ADMIN_TOKEN:-}" ]]; then
+  AUTH_ARGS=(-H "Authorization: Bearer ${WORKBENCH_ADMIN_TOKEN}")
+fi
+API_JSON=$(curl -fsS "${AUTH_ARGS[@]}" http://127.0.0.1:3100/tasks/queue/status)
 WEB_HTTP=$(curl -fsS -o /tmp/image-workbench-web-smoke.html -w '%{http_code}' http://127.0.0.1:3000/)
 CURRENT_REAL=$(readlink -f "${APP_ROOT}/current")
 mapfile -t OLD_RELEASES < <(find "${APP_ROOT}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -rn | awk '{print $2}' | grep -Fvx "$CURRENT_REAL" | tail -n +"$KEEP_RELEASES" || true)
