@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, U
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { PrismaService } from '../prisma.service';
-import { attachRequestContext, canUseMethod, DEFAULT_WORKSPACE_ID, readBearerToken, resolveRequestContext, tokenHash } from './request-context';
+import { attachRequestContext, canUseMethod, DEFAULT_WORKSPACE_ID, readBearerToken, resolveRequestContext, tokenHash, verifyCsrfForCookieAuth } from './request-context';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 export const ADMIN_TOKEN_ENV = 'WORKBENCH_ADMIN_TOKEN';
@@ -34,6 +34,7 @@ export class AdminTokenGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<Request & { workbenchContext?: any }>();
     const token = readBearerToken(req);
     checkRateLimit(req, token);
+    if (!verifyCsrfForCookieAuth(req)) throw new UnauthorizedException('csrf token required');
     const adminToken = process.env[ADMIN_TOKEN_ENV];
 
     if (adminToken && token === adminToken) {

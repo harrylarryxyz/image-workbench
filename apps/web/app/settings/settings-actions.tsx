@@ -13,10 +13,24 @@ export function SettingsActions({ tokens }: { tokens: TokenRow[] }) {
   const [created, setCreated] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  async function loginWithCookie() {
+    await apiPost('/auth/login', { token: token.trim(), workspaceId: workspaceId.trim() || 'default' });
+    window.localStorage.setItem('workbench_workspace', workspaceId.trim() || 'default');
+    setMessage('已登录并写入 HttpOnly session cookie；页面会刷新。');
+    window.location.reload();
+  }
+
+  async function logout() {
+    await apiPost('/auth/logout', {});
+    window.localStorage.removeItem('workbench_token');
+    setMessage('已退出当前浏览器 session；页面会刷新。');
+    window.location.reload();
+  }
+
   function saveLocalToken() {
     if (token.trim()) window.localStorage.setItem('workbench_token', token.trim());
-    if (workspaceId.trim()) window.localStorage.setItem('workbench_workspace_id', workspaceId.trim());
-    setMessage('已保存到当前浏览器 localStorage。');
+    if (workspaceId.trim()) window.localStorage.setItem('workbench_workspace', workspaceId.trim());
+    setMessage('已保存到当前浏览器 localStorage。优先建议使用上方 Cookie 登录。');
   }
 
   async function createToken() {
@@ -35,7 +49,12 @@ export function SettingsActions({ tokens }: { tokens: TokenRow[] }) {
       <h2>登录与 Token 管理</h2>
       <label>Token<input value={token} onChange={(event) => setToken(event.target.value)} placeholder="WORKBENCH_ADMIN_TOKEN 或 session token" /></label>
       <label>Workspace ID<input value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} /></label>
-      <div className="row"><button type="button" onClick={saveLocalToken}>保存到浏览器</button><button type="button" onClick={createToken}>生成新 Session Token</button></div>
+      <div className="row">
+        <button type="button" onClick={loginWithCookie}>Cookie 登录</button>
+        <button type="button" onClick={logout}>退出</button>
+        <button type="button" onClick={saveLocalToken}>保存到浏览器</button>
+        <button type="button" onClick={createToken}>生成新 Session Token</button>
+      </div>
       <div className="grid two">
         <label>新 Token 标签<input value={label} onChange={(event) => setLabel(event.target.value)} /></label>
         <label>角色<select value={role} onChange={(event) => setRole(event.target.value)}><option value="viewer">viewer</option><option value="operator">operator</option><option value="admin">admin</option><option value="owner">owner</option></select></label>

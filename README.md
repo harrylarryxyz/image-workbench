@@ -110,7 +110,7 @@ S3_SECRET_ACCESS_KEY=
 PROVIDER_SECRET_KEY=64_HEX_CHARS_FOR_AES_256_GCM
 WORKBENCH_ADMIN_TOKEN=optional_admin_token_for_api
 WORKBENCH_RATE_LIMIT_PER_MINUTE=240
-NEXT_PUBLIC_WORKBENCH_TOKEN=optional_admin_token_for_browser
+NEXT_PUBLIC_WORKBENCH_TOKEN=optional_session_token_for_internal_browser
 NEXT_PUBLIC_WORKSPACE_ID=default
 IMAGE_API_BASE=https://api.example.com/v1
 IMAGE_API_KEY=YOUR_PROVIDER_API_KEY
@@ -122,7 +122,8 @@ Notes:
 - Keep API keys server-side only. Do not expose provider keys to the browser.
 - `.env.local` is ignored by Git.
 - Provider records created in the UI are stored in the database. New and updated provider keys are encrypted-at-rest with AES-256-GCM and stored with an `enc:v1:` prefix; legacy plaintext values remain readable for migration compatibility.
-- Use `WORKBENCH_ADMIN_TOKEN` as the bootstrap owner token. Create narrower session tokens from `Settings` or `POST /auth/tokens`.
+- Use `WORKBENCH_ADMIN_TOKEN` as the server-only bootstrap owner token. Browser users should open `Settings`, login with the bootstrap/session token, and then operate through the HttpOnly session cookie plus CSRF header.
+- Create narrower session tokens from `Settings` or `POST /auth/tokens`; avoid exposing the bootstrap token through `NEXT_PUBLIC_*` unless this is a trusted private deployment.
 - Open `Settings` to inspect the current auth context, save a browser token, and manage workspace session tokens.
 - Keep `STORAGE_BACKEND=local` on a single VPS unless R2/S3/MinIO credentials are ready; remote storage can be enabled through the S3-compatible variables above.
 

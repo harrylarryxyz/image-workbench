@@ -7,7 +7,11 @@ import { getRequestContext, resolveRequestContext, tokenHash, type WorkbenchRole
 
 function newToken() { return `iwb_${randomBytes(24).toString('base64url')}`; }
 function maskedHash(hash: string) { return `${hash.slice(0, 10)}…${hash.slice(-6)}`; }
-function cookieOptions() { return { httpOnly: true, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/' }; }
+function cookieOptions(httpOnly = true) { return { httpOnly, sameSite: 'lax' as const, secure: process.env.NODE_ENV === 'production', path: '/' }; }
+function setSessionCookies(res: Response, token: string) {
+  res.cookie('workbench_token', token, cookieOptions(true));
+  res.cookie('workbench_csrf', randomBytes(16).toString('base64url'), cookieOptions(false));
+}
 
 @Controller('auth')
 export class AuthController {
@@ -19,32 +23,34 @@ export class AuthController {
     const token = String(body?.token ?? '').trim();
     if (!token) throw new UnauthorizedException('token is required');
     const adminToken = process.env.WORKBENCH_ADMIN_TOKEN;
-    const workspaceId = String(body?.workspaceId ?? req.headers['x-workspace-id'] ?? 'default');
-    await this.prisma.workspace.upsert({ where: { id: workspaceId }, update: {}, create: { id: workspaceId, slug: workspaceId, name: workspaceId === 'default' ? 'Default Workspace' : workspaceId } });
 
     if (adminToken && token === adminToken) {
+      const workspaceId = String(body?.workspaceId ?? req.headers['x-workspace-id'] ?? 'default');
+      await this.prisma.workspace.upsert({ where: { id: workspaceId }, update: {}, create: { id: workspaceId, slug: workspaceId, name: workspaceId === 'default' ? 'Default Workspace' : workspaceId } });
       const hash = tokenHash(token);
       await this.prisma.userSession.upsert({
         where: { tokenHash: hash },
         update: { workspaceId, role: 'owner', label: 'bootstrap-admin-token', lastSeenAt: new Date(), revokedAt: null },
         create: { workspaceId, tokenHash: hash, role: 'owner', label: 'bootstrap-admin-token', lastSeenAt: new Date() },
       });
-      res.cookie('workbench_token', token, cookieOptions());
+      setSessionCookies(res, token);
       return { ok: true, workspaceId, role: 'owner', label: 'bootstrap-admin-token' };
     }
 
     const session = await this.prisma.userSession.findUnique({ where: { tokenHash: tokenHash(token) } });
     if (!session || session.revokedAt || (session.expiresAt && session.expiresAt < new Date())) throw new UnauthorizedException('invalid session token');
-    res.cookie('workbench_token', token, cookieOptions());
+    setSessionCookies(res, token);
     return { ok: true, workspaceId: session.workspaceId, role: session.role, label: session.label };
   }
 
   @Get('me')
   async me(@Req() req: Request) { return getRequestContext(req); }
 
+  @Public()
   @Post('logout')
   async logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('workbench_token', cookieOptions());
+    res.clearCookie('workbench_token', cookieOptions(true));
+    res.clearCookie('workbench_csrf', cookieOptions(false));
     return { ok: true };
   }
 

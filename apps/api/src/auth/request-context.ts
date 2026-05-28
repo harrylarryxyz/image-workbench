@@ -19,7 +19,7 @@ export function tokenHash(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
 
-function parseCookies(header?: string) {
+export function parseCookies(header?: string) {
   return Object.fromEntries(String(header ?? '').split(';').map((part) => part.trim()).filter(Boolean).map((part) => {
     const idx = part.indexOf('=');
     return idx === -1 ? [part, ''] : [part.slice(0, idx), decodeURIComponent(part.slice(idx + 1))];
@@ -45,11 +45,26 @@ export function roleAtLeast(role: WorkbenchRole, minimum: WorkbenchRole) {
 
 export function canUseMethod(role: WorkbenchRole, method: string, path = '') {
   const verb = method.toUpperCase();
-  if (['GET', 'HEAD', 'OPTIONS'].includes(verb)) return true;
   const normalized = path.toLowerCase();
-  if (normalized.startsWith('/providers') || normalized.startsWith('/workspaces') || normalized.startsWith('/auth/tokens')) return roleAtLeast(role, 'admin');
+  if (normalized.startsWith('/auth/tokens') || normalized.startsWith('/audit-logs')) return roleAtLeast(role, 'admin');
+  if (normalized.startsWith('/providers') || normalized.startsWith('/workspaces')) {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(verb)) return roleAtLeast(role, 'viewer');
+    return roleAtLeast(role, 'admin');
+  }
+  if (['GET', 'HEAD', 'OPTIONS'].includes(verb)) return roleAtLeast(role, 'viewer');
   if (verb === 'DELETE') return roleAtLeast(role, 'admin');
   return roleAtLeast(role, 'operator');
+}
+
+export function verifyCsrfForCookieAuth(req?: Request | any): boolean {
+  const verb = String(req?.method ?? 'GET').toUpperCase();
+  if (['GET', 'HEAD', 'OPTIONS'].includes(verb)) return true;
+  const cookies = parseCookies(req?.headers?.cookie);
+  if (!cookies.workbench_token) return true;
+  const authorization = String(req?.headers?.authorization ?? '');
+  if (/^Bearer\s+/i.test(authorization)) return true;
+  const header = String(req?.headers?.['x-csrf-token'] ?? req?.headers?.['x-workbench-csrf'] ?? '');
+  return Boolean(cookies.workbench_csrf && header && cookies.workbench_csrf === header);
 }
 
 export function getRequestContext(req?: Request | any): RequestContext {

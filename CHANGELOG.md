@@ -8,7 +8,7 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 ### Added
 
-- v0.8 team hardening: bootstrap/session login endpoints, HTTP-only cookie support, session-token creation/list/revoke flows, role-based access for owner/admin/operator/viewer, and Settings page token management.
+- v0.8 team hardening: bootstrap/session login endpoints, HTTP-only cookie support, CSRF-protected browser mutations, session-token creation/list/revoke flows, role-based access for owner/admin/operator/viewer, and Settings page token management.
 - Workspace isolation for providers, tasks, gallery assets, prompts, canvas projects, ops metrics, and audit-log reads.
 - Security hardening for audit metadata, per-token/IP rate limiting, workspace-scoped uploads, and read-only viewer sessions.
 

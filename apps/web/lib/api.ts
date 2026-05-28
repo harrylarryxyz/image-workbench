@@ -5,18 +5,26 @@ function apiBase(): string {
   return process.env.NEXT_PUBLIC_API_BASE ?? '/api';
 }
 
+function readBrowserCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const prefix = `${name}=`;
+  const value = document.cookie.split('; ').find((part) => part.startsWith(prefix));
+  return value ? decodeURIComponent(value.slice(prefix.length)) : null;
+}
+
 export function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = {};
-  const envToken = process.env.NEXT_PUBLIC_WORKBENCH_TOKEN;
-  const envWorkspace = process.env.NEXT_PUBLIC_WORKSPACE_ID;
-  if (envToken) headers.authorization = `Bearer ${envToken}`;
-  if (envWorkspace) headers['x-workspace-id'] = envWorkspace;
-  if (typeof window !== 'undefined') {
-    const token = window.localStorage.getItem('workbench_token');
-    const workspace = window.localStorage.getItem('workbench_workspace_id');
-    if (token) headers.authorization = `Bearer ${token}`;
-    if (workspace) headers['x-workspace-id'] = workspace;
-  }
+  const isBrowser = typeof window !== 'undefined';
+  const token = isBrowser
+    ? window.localStorage.getItem('workbench_token') || process.env.NEXT_PUBLIC_WORKBENCH_TOKEN
+    : process.env.WORKBENCH_ADMIN_TOKEN || process.env.NEXT_PUBLIC_WORKBENCH_TOKEN;
+  const workspace = isBrowser
+    ? window.localStorage.getItem('workbench_workspace') || window.localStorage.getItem('workbench_workspace_id') || process.env.NEXT_PUBLIC_WORKSPACE_ID
+    : process.env.WORKBENCH_WORKSPACE_ID || process.env.NEXT_PUBLIC_WORKSPACE_ID;
+  const csrf = isBrowser ? readBrowserCookie('workbench_csrf') : null;
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (workspace) headers['x-workspace-id'] = workspace;
+  if (csrf) headers['x-csrf-token'] = csrf;
   return headers;
 }
 
