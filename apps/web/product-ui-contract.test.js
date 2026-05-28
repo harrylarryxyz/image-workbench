@@ -73,6 +73,7 @@ test('shared visual language includes premium dark app shell and image-first com
   for (const marker of ['--surface-canvas', '--accent', '.studio-shell', '.preview-stage', '.image-card', '.canvas-dock', '.diagnostics']) {
     assert.match(css, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `globals.css missing ${marker}`);
   }
+  assert.match(layout, /import\s+['"]\.\/globals\.css['"]/, 'root layout must import globals.css so App Router pages ship the compiled stylesheet');
   assert.match(layout, /Studio|Gallery|Canvas|Ops/, 'navigation should use concise product sections');
 });
 
