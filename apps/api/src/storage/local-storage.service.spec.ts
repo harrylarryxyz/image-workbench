@@ -32,6 +32,18 @@ describe('LocalStorageService backend compatibility', () => {
     await expect(service.resolveExistingPath(saved.storageKey)).resolves.toContain(saved.storageKey.replace('local://', ''));
   });
 
+  it('stores namespaced uploads under their workspace directory', async () => {
+    const service = new LocalStorageService({ backend: 'local', root: await tempRoot() });
+
+    const saved = await service.putImage(tinyPng, 'uploads/default');
+
+    expect(saved.storageKey).toMatch(/^local:\/\/uploads\/default\//);
+    const path = await service.resolveExistingPath(saved.storageKey);
+    expect(path).toContain('/uploads/default/');
+    const bytes = await service.readImage(saved.storageKey);
+    expect(Buffer.from(bytes).equals(tinyPng)).toBe(true);
+  });
+
   it('generates real local webp thumbnails for gallery assets', async () => {
     const service = new LocalStorageService({ backend: 'local', root: await tempRoot() });
 

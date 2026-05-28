@@ -32,6 +32,16 @@ function serializeProject(row: any) {
 
 const includeGraph = { nodes: { orderBy: { createdAt: 'asc' as const } }, edges: { orderBy: { id: 'asc' as const } } };
 
+
+function normalizeStorageRef(value: unknown) {
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  if (/^(?:local|s3|r2|minio):\/\//.test(text)) return text;
+  const keyMatch = text.match(/[?&]key=([^&\s]+)/);
+  if (keyMatch) return decodeURIComponent(keyMatch[1]);
+  return text.includes('://') ? text : '';
+}
+
 function topoTaskNodes(nodes: Array<{ id: string; data?: any }>, edges: Array<{ source: string; target: string }>) {
   const taskIds = new Set(nodes.filter((node) => node.id.startsWith('task') || String(node.data?.label ?? '').toLowerCase().startsWith('task')).map((node) => node.id));
   if (!taskIds.size) for (const node of nodes.filter((node) => node.id.startsWith('prompt')).slice(0, 1)) taskIds.add(node.id);
@@ -135,7 +145,7 @@ export class CanvasProjectsController {
     for (const taskNode of taskNodes) {
       const upstream = edges.filter((edge) => edge.target === taskNode.id).map((edge) => nodes.find((node) => node.id === edge.source)).filter(Boolean) as any[];
       const promptNode = upstream.find((node) => String(node.id).startsWith('prompt')) ?? nodes.find((node) => String(node.id).startsWith('prompt')) ?? taskNode;
-      const explicitRefs = upstream.filter((node) => String(node.id).startsWith('image')).map((node) => String(node.data?.storageKey ?? String(node.data?.label ?? '').split('\n').at(-1) ?? '').trim()).filter((x) => x.includes('://'));
+      const explicitRefs = upstream.filter((node) => String(node.id).startsWith('image')).map((node) => normalizeStorageRef(node.data?.storageKey ?? String(node.data?.label ?? '').split('\n').at(-1))).filter(Boolean);
       const generatedRefs = upstream.map((node) => nodeOutputRefs.get(node.id)).filter(Boolean) as string[];
       const imageRefs = [...explicitRefs, ...generatedRefs];
       const label = String(promptNode.data?.prompt ?? promptNode.data?.label ?? '');

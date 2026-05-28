@@ -43,9 +43,10 @@ export class TasksService {
   async createEditTask(input: any, ctx?: RequestContext) {
     const request = GenerateImageRequestSchema.parse(input);
     const refKeys = await this.refs.assertExistingStorageKeys(Array.isArray(input?.refKeys) ? input.refKeys.map(String) : [], ctx);
+    const maskKey = typeof input?.maskKey === 'string' && input.maskKey.trim() ? (await this.refs.assertExistingStorageKeys([input.maskKey], ctx))[0] : undefined;
     const provider = await this.providers.getDefault(ctx);
     const model = request.model || provider.defaultModel;
-    const params = { ...request, refKeys, maskKey: typeof input?.maskKey === 'string' ? input.maskKey : undefined, editMode: 'reference' };
+    const params = { ...request, refKeys, maskKey, editMode: 'reference' };
     const task = await this.prisma.generationTask.create({
       data: {
         type: 'image.edit',

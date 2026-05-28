@@ -35,6 +35,10 @@ This project follows a practical changelog format inspired by [Keep a Changelog]
 
 ### Fixed
 
+- Reference-image edit upload now stores namespaced local uploads in the correct workspace directory and accepts freshly uploaded workspace refs before they are attached to generated gallery assets.
+- Edit page upload/mask upload now uses authenticated API helpers with CSRF headers; provider detection uses the same API helper.
+- Mask drawing now uses the correct React/Konva pointer-move handler.
+- Canvas editing now has a side-panel node editor for Prompt/Image/Task data, saves unsaved graphs before execution, and runs Image-reference upstream nodes as edit tasks.
 - Reconciled stale `RUNNING` tasks that already have persisted image assets so tasks interrupted between provider success and final status update are shown as `SUCCEEDED`.
 - Avoided Prisma write failures when persisting generated images by storing runtime-only asset URLs and thumbnail metadata under `metadataJson` instead of top-level `ImageAsset` fields.
 

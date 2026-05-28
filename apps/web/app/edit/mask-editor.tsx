@@ -46,7 +46,7 @@ function MaskEditorInner({ imageUrl, onMaskReady }: MaskEditorProps) {
   return <div>
     <div className="muted">在画布上涂白色区域作为 mask；保存后会作为 mask.png 上传并随编辑任务提交。</div>
     {imageUrl ? <div className="thumb" style={{backgroundImage: `url(${imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', minHeight: 260}}>
-      <Stage ref={stageRef} width={360} height={260} onMouseDown={start} onTouchStart={start} onMousemove={move as any} onTouchMove={move as any} onMouseUp={() => setDrawing(false)} onTouchEnd={() => setDrawing(false)}>
+      <Stage ref={stageRef} width={360} height={260} onMouseDown={start} onTouchStart={start} onMouseMove={move as any} onTouchMove={move as any} onMouseUp={() => setDrawing(false)} onTouchEnd={() => setDrawing(false)}>
         <Layer>
           {strokes.map((stroke, index) => <Line key={index} points={stroke.points} stroke="white" strokeWidth={28} lineCap="round" lineJoin="round" globalCompositeOperation="source-over" />)}
         </Layer>

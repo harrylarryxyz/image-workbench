@@ -81,8 +81,7 @@ export class LocalStorageService {
     let thumbnailKey: string | undefined;
     let thumbnailSizeBytes: number | undefined;
     if (this.backend === 'local') {
-      const dir = join(this.root, sha256.slice(0, 2));
-      await mkdir(dir, { recursive: true });
+      await mkdir(join(this.root, ...objectKey.split('/').slice(0, -1)), { recursive: true });
       await writeFile(join(this.root, objectKey), bytes);
       const thumbnail = await this.createThumbnail(bytes);
       if (thumbnail) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { apiPost } from '../../lib/api';
+import { apiFormPost, apiGet, apiPost } from '../../lib/api';
 import { pollTaskUntilTerminal, subscribeTaskEvents } from '../../lib/task-events';
 import { MaskEditor } from './mask-editor';
 
@@ -11,6 +11,14 @@ type EditTask = { id: string; type?: string; status: string; model?: string; pro
 type ProviderSummary = { name: string; enabled: boolean; capabilities?: { edit: boolean | null; maxRefs: number | null; source: string }; editHealth?: { status: string; errorCode: string | null; errorMessage: string | null } };
 
 const TERMINAL_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
+
+function assetSrc(url?: string | null) {
+  if (!url) return '';
+  if (/^https?:\/\//.test(url)) return url;
+  if (url.startsWith('/api/')) return url;
+  if (url.startsWith('/assets/')) return `/api${url}`;
+  return url;
+}
 
 function statusClass(status?: string) {
   const normalized = (status ?? '').toLowerCase();
@@ -40,9 +48,8 @@ export default function EditPage() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/providers')
-      .then((res) => res.ok ? res.json() : Promise.reject(new Error(`providers failed: ${res.status}`)))
-      .then((rows: ProviderSummary[]) => setProvider(rows.find((item) => item.enabled) ?? rows[0] ?? null))
+    apiGet<ProviderSummary[]>('/providers')
+      .then((rows) => setProvider(rows.find((item) => item.enabled) ?? rows[0] ?? null))
       .catch(() => setProvider(null));
   }, []);
 
@@ -76,9 +83,7 @@ export default function EditPage() {
     setBusy(true);
     const form = new FormData(event.currentTarget);
     try {
-      const res = await fetch('/api/assets/upload', { method: 'POST', body: form });
-      if (!res.ok) throw new Error(`upload failed: ${res.status} ${await res.text()}`);
-      const uploaded = await res.json();
+      const uploaded = await apiFormPost<Uploaded>('/assets/upload', form);
       setUploads((prev) => [...prev, uploaded].slice(0, 4));
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : String(error) });
@@ -92,9 +97,7 @@ export default function EditPage() {
     const form = new FormData();
     form.set('file', file);
     try {
-      const res = await fetch('/api/assets/upload', { method: 'POST', body: form });
-      if (!res.ok) throw new Error(`mask upload failed: ${res.status} ${await res.text()}`);
-      const uploaded = await res.json();
+      const uploaded = await apiFormPost<Uploaded>('/assets/upload', form);
       setMask(uploaded);
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : String(error) });
@@ -149,7 +152,7 @@ export default function EditPage() {
       <label>Edit Prompt</label>
       <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
       <h3>Mask</h3>
-      <MaskEditor imageUrl={uploads[0] ? `/api${uploads[0].assetUrl}` : null} onMaskReady={uploadMask} />
+      <MaskEditor imageUrl={assetSrc(uploads[0]?.assetUrl)} onMaskReady={uploadMask} />
       {mask ? <div className="muted">Mask ready: {mask.storageKey}</div> : <div className="muted">Mask optional；当前 provider 不支持时可留空。</div>}
       <button className="btn" disabled={submitting || uploads.length === 0} onClick={submitEdit}>{submitting ? '提交中…' : '创建编辑任务'}</button>
     </div>
@@ -158,7 +161,7 @@ export default function EditPage() {
       <h1>{uploads.length} / 4</h1>
       <div className="gallery">
         {uploads.map((item) => <div className="card" key={item.storageKey}>
-          <img className="thumb-img" src={`/api${item.assetUrl}`} alt={item.originalName ?? 'reference'} />
+          <img className="thumb-img" src={assetSrc(item.assetUrl)} alt={item.originalName ?? 'reference'} />
           <p>{item.originalName ?? item.storageKey}</p>
           <div className="muted">{item.format} · {Math.round(item.sizeBytes / 1024)} KB</div>
         </div>)}
@@ -171,8 +174,8 @@ export default function EditPage() {
         </div>
         {task.errorMessage ? <pre className="error">{task.errorMessage}</pre> : null}
         {task.images?.length ? <div className="gallery result-gallery">
-          {task.images.map((image) => <a className="card" href={`/api${image.assetUrl}`} target="_blank" rel="noreferrer" key={image.id}>
-            <img className="thumb-img" src={`/api${image.assetUrl}`} alt={task.prompt ?? 'edited image'} />
+          {task.images.map((image) => <a className="card" href={assetSrc(image.assetUrl)} target="_blank" rel="noreferrer" key={image.id}>
+            <img className="thumb-img" src={assetSrc(image.assetUrl)} alt={task.prompt ?? 'edited image'} />
             <div className="muted">{image.format} · {Math.round(image.sizeBytes / 1024)} KB{image.width && image.height ? ` · ${image.width}×${image.height}` : ''}</div>
           </a>)}
         </div> : <div className="thumb">{TERMINAL_STATUSES.has(task.status) ? 'No image returned' : 'Waiting for edited image…'}</div>}

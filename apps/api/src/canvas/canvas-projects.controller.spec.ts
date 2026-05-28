@@ -29,25 +29,39 @@ describe('CanvasProjectsController', () => {
     expect(created).toMatchObject({ id: 'canvas_1', name: 'Storyboard', nodes: [node], edges: [edge] });
   });
 
-  it('updates projects by replacing graph children atomically', async () => {
+  it('runs an edit task when an image reference node feeds a task node', async () => {
+    const row = {
+      id: 'canvas_1', name: 'Storyboard', description: null, createdAt: new Date('2026-05-27T00:00:00Z'), updatedAt: new Date('2026-05-27T00:00:00Z'), isTemplate: false,
+      nodes: [
+        { id: 'prompt-1', type: 'default', positionX: 10, positionY: 20, dataJson: { prompt: 'make it cinematic' } },
+        { id: 'image-1', type: 'default', positionX: 20, positionY: 30, dataJson: { storageKey: 'local://uploads/default/ref.png' } },
+        { id: 'task-1', type: 'default', positionX: 30, positionY: 40, dataJson: { model: 'gpt-image-2', size: '1024x1024', quality: 'low' } },
+      ],
+      edges: [
+        { id: 'e-p', sourceNodeId: 'prompt-1', targetNodeId: 'task-1', type: 'default', dataJson: null },
+        { id: 'e-i', sourceNodeId: 'image-1', targetNodeId: 'task-1', type: 'default', dataJson: null },
+      ],
+    };
     const prisma = {
       canvasProject: {
-        findFirst: vi.fn().mockResolvedValue({ id: 'canvas_1' }),
-        update: vi.fn().mockResolvedValue({
-          id: 'canvas_1', name: 'Updated', description: null, createdAt: new Date('2026-05-27T00:00:00Z'), updatedAt: new Date('2026-05-27T00:00:01Z'),
-          nodes: [{ id: node.id, type: node.type, positionX: 10, positionY: 20, dataJson: node.data }],
-          edges: [],
-        }),
+        findFirst: vi.fn().mockResolvedValue(row),
+        update: vi.fn().mockResolvedValue(row),
       },
     };
-    const controller = new CanvasProjectsController(prisma as any);
+    const tasks = {
+      createEditTask: vi.fn().mockResolvedValue({ id: 'task_edit_1', status: 'QUEUED' }),
+      createGenerateTask: vi.fn(),
+    };
+    const controller = new CanvasProjectsController(prisma as any, tasks as any);
 
-    const updated = await controller.update('canvas_1', { name: 'Updated', nodes: [node], edges: [] });
+    const result = await controller.run('canvas_1');
 
-    expect(prisma.canvasProject.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'canvas_1' },
-      data: expect.objectContaining({ nodes: { deleteMany: {}, create: expect.any(Array) }, edges: { deleteMany: {}, create: [] } }),
-    }));
-    expect(updated.nodes).toEqual([node]);
+    expect(tasks.createEditTask).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: 'make it cinematic',
+      refKeys: ['local://uploads/default/ref.png'],
+      model: 'gpt-image-2',
+    }), expect.any(Object));
+    expect(tasks.createGenerateTask).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ projectId: 'canvas_1', created: [{ nodeId: 'task-1', taskId: 'task_edit_1', status: 'QUEUED' }] });
   });
 });
