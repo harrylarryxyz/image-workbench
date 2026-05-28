@@ -70,3 +70,20 @@ test('tailwind and shadcn foundation is configured before UI refactor', () => {
   assert.match(button, /buttonVariants/, 'button should use the canonical shadcn variant pattern');
   assert.match(input, /data-slot="input"/, 'input should use the shadcn data-slot component pattern');
 });
+
+test('first refactor batch uses shadcn primitives instead of legacy button form card classes', () => {
+  const files = [
+    'providers/page.tsx',
+    'edit/page.tsx',
+    'edit/mask-editor.tsx',
+    'prompts/prompt-enhancer.tsx',
+    'prompts/prompt-actions.tsx',
+  ];
+
+  for (const relative of files) {
+    const text = readPage(relative);
+    assert.match(text, /@\/components\/ui\/(button|input|textarea|card|label|badge|select)/, `${relative} should import shadcn ui primitives`);
+    assert.doesNotMatch(text, /className="(?:btn|pill|card|task-card|studio-panel|notice|status)(?:\s|"|$)/, `${relative} should not use legacy visual component classes`);
+    assert.doesNotMatch(text, /<button(?![^>]*asChild)/, `${relative} should use Button instead of naked button tags`);
+  }
+});

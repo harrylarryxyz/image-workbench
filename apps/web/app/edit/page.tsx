@@ -2,6 +2,12 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { apiFormPost, apiGet, apiPost } from '../../lib/api';
 import { pollTaskUntilTerminal, subscribeTaskEvents } from '../../lib/task-events';
 import { MaskEditor } from './mask-editor';
@@ -21,13 +27,12 @@ function assetSrc(url?: string | null) {
   return url;
 }
 
-function statusClass(status?: string) {
+function statusVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const normalized = (status ?? '').toLowerCase();
-  if (normalized === 'succeeded') return 'status ok';
-  if (normalized === 'failed' || normalized === 'cancelled') return 'status bad';
-  if (normalized === 'running') return 'status run';
-  if (normalized === 'queued' || normalized === 'pending') return 'status wait';
-  return 'status neutral';
+  if (normalized === 'succeeded') return 'secondary';
+  if (normalized === 'failed' || normalized === 'cancelled') return 'destructive';
+  if (normalized === 'running' || normalized === 'queued' || normalized === 'pending') return 'outline';
+  return 'default';
 }
 
 export default function EditPage() {
@@ -149,52 +154,57 @@ export default function EditPage() {
       <p className="sub">上传参考图、绘制 Mask、提交编辑任务，并在同一屏完成预览、下载、继续创作和诊断。</p>
     </section>
 
-    <div className="studio-shell">
-      <section className="studio-panel control-stack">
-        <div className="notice">
-          <b>Provider readiness</b>
-          <p className="muted" style={{ margin: '6px 0 0' }}>{provider ? `${provider.name} · edit ${provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'} · health ${provider.editHealth?.status ?? 'untested'}` : 'Provider capability loading…'}</p>
-        </div>
-        <form onSubmit={upload}>
-          <label>Reference Image</label>
-          <input name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
-          <button className="btn" disabled={busy} type="submit">上传参考图</button>
-        </form>
-        <div>
-          <label>Edit Prompt</label>
-          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-        </div>
-        <div>
-          <h3>Mask 编辑器</h3>
-          <p className="muted">在第一张参考图上绘制白色区域，支持 mask 的 provider 会只编辑选中区域。</p>
-          <MaskEditor imageUrl={assetSrc(uploads[0]?.assetUrl)} onMaskReady={uploadMask} />
-          {mask ? <div className="notice success">Mask ready: {mask.originalName ?? mask.storageKey.split('/').pop()}</div> : <div className="fine-print">Mask optional；不需要局部修改时可留空。</div>}
-        </div>
-        <button className="btn" disabled={submitting || uploads.length === 0} onClick={submitEdit}>{submitting ? '提交中…' : '创建编辑任务'}</button>
-      </section>
+    <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+      <Card>
+        <CardHeader>
+          <CardDescription>Create Studio · Edit</CardDescription>
+          <CardTitle>编辑输入</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <b className="block text-sm">Provider readiness</b>
+            <p className="mt-1 text-sm text-muted-foreground">{provider ? `${provider.name} · edit ${provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'} · health ${provider.editHealth?.status ?? 'untested'}` : 'Provider capability loading…'}</p>
+          </div>
+          <form className="space-y-3" onSubmit={upload}>
+            <Label htmlFor="reference-image">Reference Image</Label>
+            <Input id="reference-image" name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
+            <Button disabled={busy} type="submit">上传参考图</Button>
+          </form>
+          <div className="space-y-2">
+            <Label htmlFor="edit-prompt">Edit Prompt</Label>
+            <Textarea id="edit-prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+          </div>
+          <div className="space-y-3">
+            <div><h3 className="text-base font-semibold">Mask 编辑器</h3><p className="text-sm text-muted-foreground">在第一张参考图上绘制白色区域，支持 mask 的 provider 会只编辑选中区域。</p></div>
+            <MaskEditor imageUrl={assetSrc(uploads[0]?.assetUrl)} onMaskReady={uploadMask} />
+            {mask ? <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">Mask ready: {mask.originalName ?? mask.storageKey.split('/').pop()}</div> : <p className="text-xs text-muted-foreground">Mask optional；不需要局部修改时可留空。</p>}
+          </div>
+          <Button disabled={submitting || uploads.length === 0} onClick={submitEdit}>{submitting ? '提交中…' : '创建编辑任务'}</Button>
+        </CardContent>
+      </Card>
 
       <section className="preview-stage">
-        <div className="task-head">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div><p className="eyebrow">PreviewStage</p><h2>{task?.id ?? `${uploads.length} / 4 references`}</h2></div>
-          <span className={statusClass(task?.status)}>{task?.status ?? 'READY'}</span>
+          <Badge variant={statusVariant(task?.status)}>{task?.status ?? 'READY'}</Badge>
         </div>
         <div className="preview-frame">
           {outputUrl ? <img src={outputUrl} alt={task?.prompt ?? 'edited image'} /> : uploads[0] ? <img src={assetSrc(uploads[0].assetUrl)} alt={uploads[0].originalName ?? 'reference'} /> : <div className="preview-empty"><b>上传参考图开始编辑</b><span>输出图会替换这里的参考预览；图片工具条会提供下载、继续编辑和发送到 Canvas。</span></div>}
         </div>
-        <div className="image-action-toolbar">
-          {outputUrl ? <a className="pill" href={outputUrl} target="_blank" rel="noreferrer" download>下载输出</a> : null}
-          {firstOutput?.storageKey ? <Link className="pill" href={`/edit?ref=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>继续编辑输出</Link> : null}
-          {firstOutput?.storageKey ? <Link className="pill" href={`/canvas?image=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>发送到 Canvas</Link> : null}
-          {task?.id ? <Link className="pill" href={`/tasks/${task.id}`}>任务详情</Link> : null}
-          <span className="pill">{activeTaskId ? 'SSE 实时更新中…' : 'Ready'}</span>
+        <div className="flex flex-wrap gap-2">
+          {outputUrl ? <Button asChild variant="secondary"><a href={outputUrl} target="_blank" rel="noreferrer" download>下载输出</a></Button> : null}
+          {firstOutput?.storageKey ? <Button asChild variant="secondary"><Link href={`/edit?ref=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>继续编辑输出</Link></Button> : null}
+          {firstOutput?.storageKey ? <Button asChild variant="outline"><Link href={`/canvas?image=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>发送到 Canvas</Link></Button> : null}
+          {task?.id ? <Button asChild variant="outline"><Link href={`/tasks/${task.id}`}>任务详情</Link></Button> : null}
+          <Badge variant="outline">{activeTaskId ? 'SSE 实时更新中…' : 'Ready'}</Badge>
         </div>
         <div className="reference-strip">
-          {uploads.map((item) => <div className="reference-card" key={item.storageKey}>
+          {uploads.map((item) => <Card key={item.storageKey} className="overflow-hidden p-0">
             <img src={assetSrc(item.assetUrl)} alt={item.originalName ?? 'reference'} />
-            <p className="fine-print">{item.originalName ?? item.storageKey}</p>
-          </div>)}
+            <CardContent className="p-3"><p className="text-xs text-muted-foreground">{item.originalName ?? item.storageKey}</p></CardContent>
+          </Card>)}
         </div>
-        {task?.errorMessage ? <div className="notice error">{task.errorMessage}</div> : null}
+        {task?.errorMessage ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-red-100">{task.errorMessage}</div> : null}
         <details className="diagnostics">
           <summary>Diagnostics · 上传与编辑任务响应</summary>
           <pre className="debug-json">{JSON.stringify(result ?? { hint: 'Upload reference images, then create edit task.' }, null, 2)}</pre>

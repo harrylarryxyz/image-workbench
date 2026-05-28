@@ -41,7 +41,7 @@ test('edit page uploads a reference image and submits an edit task', async ({ pa
   await page.goto('/edit');
   await page.locator('input[type="file"]').setInputFiles({ name: 'ref.png', mimeType: 'image/png', buffer: tinyPng });
   await page.getByRole('button', { name: '上传参考图' }).click();
-  await expect(page.locator('.reference-card').filter({ hasText: 'ref.png' })).toBeVisible();
+  await expect(page.locator('p').filter({ hasText: /^ref\.png$/ })).toBeVisible();
   await page.getByRole('button', { name: '创建编辑任务' }).click();
   await expect(page.getByRole('heading', { name: 'task_edit_e2e' })).toBeVisible();
 });

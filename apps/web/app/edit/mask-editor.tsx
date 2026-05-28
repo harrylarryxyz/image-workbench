@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
 import { Layer, Line, Stage } from 'react-konva';
+import { Button } from '@/components/ui/button';
 
 type MaskEditorProps = {
   imageUrl?: string | null;
@@ -135,10 +136,10 @@ function MaskEditorInner({ imageUrl, onMaskReady }: MaskEditorProps) {
           {strokes.map((stroke, index) => <Line key={index} points={stroke.points} stroke="white" strokeWidth={28} lineCap="round" lineJoin="round" globalCompositeOperation="source-over" />)}
         </Layer>
       </Stage>
-    </div> : <div className="thumb">{imageUrl ? '正在读取参考图尺寸…' : '先添加参考图再画 mask'}</div>}
-    <div className="actions">
-      <button className="pill" type="button" onClick={() => setStrokes([])}>清空 Mask</button>
-      <button className="pill" type="button" disabled={!imageUrl || !dimensions || strokes.length === 0} onClick={exportMask}>保存 Mask</button>
+    </div> : <div className="grid min-h-40 place-items-center rounded-lg border bg-muted/30 text-sm text-muted-foreground">{imageUrl ? '正在读取参考图尺寸…' : '先添加参考图再画 mask'}</div>}
+    <div className="mt-3 flex flex-wrap gap-2">
+      <Button variant="secondary" type="button" onClick={() => setStrokes([])}>清空 Mask</Button>
+      <Button variant="outline" type="button" disabled={!imageUrl || !dimensions || strokes.length === 0} onClick={exportMask}>保存 Mask</Button>
     </div>
   </div>;
 }
