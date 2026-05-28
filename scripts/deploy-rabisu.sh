@@ -117,6 +117,10 @@ ln -sfn "${APP_ROOT}/shared/uploads" "$RELEASE/data"
 cd "$RELEASE"
 /usr/local/bin/pnpm install --frozen-lockfile
 /usr/local/bin/pnpm --filter @image-workbench/api prisma:generate
+set -a
+# shellcheck disable=SC1091
+. "${APP_ROOT}/shared/.env"
+set +a
 (cd apps/api && /usr/local/bin/pnpm exec prisma migrate deploy)
 /usr/local/bin/pnpm --filter @image-workbench/web test -- api-base.production.test.js
 
