@@ -4,6 +4,13 @@ import '@xyflow/react/dist/style.css';
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Background, Controls, MiniMap, ReactFlow, addEdge, applyEdgeChanges, applyNodeChanges, type Edge, type Node } from '@xyflow/react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
+import { Textarea } from '@/components/ui/textarea';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
 
 type CanvasExport = { nodes: Node[]; edges: Edge[] };
@@ -39,12 +46,12 @@ function nodeKind(id?: string | null) {
   return 'Node';
 }
 
-function statusClass(status?: string) {
+function statusVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   const normalized = (status ?? '').toLowerCase();
-  if (normalized === 'succeeded') return 'status ok';
-  if (normalized === 'failed' || normalized === 'cancelled') return 'status bad';
-  if (normalized === 'running') return 'status run';
-  return 'status wait';
+  if (normalized === 'succeeded') return 'default';
+  if (normalized === 'failed' || normalized === 'cancelled') return 'destructive';
+  if (normalized === 'running') return 'secondary';
+  return 'outline';
 }
 
 export default function CanvasPage() {
@@ -233,102 +240,118 @@ export default function CanvasPage() {
           <Controls />
         </ReactFlow>
         <div className="canvas-dock" aria-label="Canvas Dock">
-          <button className="pill" type="button" onClick={addPromptNode}>添加 Prompt 节点</button>
-          <button className="pill" type="button" onClick={addImageNode}>添加 Image 节点</button>
-          <button className="pill" type="button" onClick={addTaskNode}>添加 Task 节点</button>
-          <button className="pill" type="button" onClick={duplicateSelected} disabled={!selectedNode}>复制节点</button>
-          <button className="pill" type="button" onClick={rerunSelectedNode} disabled={!activeProjectId || !selectedNodeId}>单节点重跑</button>
-          <button className="pill" type="button" onClick={createTaskFromCanvas}>执行画布任务</button>
+          <Button size="sm" variant="secondary" type="button" onClick={addPromptNode}>添加 Prompt 节点</Button>
+          <Button size="sm" variant="secondary" type="button" onClick={addImageNode}>添加 Image 节点</Button>
+          <Button size="sm" variant="secondary" type="button" onClick={addTaskNode}>添加 Task 节点</Button>
+          <Button size="sm" variant="outline" type="button" onClick={duplicateSelected} disabled={!selectedNode}>复制节点</Button>
+          <Button size="sm" variant="outline" type="button" onClick={rerunSelectedNode} disabled={!activeProjectId || !selectedNodeId}>单节点重跑</Button>
+          <Button size="sm" type="button" onClick={createTaskFromCanvas}>执行画布任务</Button>
         </div>
       </div>
 
-      <aside className="card canvas-inspector" data-testid="canvas-node-editor">
-        <p className="eyebrow">Inspector</p>
-        <h2>{nodeKind(selectedNode?.id)}</h2>
-        <label>项目名</label>
-        <input value={projectName} onChange={(event) => setProjectName(event.target.value)} />
-        <div className="actions">
-          <button className="pill" type="button" onClick={() => saveProject()}>{activeProjectId ? '保存项目' : '新建保存'}</button>
-          <button className="pill" type="button" onClick={() => saveProject({ template: true })}>保存为模板</button>
-          <button className="pill" type="button" onClick={loadProjects}>加载项目</button>
-          <button className="pill" type="button" onClick={loadTemplates}>加载模板</button>
-          <button className="pill" type="button" onClick={() => loadRuns()} disabled={!activeProjectId}>刷新运行</button>
-          <button className="pill" type="button" onClick={askAgentNext}>Agent 建议下一步</button>
-          <button className="pill" type="button" onClick={deleteProject} disabled={!activeProjectId}>删除当前项目</button>
-          <button className="pill" type="button" onClick={clearCanvas}>重置画布</button>
-        </div>
-        {message ? <div className="notice">{message}</div> : null}
+      <Card className="canvas-inspector" data-testid="canvas-node-editor">
+        <CardHeader>
+          <p className="eyebrow">Inspector</p>
+          <CardTitle>{nodeKind(selectedNode?.id)}</CardTitle>
+          <CardDescription>选中节点会在这里编辑；连线决定执行时的 prompt、reference、mask 和 rerun 范围。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="canvas-project-name">项目名</Label>
+            <Input id="canvas-project-name" value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" type="button" onClick={() => saveProject()}>{activeProjectId ? '保存项目' : '新建保存'}</Button>
+            <Button size="sm" variant="outline" type="button" onClick={() => saveProject({ template: true })}>保存为模板</Button>
+            <Button size="sm" variant="outline" type="button" onClick={loadProjects}>加载项目</Button>
+            <Button size="sm" variant="outline" type="button" onClick={loadTemplates}>加载模板</Button>
+            <Button size="sm" variant="outline" type="button" onClick={() => loadRuns()} disabled={!activeProjectId}>刷新运行</Button>
+            <Button size="sm" variant="outline" type="button" onClick={askAgentNext}>Agent 建议下一步</Button>
+            <Button size="sm" variant="destructive" type="button" onClick={deleteProject} disabled={!activeProjectId}>删除当前项目</Button>
+            <Button size="sm" variant="secondary" type="button" onClick={clearCanvas}>重置画布</Button>
+          </div>
+          {message ? <Card className="border-border/70 bg-muted/30"><CardContent className="pt-6 text-sm text-muted-foreground">{message}</CardContent></Card> : null}
 
-        {selectedNode ? <div className="control-stack">
-          <div className="notice"><b>{selectedNode.id}</b><p className="fine-print">选中节点会在这里编辑；连线决定执行时的 prompt、reference、mask 和 rerun 范围。</p></div>
-          {selectedNode.id.startsWith('prompt') ? <>
-            <label>Prompt</label>
-            <textarea value={String(selectedNode.data?.prompt ?? String(selectedNode.data?.label ?? '').split('\n').slice(1).join('\n'))} onChange={(event) => patchSelectedData({ prompt: event.target.value })} />
-          </> : null}
-          {selectedNode.id.startsWith('image') ? <>
-            <label>Storage Key</label>
-            <input placeholder="local://uploads/default/... 或图库 storageKey" value={String(selectedNode.data?.storageKey ?? '')} onChange={(event) => patchSelectedData({ storageKey: event.target.value })} />
-            <p className="muted">可从 Asset Library 的“Canvas”动作或 Edit 上传结果传入。</p>
-          </> : null}
-          {selectedNode.id.startsWith('task') ? <>
-            <label>Prompt override</label>
-            <textarea value={String(selectedNode.data?.prompt ?? '')} onChange={(event) => patchSelectedData({ prompt: event.target.value })} placeholder="可留空，自动使用上游 Prompt 节点" />
-            <label>Model</label>
-            <input value={String(selectedNode.data?.model ?? 'gpt-image-2')} onChange={(event) => patchSelectedData({ model: event.target.value })} />
-            <label>Size</label>
-            <input value={String(selectedNode.data?.size ?? '1024x1024')} onChange={(event) => patchSelectedData({ size: event.target.value })} />
-            <label>Quality</label>
-            <select value={String(selectedNode.data?.quality ?? 'low')} onChange={(event) => patchSelectedData({ quality: event.target.value })}><option>low</option><option>medium</option><option>high</option></select>
-            <label>Mask Key</label>
-            <input value={String(selectedNode.data?.maskKey ?? '')} onChange={(event) => patchSelectedData({ maskKey: event.target.value })} placeholder="可选：Mask 上传后得到的 storageKey" />
-          </> : null}
-        </div> : <p className="muted">点击画布节点后编辑。</p>}
+          {selectedNode ? <div className="space-y-4">
+            <Card className="bg-muted/30"><CardContent className="pt-6"><b>{selectedNode.id}</b><p className="fine-print">{String(selectedNode.data?.label ?? '').split('\n')[0]}</p></CardContent></Card>
+            {selectedNode.id.startsWith('prompt') ? <div className="space-y-2">
+              <Label htmlFor="canvas-node-prompt">Prompt</Label>
+              <Textarea id="canvas-node-prompt" value={String(selectedNode.data?.prompt ?? String(selectedNode.data?.label ?? '').split('\n').slice(1).join('\n'))} onChange={(event) => patchSelectedData({ prompt: event.target.value })} />
+            </div> : null}
+            {selectedNode.id.startsWith('image') ? <div className="space-y-2">
+              <Label htmlFor="canvas-storage-key">Storage Key</Label>
+              <Input id="canvas-storage-key" placeholder="local://uploads/default/... 或图库 storageKey" value={String(selectedNode.data?.storageKey ?? '')} onChange={(event) => patchSelectedData({ storageKey: event.target.value })} />
+              <p className="muted">可从 Asset Library 的“Canvas”动作或 Edit 上传结果传入。</p>
+            </div> : null}
+            {selectedNode.id.startsWith('task') ? <div className="space-y-3">
+              <div className="space-y-2"><Label htmlFor="canvas-task-prompt">Prompt override</Label><Textarea id="canvas-task-prompt" value={String(selectedNode.data?.prompt ?? '')} onChange={(event) => patchSelectedData({ prompt: event.target.value })} placeholder="可留空，自动使用上游 Prompt 节点" /></div>
+              <div className="space-y-2"><Label htmlFor="canvas-task-model">Model</Label><Input id="canvas-task-model" value={String(selectedNode.data?.model ?? 'gpt-image-2')} onChange={(event) => patchSelectedData({ model: event.target.value })} /></div>
+              <div className="space-y-2"><Label htmlFor="canvas-task-size">Size</Label><Input id="canvas-task-size" value={String(selectedNode.data?.size ?? '1024x1024')} onChange={(event) => patchSelectedData({ size: event.target.value })} /></div>
+              <div className="space-y-2"><Label htmlFor="canvas-task-quality">Quality</Label><NativeSelect id="canvas-task-quality" value={String(selectedNode.data?.quality ?? 'low')} onChange={(event) => patchSelectedData({ quality: event.target.value })}><option>low</option><option>medium</option><option>high</option></NativeSelect></div>
+              <div className="space-y-2"><Label htmlFor="canvas-task-mask">Mask Key</Label><Input id="canvas-task-mask" value={String(selectedNode.data?.maskKey ?? '')} onChange={(event) => patchSelectedData({ maskKey: event.target.value })} placeholder="可选：Mask 上传后得到的 storageKey" /></div>
+            </div> : null}
+          </div> : <p className="muted">点击画布节点后编辑。</p>}
 
-        <div className="actions">
-          {projects.map((project) => <button className="pill" type="button" key={project.id} onClick={() => openProject(project.id)}>{project.name}</button>)}
-          {templates.map((template) => <button className="pill" type="button" key={template.id} onClick={() => useTemplate(template.id)}>模板：{template.name}</button>)}
-        </div>
-      </aside>
+          <div className="flex flex-wrap gap-2">
+            {projects.map((project) => <Button size="sm" variant="outline" type="button" key={project.id} onClick={() => openProject(project.id)}>{project.name}</Button>)}
+            {templates.map((template) => <Button size="sm" variant="outline" type="button" key={template.id} onClick={() => useTemplate(template.id)}>模板：{template.name}</Button>)}
+          </div>
+        </CardContent>
+      </Card>
     </div>
 
-    <div className="grid two" style={{ marginTop: 16 }}>
-      <section className="card">
-        <p className="eyebrow">Run output</p>
-        <h2>{runItems.length ? `${runItems.length} 个节点已创建任务` : '运行记录与缩略图'}</h2>
-        <div className="task-list">
-          {runItems.map((item) => <div className="task-card" key={`${item.nodeId}-${item.taskId}`}>
-            <div className="task-head"><span className="status wait">{item.status}</span><span className="fine-print">{item.nodeId}</span></div>
-            <h3>{item.taskId}</h3>
-            <div className="actions"><Link className="pill" href={`/tasks/${item.taskId}`}>打开任务详情</Link></div>
-          </div>)}
-          {visibleRuns.map((run) => (run.nodes ?? []).map((node) => <div className="task-card" key={node.id}>
-            <div className="task-head"><span className={statusClass(node.status)}>{node.status}</span><span className="fine-print">{node.nodeId}</span></div>
-            <h3>{node.taskId ?? node.id}</h3>
-            <div className="reference-strip">
-              {(node.images ?? []).map((image, index) => {
-                const src = withApi(image.thumbnailUrl ?? image.assetUrl ?? (image.storageKey ? `/assets/file?key=${encodeURIComponent(image.storageKey)}` : null));
-                return src ? <Link className="reference-card" href={`/gallery?q=${encodeURIComponent(image.storageKey ?? '')}`} key={`${node.id}-${index}`}><img src={src} alt="canvas run result" /></Link> : null;
-              })}
-            </div>
-            {node.taskId ? <div className="actions"><Link className="pill" href={`/tasks/${node.taskId}`}>任务详情</Link><button className="pill" type="button" onClick={() => replayRun(run.id)}>Replay run</button></div> : null}
-          </div>))}
-        </div>
-        <details className="diagnostics">
-          <summary>Diagnostics · run result</summary>
-          <pre className="debug-json">{JSON.stringify(result ?? { hint: 'Create a task from canvas.' }, null, 2)}</pre>
-        </details>
-      </section>
+    <div className="grid gap-4 md:grid-cols-2 mt-4">
+      <Card>
+        <CardHeader>
+          <p className="eyebrow">Run output</p>
+          <CardTitle>{runItems.length ? `${runItems.length} 个节点已创建任务` : '运行记录与缩略图'}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="task-list">
+            {runItems.map((item) => <Card key={`${item.nodeId}-${item.taskId}`}>
+              <CardContent className="space-y-3 pt-6">
+                <div className="task-head"><Badge variant={statusVariant(item.status)}>{item.status}</Badge><span className="fine-print">{item.nodeId}</span></div>
+                <h3>{item.taskId}</h3>
+                <div className="flex flex-wrap gap-2"><Button asChild size="sm" variant="outline"><Link href={`/tasks/${item.taskId}`}>打开任务详情</Link></Button></div>
+              </CardContent>
+            </Card>)}
+            {visibleRuns.map((run) => (run.nodes ?? []).map((node) => <Card key={node.id}>
+              <CardContent className="space-y-3 pt-6">
+                <div className="task-head"><Badge variant={statusVariant(node.status)}>{node.status}</Badge><span className="fine-print">{node.nodeId}</span></div>
+                <h3>{node.taskId ?? node.id}</h3>
+                <div className="reference-strip">
+                  {(node.images ?? []).map((image, index) => {
+                    const src = withApi(image.thumbnailUrl ?? image.assetUrl ?? (image.storageKey ? `/assets/file?key=${encodeURIComponent(image.storageKey)}` : null));
+                    return src ? <Link className="reference-card" href={`/gallery?q=${encodeURIComponent(image.storageKey ?? '')}`} key={`${node.id}-${index}`}><img src={src} alt="canvas run result" /></Link> : null;
+                  })}
+                </div>
+                {node.taskId ? <div className="flex flex-wrap gap-2"><Button asChild size="sm" variant="outline"><Link href={`/tasks/${node.taskId}`}>任务详情</Link></Button><Button size="sm" variant="outline" type="button" onClick={() => replayRun(run.id)}>Replay run</Button></div> : null}
+              </CardContent>
+            </Card>))}
+          </div>
+          <details className="diagnostics">
+            <summary>Diagnostics · run result</summary>
+            <pre className="debug-json">{JSON.stringify(result ?? { hint: 'Create a task from canvas.' }, null, 2)}</pre>
+          </details>
+        </CardContent>
+      </Card>
 
-      <form className="card" onSubmit={importCanvas}>
-        <p className="eyebrow">Import / Export</p>
-        <h2>Canvas JSON</h2>
-        <p className="muted">导入/导出保留为高级能力，默认折叠。CanvasRun 会额外保留每次执行快照，可 replay。</p>
-        <details className="diagnostics" data-testid="canvas-json-panel">
-          <summary>打开 Import / Export JSON</summary>
-          <textarea data-testid="canvas-json" value={importText || exported} onChange={(e) => setImportText(e.target.value)} />
-          <div className="actions"><button className="btn" type="submit">导入 JSON</button><button className="pill" type="button" onClick={() => navigator.clipboard?.writeText(exported)}>复制 JSON</button></div>
-        </details>
-      </form>
+      <Card>
+        <CardHeader>
+          <p className="eyebrow">Import / Export</p>
+          <CardTitle>Canvas JSON</CardTitle>
+          <CardDescription>导入/导出保留为高级能力，默认折叠。CanvasRun 会额外保留每次执行快照，可 replay。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={importCanvas}>
+            <details className="diagnostics" data-testid="canvas-json-panel">
+              <summary>打开 Import / Export JSON</summary>
+              <Textarea data-testid="canvas-json" value={importText || exported} onChange={(e) => setImportText(e.target.value)} className="min-h-72 font-mono" />
+              <div className="mt-3 flex flex-wrap gap-2"><Button type="submit">导入 JSON</Button><Button variant="outline" type="button" onClick={() => navigator.clipboard?.writeText(exported)}>复制 JSON</Button></div>
+            </details>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   </section>;
 }

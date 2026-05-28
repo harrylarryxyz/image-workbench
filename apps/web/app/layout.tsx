@@ -1,6 +1,8 @@
 import './globals.css';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export const metadata = { title: 'Image Workbench Studio', description: 'Private AI image creation studio' };
 
@@ -30,10 +32,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
             <nav className="nav" aria-label="Primary">
-              {nav.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
+              {nav.map(([label, href]) => <Button asChild key={href} variant="ghost" className="w-full justify-start"><Link href={href}>{label}</Link></Button>)}
             </nav>
             <div className="sidebar-footer">
-              <b style={{ color: 'var(--text-secondary)' }}>Production studio shell</b><br />
+              <Badge variant="outline">Production studio shell</Badge><br />
               创作、素材、画布、任务和运维保持一个产品语言；诊断信息只在需要时展开。
             </div>
           </aside>
