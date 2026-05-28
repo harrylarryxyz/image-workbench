@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -13,7 +14,8 @@ function* walk(dir) {
 }
 
 test('production browser chunks do not point API calls at localhost', () => {
-  const staticDir = join(process.cwd(), '.next', 'static');
+  const appDir = dirname(fileURLToPath(import.meta.url));
+  const staticDir = join(appDir, '.next', 'static');
   assert.equal(existsSync(staticDir), true, 'run `pnpm --filter @image-workbench/web build` before this guard');
   const offenders = [];
   for (const file of walk(staticDir)) {

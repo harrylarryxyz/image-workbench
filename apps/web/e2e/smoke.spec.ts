@@ -3,8 +3,8 @@ import { test, expect } from '@playwright/test';
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l3kG7wAAAABJRU5ErkJggg==', 'base64');
 
 const routes = [
-  ['/', /AI Image Workbench|Generate/i],
-  ['/gallery', /Gallery/i],
+  ['/', /Create Studio|创作工作台/i],
+  ['/gallery', /Asset Library|素材库/i],
   ['/edit', /Edit|参考|Mask/i],
   ['/prompts', /Prompt/i],
   ['/canvas', /Canvas|节点画布/i],
@@ -39,9 +39,9 @@ test('edit page uploads a reference image and submits an edit task', async ({ pa
   await page.goto('/edit');
   await page.locator('input[type="file"]').setInputFiles({ name: 'ref.png', mimeType: 'image/png', buffer: tinyPng });
   await page.getByRole('button', { name: '上传参考图' }).click();
-  await expect(page.getByText('ref.png')).toBeVisible();
+  await expect(page.locator('.reference-card').filter({ hasText: 'ref.png' })).toBeVisible();
   await page.getByRole('button', { name: '创建编辑任务' }).click();
-  await expect(page.getByText('task_edit_e2e')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'task_edit_e2e' })).toBeVisible();
 });
 
 test('canvas can add nodes, edit an image reference, export JSON and run the saved graph', async ({ page }) => {
@@ -56,8 +56,9 @@ test('canvas can add nodes, edit an image reference, export JSON and run the sav
   await page.goto('/canvas');
   await page.getByRole('button', { name: '添加 Image 节点' }).click();
   await page.getByPlaceholder('local://uploads/default/... 或图库 storageKey').fill('local://uploads/default/ref.png');
+  await page.getByText('打开 Import / Export JSON').click();
   await expect(page.getByTestId('canvas-json')).toContainText('local://uploads/default/ref.png');
   await page.getByRole('button', { name: '执行画布任务' }).click();
-  await expect(page.locator('pre').filter({ hasText: 'task_edit_canvas' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'task_edit_canvas' })).toBeVisible();
   expect(savedBody.nodes.some((node: any) => node.id.startsWith('image') && node.data.storageKey === 'local://uploads/default/ref.png')).toBe(true);
 });

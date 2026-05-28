@@ -1,12 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { apiFormPost, apiGet, apiPost } from '../../lib/api';
 import { pollTaskUntilTerminal, subscribeTaskEvents } from '../../lib/task-events';
 import { MaskEditor } from './mask-editor';
 
 type Uploaded = { storageKey: string; assetUrl: string; originalName?: string; format: string; sizeBytes: number };
-type TaskImage = { id: string; assetUrl: string; format: string; sizeBytes: number; width?: number | null; height?: number | null; createdAt?: string };
+type TaskImage = { id: string; assetUrl: string; storageKey?: string; format: string; sizeBytes: number; width?: number | null; height?: number | null; createdAt?: string };
 type EditTask = { id: string; type?: string; status: string; model?: string; prompt?: string; errorCode?: string | null; errorMessage?: string | null; elapsedMs?: number | null; images?: TaskImage[]; createdAt?: string; updatedAt?: string };
 type ProviderSummary = { name: string; enabled: boolean; capabilities?: { edit: boolean | null; maxRefs: number | null; source: string }; editHealth?: { status: string; errorCode: string | null; errorMessage: string | null } };
 
@@ -25,7 +26,8 @@ function statusClass(status?: string) {
   if (normalized === 'succeeded') return 'status ok';
   if (normalized === 'failed' || normalized === 'cancelled') return 'status bad';
   if (normalized === 'running') return 'status run';
-  return 'status wait';
+  if (normalized === 'queued' || normalized === 'pending') return 'status wait';
+  return 'status neutral';
 }
 
 export default function EditPage() {
@@ -85,6 +87,7 @@ export default function EditPage() {
     try {
       const uploaded = await apiFormPost<Uploaded>('/assets/upload', form);
       setUploads((prev) => [...prev, uploaded].slice(0, 4));
+      setResult({ uploaded: uploaded.storageKey });
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -99,6 +102,7 @@ export default function EditPage() {
     try {
       const uploaded = await apiFormPost<Uploaded>('/assets/upload', form);
       setMask(uploaded);
+      setResult({ mask: uploaded.storageKey });
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : String(error) });
     } finally {
@@ -134,53 +138,67 @@ export default function EditPage() {
     }
   }
 
-  return <section className="grid two">
-    <div className="card">
-      <p className="eyebrow">Edit</p>
-      <h1>参考图编辑</h1>
-      <p className="sub">上传 1-4 张参考图，创建 image.edit 任务。当前第一版走 Images API `/images/edits`。</p>
-      {provider ? <div className="metric" style={{ margin: '12px 0' }}>
-        <span>Current provider</span>
-        <b>{provider.name}</b>
-        <div className="muted">Edit capability: {provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'} · health: {provider.editHealth?.status ?? 'untested'}{provider.editHealth?.errorCode ? ` · ${provider.editHealth.errorCode}` : ''}</div>
-      </div> : null}
-      <form onSubmit={upload}>
-        <label>Reference Image</label>
-        <input name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
-        <button className="btn" disabled={busy} type="submit">上传参考图</button>
-      </form>
-      <label>Edit Prompt</label>
-      <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-      <h3>Mask</h3>
-      <MaskEditor imageUrl={assetSrc(uploads[0]?.assetUrl)} onMaskReady={uploadMask} />
-      {mask ? <div className="muted">Mask ready: {mask.storageKey}</div> : <div className="muted">Mask optional；当前 provider 不支持时可留空。</div>}
-      <button className="btn" disabled={submitting || uploads.length === 0} onClick={submitEdit}>{submitting ? '提交中…' : '创建编辑任务'}</button>
-    </div>
-    <div className="card">
-      <p className="eyebrow">References</p>
-      <h1>{uploads.length} / 4</h1>
-      <div className="gallery">
-        {uploads.map((item) => <div className="card" key={item.storageKey}>
-          <img className="thumb-img" src={assetSrc(item.assetUrl)} alt={item.originalName ?? 'reference'} />
-          <p>{item.originalName ?? item.storageKey}</p>
-          <div className="muted">{item.format} · {Math.round(item.sizeBytes / 1024)} KB</div>
-        </div>)}
-      </div>
-      <h3>Result</h3>
-      {task ? <div className="result-panel">
-        <div className="task-head">
-          <span className={statusClass(task.status)}>{task.status}</span>
-          <span className="muted">{activeTaskId ? 'SSE 实时更新中…' : task.elapsedMs ? `${task.elapsedMs}ms` : '已停止更新'}</span>
+  const firstOutput = task?.images?.[0];
+  const outputUrl = assetSrc(firstOutput?.assetUrl);
+
+  return <>
+    <section className="studio-hero">
+      <p className="eyebrow">Create Studio · Edit</p>
+      <h1>参考图编辑工作台</h1>
+      <p className="sub">上传参考图、绘制 Mask、提交编辑任务，并在同一屏完成预览、下载、继续创作和诊断。</p>
+    </section>
+
+    <div className="studio-shell">
+      <section className="studio-panel control-stack">
+        <div className="notice">
+          <b>Provider readiness</b>
+          <p className="muted" style={{ margin: '6px 0 0' }}>{provider ? `${provider.name} · edit ${provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'} · health ${provider.editHealth?.status ?? 'untested'}` : 'Provider capability loading…'}</p>
         </div>
-        {task.errorMessage ? <pre className="error">{task.errorMessage}</pre> : null}
-        {task.images?.length ? <div className="gallery result-gallery">
-          {task.images.map((image) => <a className="card" href={assetSrc(image.assetUrl)} target="_blank" rel="noreferrer" key={image.id}>
-            <img className="thumb-img" src={assetSrc(image.assetUrl)} alt={task.prompt ?? 'edited image'} />
-            <div className="muted">{image.format} · {Math.round(image.sizeBytes / 1024)} KB{image.width && image.height ? ` · ${image.width}×${image.height}` : ''}</div>
-          </a>)}
-        </div> : <div className="thumb">{TERMINAL_STATUSES.has(task.status) ? 'No image returned' : 'Waiting for edited image…'}</div>}
-      </div> : null}
-      <pre>{JSON.stringify(result ?? { hint: 'Upload reference images, then create edit task.' }, null, 2)}</pre>
+        <form onSubmit={upload}>
+          <label>Reference Image</label>
+          <input name="file" type="file" accept="image/png,image/jpeg,image/webp" required />
+          <button className="btn" disabled={busy} type="submit">上传参考图</button>
+        </form>
+        <div>
+          <label>Edit Prompt</label>
+          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+        </div>
+        <div>
+          <h3>Mask 编辑器</h3>
+          <p className="muted">在第一张参考图上绘制白色区域，支持 mask 的 provider 会只编辑选中区域。</p>
+          <MaskEditor imageUrl={assetSrc(uploads[0]?.assetUrl)} onMaskReady={uploadMask} />
+          {mask ? <div className="notice success">Mask ready: {mask.originalName ?? mask.storageKey.split('/').pop()}</div> : <div className="fine-print">Mask optional；不需要局部修改时可留空。</div>}
+        </div>
+        <button className="btn" disabled={submitting || uploads.length === 0} onClick={submitEdit}>{submitting ? '提交中…' : '创建编辑任务'}</button>
+      </section>
+
+      <section className="preview-stage">
+        <div className="task-head">
+          <div><p className="eyebrow">PreviewStage</p><h2>{task?.id ?? `${uploads.length} / 4 references`}</h2></div>
+          <span className={statusClass(task?.status)}>{task?.status ?? 'READY'}</span>
+        </div>
+        <div className="preview-frame">
+          {outputUrl ? <img src={outputUrl} alt={task?.prompt ?? 'edited image'} /> : uploads[0] ? <img src={assetSrc(uploads[0].assetUrl)} alt={uploads[0].originalName ?? 'reference'} /> : <div className="preview-empty"><b>上传参考图开始编辑</b><span>输出图会替换这里的参考预览；图片工具条会提供下载、继续编辑和发送到 Canvas。</span></div>}
+        </div>
+        <div className="image-action-toolbar">
+          {outputUrl ? <a className="pill" href={outputUrl} target="_blank" rel="noreferrer" download>下载输出</a> : null}
+          {firstOutput?.storageKey ? <Link className="pill" href={`/edit?ref=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>继续编辑输出</Link> : null}
+          {firstOutput?.storageKey ? <Link className="pill" href={`/canvas?image=${encodeURIComponent(firstOutput.storageKey)}&prompt=${encodeURIComponent(prompt)}`}>发送到 Canvas</Link> : null}
+          {task?.id ? <Link className="pill" href={`/tasks/${task.id}`}>任务详情</Link> : null}
+          <span className="pill">{activeTaskId ? 'SSE 实时更新中…' : 'Ready'}</span>
+        </div>
+        <div className="reference-strip">
+          {uploads.map((item) => <div className="reference-card" key={item.storageKey}>
+            <img src={assetSrc(item.assetUrl)} alt={item.originalName ?? 'reference'} />
+            <p className="fine-print">{item.originalName ?? item.storageKey}</p>
+          </div>)}
+        </div>
+        {task?.errorMessage ? <div className="notice error">{task.errorMessage}</div> : null}
+        <details className="diagnostics">
+          <summary>Diagnostics · 上传与编辑任务响应</summary>
+          <pre className="debug-json">{JSON.stringify(result ?? { hint: 'Upload reference images, then create edit task.' }, null, 2)}</pre>
+        </details>
+      </section>
     </div>
-  </section>;
+  </>;
 }

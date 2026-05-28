@@ -1,6 +1,6 @@
 # Image Workbench
 
-Image Workbench is a private, production-oriented AI image creation workbench for GPT Image 2 and OpenAI-compatible image providers. It replaces the temporary `image-draw-web` FastAPI demo with a TypeScript monorepo, queued generation pipeline, provider management, SSE task diagnostics, gallery, prompt library, mask editing, React Flow canvas workflows, S3-compatible storage-key contracts, and encrypted provider secrets, optional admin-token protection, audit logs, usage metrics, batch gallery actions, prompt versioning, and executable canvas workflows.
+Image Workbench is a private, production-oriented AI image creation studio for GPT Image 2 and OpenAI-compatible image providers. It replaces the temporary `image-draw-web` FastAPI demo with a TypeScript monorepo, queued generation pipeline, productized Create Studio, Asset Library, Provider control center, SSE task diagnostics, prompt library, mask editing, React Flow canvas workflows, S3-compatible storage-key contracts, encrypted provider secrets, optional admin-token protection, audit logs, usage metrics, batch gallery actions, prompt versioning, and executable canvas workflows.
 
 ## What it does
 
@@ -10,26 +10,27 @@ Image Workbench is a private, production-oriented AI image creation workbench fo
 - Store task metadata, provider profiles, route diagnostics, errors, and image assets in PostgreSQL via Prisma.
 - Serve generated/uploaded assets from local storage with backend-prefixed keys that are compatible with S3, R2, and MinIO object stores.
 - Manage providers from the UI, including masked keys, model capability summaries, `/models` checks, and `/images/edits` probes.
-- Inspect tasks, retry failed/cancelled jobs, cancel queued jobs, reuse prompts/parameters, and browse outputs in Gallery.
+- Inspect tasks, retry failed/cancelled jobs, cancel queued jobs, reuse prompts/parameters, and browse outputs in an image-first Asset Library.
 - Maintain reusable prompt presets for recurring styles and workflows.
 
 ## Current status
 
-This project is in active `0.2.x` development. The core generate/edit pipeline, SSE status updates, Gallery 2.0 with generated thumbnails, prompt workflows, mask editing, persisted Canvas projects, backend-prefixed storage keys, provider secret encryption, one-shot legacy key migration, and browser E2E smoke tests are implemented. S3/R2/MinIO remote-object adapters are implemented and configurable; single-VPS deployments can continue using local storage until object-storage credentials are configured.
+This project is in active `0.9.x` productization work. The core generate/edit pipeline, SSE status updates, productized Create Studio, Asset Library with generated thumbnails, prompt workflows, mask editing, persisted Canvas projects, backend-prefixed storage keys, provider secret encryption, one-shot legacy key migration, and browser E2E smoke tests are implemented. S3/R2/MinIO remote-object adapters are implemented and configurable; single-VPS deployments can continue using local storage until object-storage credentials are configured.
 
 Implemented:
 
-- Next.js web UI with pages for Generate, Edit, Tasks, Task Detail, Gallery, Providers, Prompts, and Canvas.
+- Next.js web UI with a dark studio AppShell, Create Studio, Edit workspace, Asset Library, Tasks, Task Detail, Provider control center, Prompts, Ops, Settings, and Canvas.
 - NestJS API with provider, task, gallery, asset, and prompt modules.
 - PostgreSQL schema for providers, generation tasks, image assets, canvas projects/nodes/edges, and prompt presets.
 - Redis/BullMQ worker for async image generation and editing.
 - SSE task updates with polling fallback.
 - Local image upload, asset serving, metadata extraction, generated WebP thumbnails, and S3/R2/MinIO-compatible storage key contracts.
 - Provider diagnostics, encrypted provider secrets, one-shot legacy plaintext key migration, and error classification for common upstream failures.
-- Persisted React Flow canvas projects and Konva mask editor.
+- Persisted React Flow canvas projects, Canvas Dock/Inspector workflow, and Konva mask editor.
 
 Planned:
 
+- Canvas run history with node-level execution state, rerun/replay, and live output thumbnails.
 - Multi-user hardening beyond workspace/session groundwork, if public team access is required.
 
 ## Architecture
@@ -43,7 +44,7 @@ apps/web  ──HTTP──>  apps/api  ──Prisma──> PostgreSQL
    │                    │
    │                    └─Storage──> local filesystem data/uploads or S3-compatible object keys
    │
-   └─Next.js UI: generate, edit, tasks, gallery, providers, prompts, canvas
+   └─Next.js UI: Create Studio, Edit, Asset Library, Tasks, Providers, Prompts, Canvas, Ops
 ```
 
 ## Stack
@@ -175,13 +176,13 @@ Default local URLs:
 3. Run the `/models` test to verify the base URL and key.
 4. Run the `/images/edits` probe to verify reference-image edit support.
 
-### Generate an image
+### Generate an image in Create Studio
 
-1. Open `Generate`.
+1. Open `Studio`.
 2. Enter prompt/model/size/quality/format/API mode.
 3. Submit the task.
-4. The UI streams task status over SSE and shows the result image when complete.
-5. Use `Tasks` for route diagnostics and `Gallery` for output history.
+4. PreviewStage streams task status over SSE and shows the result image when complete.
+5. Use the image action toolbar for download, continued editing, Canvas handoff, or task diagnostics.
 
 ### Edit with reference images
 
@@ -190,15 +191,16 @@ Default local URLs:
 3. Write the edit prompt.
 4. Optionally draw or upload a mask.
 5. Submit the edit task.
-6. The UI streams `/tasks/:id/events` and renders returned images when the task reaches a terminal state.
+6. PreviewStage streams `/tasks/:id/events`, renders returned images, and exposes download / continue-edit / Canvas actions.
 
 ### Save a Canvas workflow
 
 1. Open `Canvas`.
-2. Add Prompt/Image/Task nodes and connect them.
-3. Enter a project name and click `新建保存` or `保存项目`.
-4. Use `加载项目列表` to reopen saved workflows later.
-5. Click `执行画布任务` to run saved Task nodes; connected Prompt/Image nodes become generate/edit task inputs.
+2. Use the Canvas Dock to add Prompt/Image/Task nodes and connect them.
+3. Use the right Inspector to edit project name, prompt text, image storage keys, model, size, and quality.
+4. Enter a project name and click `新建保存` or `保存项目`.
+5. Click `执行画布任务` to auto-save and run saved Task nodes; connected Prompt/Image nodes become generate/edit task inputs.
+6. Import/export JSON is available under a collapsed diagnostics-style panel so the main canvas stays visual.
 
 ### Migrate legacy provider secrets
 
@@ -213,8 +215,8 @@ The command skips existing `enc:v1:` values and only rewrites plaintext rows.
 
 ### Diagnose failures
 
-- `Tasks` shows queue status and recent task states.
-- `Task Detail` shows route metadata, request parameters, diagnostics, error messages, and generated images.
+- `Tasks` shows queue status and recent task states with raw payloads tucked into Diagnostics.
+- `Task Detail` shows status, generated images, actions, and a Diagnostics panel for route metadata, request parameters, and raw image payloads.
 - Failed or cancelled tasks can be retried.
 - Queued tasks can be cancelled safely.
 

@@ -28,7 +28,7 @@ type Provider = {
     source: string;
   };
   editHealth?: {
-    status: 'healthy' | 'failing' | 'unknown' | 'untested';
+    status: 'healthy' | 'failing' | 'unknown' | 'untested' | 'ok';
     lastTaskStatus: string | null;
     errorCode: string | null;
     errorMessage: string | null;
@@ -37,9 +37,17 @@ type Provider = {
   updatedAt?: string;
 };
 
+type Message = { kind: 'idle' | 'success' | 'error' | 'info'; text: string; detail?: unknown };
+
+function capabilityLabel(value?: boolean | null) {
+  if (value === true) return 'supported';
+  if (value === false) return 'unsupported';
+  return 'unknown';
+}
+
 export default function ProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [message, setMessage] = useState<string>('');
+  const [message, setMessage] = useState<Message>({ kind: 'idle', text: 'No message.' });
   const [loading, setLoading] = useState(false);
 
   async function refresh() {
@@ -47,12 +55,12 @@ export default function ProvidersPage() {
     setProviders(rows);
   }
 
-  useEffect(() => { void refresh().catch((error) => setMessage(String(error))); }, []);
+  useEffect(() => { void refresh().catch((error) => setMessage({ kind: 'error', text: String(error) })); }, []);
 
   async function createProvider(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
-    setMessage('');
+    setMessage({ kind: 'info', text: 'Saving provider…' });
     const form = new FormData(event.currentTarget);
     try {
       await apiPost('/providers', {
@@ -66,9 +74,9 @@ export default function ProvidersPage() {
       });
       event.currentTarget.reset();
       await refresh();
-      setMessage('Provider saved.');
+      setMessage({ kind: 'success', text: 'Provider saved.' });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : String(error) });
     } finally {
       setLoading(false);
     }
@@ -77,44 +85,47 @@ export default function ProvidersPage() {
   async function toggle(provider: Provider) {
     await apiPatch(`/providers/${provider.id}`, { enabled: !provider.enabled });
     await refresh();
+    setMessage({ kind: 'success', text: `${provider.name} ${provider.enabled ? 'disabled' : 'enabled'}.` });
   }
 
   async function test(provider: Provider) {
-    setMessage(`Testing ${provider.name} /models...`);
+    setMessage({ kind: 'info', text: `Testing ${provider.name} /models…` });
     try {
       const result = await apiPost(`/providers/${provider.id}/test`, {});
-      setMessage(JSON.stringify(result, null, 2));
+      setMessage({ kind: 'success', text: `${provider.name} /models responded.`, detail: result });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : String(error) });
     }
   }
 
   async function testEdit(provider: Provider) {
-    setMessage(`Testing ${provider.name} /images/edits with a tiny probe image...`);
+    setMessage({ kind: 'info', text: `Testing ${provider.name} /images/edits…` });
     try {
       const result = await apiPost(`/providers/${provider.id}/test-edit`, {});
-      setMessage(JSON.stringify(result, null, 2));
+      setMessage({ kind: 'success', text: `${provider.name} edit probe finished.`, detail: result });
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : String(error) });
     }
   }
 
   async function seedEnv() {
     await apiPost('/providers/seed-env', { name: 'gettoken' });
     await refresh();
+    setMessage({ kind: 'success', text: 'Provider synchronized from environment.' });
   }
 
   return <section>
-    <div className="hero">
+    <div className="studio-hero">
       <p className="eyebrow">Providers</p>
-      <h1>Provider 配置</h1>
-      <p className="sub">管理 OpenAI-compatible 图像 provider。API key 只提交给服务端，页面只显示 masked key。</p>
+      <h1>Provider 控制中心</h1>
+      <p className="sub">把模型能力、编辑健康度和密钥状态做成运营视图；API key 只提交给服务端，页面只显示 masked key。</p>
     </div>
 
     <div className="grid two" style={{ marginTop: 20 }}>
       <form className="card" onSubmit={createProvider}>
         <p className="eyebrow">New Provider</p>
+        <h2>接入 OpenAI-compatible 服务</h2>
         <label>Name</label>
         <input name="name" placeholder="gettoken / freemodel / custom" required />
         <label>Type</label>
@@ -123,7 +134,7 @@ export default function ProvidersPage() {
         <input name="baseUrl" placeholder="https://api.example.com/v1" required />
         <label>API Key</label>
         <input name="apiKey" type="password" placeholder="sk-..." required />
-        <div className="row">
+        <div className="form-grid">
           <div><label>Default Model</label><input name="defaultModel" defaultValue="gpt-image-2" /></div>
           <div><label>API Mode</label><select name="apiMode" defaultValue="auto"><option>auto</option><option>images</option><option>responses</option></select></div>
         </div>
@@ -131,35 +142,44 @@ export default function ProvidersPage() {
         <button className="pill" type="button" onClick={seedEnv} style={{ marginLeft: 10 }}>从环境变量同步 gettoken</button>
       </form>
 
-      <div className="card">
-        <p className="eyebrow">Message</p>
-        <pre>{message || 'No message.'}</pre>
+      <div className={`card ${message.kind === 'error' ? 'notice error' : ''}`}>
+        <p className="eyebrow">Command Center</p>
+        <h2>{message.text}</h2>
+        <p className="muted">测试结果和 provider 原始响应收在 Diagnostics，避免主界面变成 API 调试台。</p>
+        <details className="diagnostics" open={Boolean(message.detail)}>
+          <summary>Diagnostics</summary>
+          <pre className="debug-json">{JSON.stringify(message.detail ?? message, null, 2)}</pre>
+        </details>
       </div>
     </div>
 
     <div className="task-list">
-      {providers.map((provider) => <div className="task-card" key={provider.id}>
+      {providers.map((provider) => <article className="task-card" key={provider.id}>
         <div className="task-head"><span className={provider.enabled ? 'status ok' : 'status bad'}>{provider.enabled ? 'ENABLED' : 'DISABLED'}</span><span className="muted">{provider.apiKeyMasked}</span></div>
         <h3>{provider.name}</h3>
-        <p>{provider.baseUrl}</p>
+        <p className="muted">{provider.baseUrl}</p>
+        <div className="metric-grid">
+          <div className="metric"><b>{provider.defaultModel}</b><span>Model</span></div>
+          <div className="metric"><b>{provider.apiMode}</b><span>Mode</span></div>
+          <div className="metric"><b>{capabilityLabel(provider.capabilities?.generate)}</b><span>Generate</span></div>
+          <div className="metric"><b>{capabilityLabel(provider.capabilities?.edit)}</b><span>Edit</span></div>
+        </div>
         <div className="kv">
-          <b>Model</b><span>{provider.defaultModel}</span>
-          <b>Mode</b><span>{provider.apiMode}</span>
           <b>Type</b><span>{provider.type}</span>
-          <b>Generate</b><span>{provider.capabilities?.generate === true ? 'supported' : provider.capabilities?.generate === false ? 'unsupported' : 'unknown'}</span>
-          <b>Edit</b><span>{provider.capabilities?.edit === true ? `supported · max refs ${provider.capabilities.maxRefs ?? '?'}` : provider.capabilities?.edit === false ? 'unsupported' : 'unknown'}</span>
+          <b>Mask</b><span>{capabilityLabel(provider.capabilities?.mask)}</span>
+          <b>Max refs</b><span>{provider.capabilities?.maxRefs ?? '?'}</span>
           <b>Edit health</b><span>{provider.editHealth?.status ?? 'untested'}{provider.editHealth?.errorCode ? ` · ${provider.editHealth.errorCode}` : ''}</span>
           <b>Sizes</b><span>{provider.capabilities?.sizes?.join(', ') ?? 'unknown'}</span>
           <b>Qualities</b><span>{provider.capabilities?.qualities?.join(', ') ?? 'unknown'}</span>
           <b>Formats</b><span>{provider.capabilities?.formats?.join(', ') ?? 'unknown'}</span>
         </div>
-        {provider.editHealth?.errorMessage ? <pre className="error">{provider.editHealth.errorMessage}</pre> : null}
+        {provider.editHealth?.errorMessage ? <div className="notice error">{provider.editHealth.errorMessage}</div> : null}
         <div className="actions">
           <button className="pill" onClick={() => toggle(provider)}>{provider.enabled ? '禁用' : '启用'}</button>
           <button className="pill" onClick={() => test(provider)}>测试 /models</button>
           <button className="pill" onClick={() => testEdit(provider)}>检测 /images/edits</button>
         </div>
-      </div>)}
+      </article>)}
     </div>
   </section>;
 }
