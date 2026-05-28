@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProvidersService } from './providers.service';
 
 function serviceWithPrisma(prisma: any) {
-  return new ProvidersService(prisma);
+  return new ProvidersService(prisma, { test: vi.fn(), testEdit: vi.fn() } as any);
 }
 
 describe('ProvidersService validation', () => {

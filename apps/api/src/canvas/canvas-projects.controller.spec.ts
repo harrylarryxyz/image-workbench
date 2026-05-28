@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CanvasProjectsController } from './canvas-projects.controller';
+import { CanvasProjectsService } from './canvas-projects.service';
+import { CanvasRunsService } from './canvas-runs.service';
 
 const node = { id: 'prompt-1', type: 'default', position: { x: 10, y: 20 }, data: { label: 'Prompt\nA neon fox' } };
 const edge = { id: 'edge-1', source: 'prompt-1', target: 'task-1', type: 'default', data: { label: 'creates' } };
+
+function makeController(prisma: any, tasks?: any) {
+  const projects = new CanvasProjectsService(prisma);
+  const runs = new CanvasRunsService(prisma, projects, tasks);
+  return new CanvasProjectsController(projects, runs);
+}
 
 describe('CanvasProjectsController', () => {
   it('creates a project with nodes and edges, then serializes it for React Flow', async () => {
@@ -15,9 +23,9 @@ describe('CanvasProjectsController', () => {
         }),
       },
     };
-    const controller = new CanvasProjectsController(prisma as any);
+    const controller = makeController(prisma);
 
-    const created = await controller.create({ name: 'Storyboard', description: 'test', nodes: [node], edges: [edge] });
+    const created = await controller.create({ name: 'Storyboard', description: 'test', nodes: [node], edges: [edge] }, {} as any);
 
     expect(prisma.canvasProject.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
@@ -60,9 +68,9 @@ describe('CanvasProjectsController', () => {
       createEditTask: vi.fn().mockResolvedValue({ id: 'task_edit_1', status: 'QUEUED' }),
       createGenerateTask: vi.fn(),
     };
-    const controller = new CanvasProjectsController(prisma as any, tasks as any);
+    const controller = makeController(prisma, tasks);
 
-    const result = await controller.run('canvas_1');
+    const result = await controller.run('canvas_1', {}, {} as any);
 
     expect(tasks.createEditTask).toHaveBeenCalledWith(expect.objectContaining({
       prompt: 'make it cinematic',
@@ -87,9 +95,9 @@ describe('CanvasProjectsController', () => {
         }),
       },
     };
-    const controller = new CanvasProjectsController(prisma as any);
+    const controller = makeController(prisma);
 
-    await controller.update('canvas_1', { name: 'Renamed' });
+    await controller.update('canvas_1', { name: 'Renamed' }, {} as any);
 
     expect(prisma.canvasProject.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.not.objectContaining({ nodes: expect.anything(), edges: expect.anything() }),
@@ -108,9 +116,9 @@ describe('CanvasProjectsController', () => {
         update: vi.fn().mockImplementation(({ data }) => Promise.resolve({ ...run.nodes[0], ...data, task: completedTask })),
       },
     };
-    const controller = new CanvasProjectsController(prisma as any);
+    const controller = makeController(prisma);
 
-    const rows = await controller.runs('canvas_1');
+    const rows = await controller.runs('canvas_1', {} as any);
 
     expect(prisma.canvasRunNode.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'SUCCEEDED' }) }));
     expect(prisma.canvasRun.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'SUCCEEDED' }) }));

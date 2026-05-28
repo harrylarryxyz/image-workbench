@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TasksService } from './tasks.service';
-
-const provider = { id: 'provider_1', defaultModel: 'gpt-image-2' };
+import { TaskEventsService } from './task-events.service';
+import { TaskMetricsService } from './task-metrics.service';
+import { TaskQueueService } from './task-queue.service';
+import { TaskReconciliationService } from './task-reconciliation.service';
 
 function makeQueue(overrides = {}) {
   return {
@@ -17,19 +18,15 @@ function makeQueue(overrides = {}) {
   } as any;
 }
 
-function makeService(prisma: any, queue = makeQueue()) {
-  return new TasksService(
-    prisma,
-    { getDefault: vi.fn().mockResolvedValue(provider) } as any,
-    queue,
-    { notify: vi.fn(), stream: vi.fn(), closeSignal: vi.fn() } as any,
-    { assertExistingStorageKeys: vi.fn().mockResolvedValue([]) } as any,
-  );
+function makeMetricsService(prisma: any, queue = makeQueue()) {
+  const events = { notify: vi.fn() } as unknown as TaskEventsService;
+  const reconciliation = new TaskReconciliationService(prisma, events);
+  const queueService = new TaskQueueService(prisma, queue, reconciliation);
+  return { service: new TaskMetricsService(prisma, queueService, reconciliation), queue };
 }
 
 describe('TasksService reconciliation', () => {
   it('marks RUNNING tasks with persisted image assets as SUCCEEDED before returning queue status', async () => {
-    const updatedAt = new Date('2026-05-27T17:09:27.742Z');
     const prisma = {
       imageAsset: {
         groupBy: vi.fn().mockResolvedValue([{ taskId: 'task_with_image', _count: { _all: 1 } }]),
@@ -40,7 +37,7 @@ describe('TasksService reconciliation', () => {
         groupBy: vi.fn().mockResolvedValue([{ status: 'SUCCEEDED', _count: { status: 1 } }]),
       },
     };
-    const service = makeService(prisma);
+    const { service } = makeMetricsService(prisma);
 
     await expect(service.queueStatus()).resolves.toEqual({
       queue: { waiting: 0, active: 0, delayed: 0, failed: 0, completed: 0, paused: false },
@@ -86,14 +83,14 @@ describe('TasksService reconciliation', () => {
             errorCode: null,
             errorMessage: null,
             elapsedMs: 208445,
-            images: [{ id: 'img_1', storageKey: '72/image.png', format: 'png', sizeBytes: 123, width: null, height: null, prompt: 'A cinematic orange robot fixing a neon sign', revisedPrompt: null, createdAt: imageCreatedAt }],
+            images: [{ id: 'img_1', storageKey: '72/image.png', format: 'png', sizeBytes: 123, width: null, height: null, prompt: 'A cinematic orange robot fixing a neon sign', revisedPrompt: null, sourceAssetId: null, createdAt: imageCreatedAt }],
             createdAt,
             updatedAt: imageCreatedAt,
           },
         ]),
       },
     };
-    const service = makeService(prisma);
+    const { service } = makeMetricsService(prisma);
 
     const rows = await service.listRecent();
 
@@ -124,7 +121,7 @@ describe('TasksService reconciliation', () => {
       getJobs: vi.fn().mockResolvedValue([]),
       add: vi.fn().mockResolvedValue({}),
     });
-    const service = makeService(prisma, queue);
+    const { service } = makeMetricsService(prisma, queue);
 
     await service.queueStatus();
 

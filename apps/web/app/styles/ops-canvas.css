@@ -1,0 +1,61 @@
+.task-list { display: grid; gap: 14px; margin-top: 20px; }
+.task-card { display: block; }
+.task-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
+.queue-grid, .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0; }
+.metric { border: 1px solid var(--line-subtle); border-radius: 16px; padding: 13px; background: rgba(255,255,255,.035); }
+.metric b { display: block; font-size: 26px; color: var(--text); letter-spacing: -.04em; }
+.metric span { color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+.kv { display: grid; grid-template-columns: 150px 1fr; gap: 7px 12px; font-size: 14px; }
+.kv b { color: var(--text-secondary); }
+.kv span { color: var(--text-muted); }
+
+.diagnostics {
+  margin-top: 14px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 16px;
+  background: rgba(0,0,0,.18);
+  overflow: hidden;
+}
+.diagnostics summary { cursor: pointer; padding: 12px 14px; color: var(--text-secondary); font-weight: 650; }
+.diagnostics pre, pre.debug-json, pre.error {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+  background: #05070b;
+  border-top: 1px solid var(--line-subtle);
+  padding: 14px;
+  color: #c8d2e8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+pre.error { border: 1px solid rgba(255,107,122,.22); border-radius: 14px; color: #ffc5cc; }
+
+.canvas-workbench { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; margin-top: 16px; align-items: stretch; }
+.canvas-surface {
+  position: relative;
+  height: 620px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: #08090d;
+  box-shadow: var(--shadow-panel);
+}
+.canvas-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(12, 13, 18, .82);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 42px rgba(0,0,0,.34);
+}
+.canvas-inspector { min-height: 620px; }
+.canvas-dock .pill { padding: 9px 11px; }
