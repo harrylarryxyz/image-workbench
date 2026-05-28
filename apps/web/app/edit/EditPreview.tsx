@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { ErrorState } from '@/components/product/state';
 import { assetSrc, statusVariant } from './edit-utils';
 import type { EditTask, Uploaded } from './types';
 
@@ -34,6 +35,6 @@ export function EditPreview({ task, uploads, outputUrl, prompt, firstOutput }: E
         <CardContent className="p-3"><p className="text-xs text-muted-foreground">{item.originalName ?? item.storageKey}</p></CardContent>
       </Card>)}
     </div>
-    {task?.errorMessage ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-red-100">{task.errorMessage}</div> : null}
+    {task?.errorMessage ? <ErrorState title="编辑任务没有完成" description="编辑服务暂时不可用，参考图和 mask 已保留，可稍后重试。" actionHref={task.id ? `/tasks/${task.id}` : '/tasks'} actionLabel="查看任务" /> : null}
   </section>;
 }

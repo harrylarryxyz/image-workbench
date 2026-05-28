@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { ErrorState } from '@/components/product/state';
 import type { TaskImage, TaskResult } from './create-types';
 import { statusVariant } from './create-utils';
 
@@ -17,6 +17,7 @@ type PreviewStageProps = {
 };
 
 export function PreviewStage({ result, primaryStatus, previewUrl, referencePreview, prompt, firstImage, versionChain, metrics }: PreviewStageProps) {
+  const taskHref = result?.id ? `/tasks/${result.id}` : '/tasks';
   return <section className="preview-stage" aria-label="预览画布">
     <div className="task-head">
       <div>
@@ -44,7 +45,7 @@ export function PreviewStage({ result, primaryStatus, previewUrl, referencePrevi
       {versionChain.length ? <div className="version-strip">
         {versionChain.map((task) => <Button asChild type="button" size="sm" variant="outline" key={task.id ?? Math.random()}><Link href={task.id ? `/tasks/${task.id}` : '#'}>{task.type ?? 'task'} · {task.status ?? 'created'} · {task.id?.slice(0, 8)}</Link></Button>)}
       </div> : null}
-      {result?.error || result?.errorMessage ? <Card className="mt-4 border-destructive/40 bg-destructive/10"><CardContent className="pt-6 text-sm text-destructive">{result.errorMessage ?? result.error}</CardContent></Card> : null}
+      {result?.error || result?.errorMessage ? <div className="mt-4"><ErrorState title="这次创作没有完成" description="生成服务暂时不可用，作品参数已保留，可稍后重试或查看任务详情。" actionHref={taskHref} actionLabel="查看任务" /></div> : null}
     </div>
   </section>;
 }

@@ -67,3 +67,25 @@ input:focus, textarea:focus, select:focus { border-color: rgba(113,112,255,.72);
 .notice { border: 1px solid var(--line-subtle); border-radius: 16px; padding: 12px 14px; background: rgba(255,255,255,.04); color: var(--text-secondary); }
 .notice.error { border-color: rgba(255,107,122,.28); background: rgba(255,107,122,.08); color: #ffc5cc; }
 .notice.success { border-color: rgba(56,217,150,.24); background: rgba(56,217,150,.08); }
+.state-card {
+  display: grid;
+  gap: 10px;
+  place-items: start;
+  border: 1px solid var(--line-subtle);
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.024));
+}
+.state-card h3 { margin: 0; }
+.diagnostics-panel {
+  margin-top: 12px;
+  border: 1px solid var(--line-subtle);
+  border-radius: 16px;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  background: rgba(0,0,0,.18);
+}
+.skeleton-line { height: 12px; border-radius: 999px; background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.18), rgba(255,255,255,.08)); background-size: 200% 100%; animation: shimmer 1.6s infinite linear; }
+.w-2\/3 { width: 66%; }
+.w-1\/2 { width: 50%; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }

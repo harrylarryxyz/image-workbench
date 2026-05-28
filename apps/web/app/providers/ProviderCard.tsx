@@ -30,9 +30,9 @@ export function ProviderCard({ provider, toggle, test, testEdit }: ProviderCardP
         <dt className="text-muted-foreground">Mask</dt><dd>{capabilityLabel(provider.capabilities?.mask)}</dd>
         <dt className="text-muted-foreground">Max refs</dt><dd>{provider.capabilities?.maxRefs ?? '?'}</dd>
         <dt className="text-muted-foreground">Edit health</dt><dd>{provider.editHealth?.status ?? 'untested'}{provider.editHealth?.errorCode ? ` · ${provider.editHealth.errorCode}` : ''}</dd>
-        <dt className="text-muted-foreground">Sizes</dt><dd>{provider.capabilities?.sizes?.join(', ') ?? 'unknown'}</dd>
-        <dt className="text-muted-foreground">Qualities</dt><dd>{provider.capabilities?.qualities?.join(', ') ?? 'unknown'}</dd>
-        <dt className="text-muted-foreground">Formats</dt><dd>{provider.capabilities?.formats?.join(', ') ?? 'unknown'}</dd>
+        <dt className="text-muted-foreground">Sizes</dt><dd>{provider.capabilities?.sizes?.join(', ') ?? 'auto detected'}</dd>
+        <dt className="text-muted-foreground">Qualities</dt><dd>{provider.capabilities?.qualities?.join(', ') ?? 'auto detected'}</dd>
+        <dt className="text-muted-foreground">Formats</dt><dd>{provider.capabilities?.formats?.join(', ') ?? 'auto detected'}</dd>
       </dl>
       {provider.editHealth?.errorMessage ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-red-100">{provider.editHealth.errorMessage}</div> : null}
       <div className="flex flex-wrap gap-2">

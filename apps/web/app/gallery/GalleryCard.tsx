@@ -23,12 +23,12 @@ export function GalleryCard({ image, index }: GalleryCardProps) {
       {image.storageKey ? <Button asChild size="sm" variant="secondary"><Link href={canvasHref}>Canvas</Link></Button> : null}
     </div>
     <div className="image-card-body">
-      <p className="image-card-title">{image.favorite ? '★ ' : ''}{image.prompt ?? image.error}</p>
+      <p className="image-card-title">{image.favorite ? '★ ' : ''}{image.prompt ?? 'Untitled asset'}</p>
       <div className="task-head">
         <Badge variant={statusVariant(image.taskStatus)}>{image.taskStatus ?? image.taskType ?? 'IMAGE'}</Badge>
         <span className="fine-print">{image.createdAt ? new Date(image.createdAt).toLocaleDateString() : ''}</span>
       </div>
-      <div className="fine-print">{image.model ?? 'model unknown'} · {image.width && image.height ? `${image.width}×${image.height}` : image.format} · {image.sizeBytes ? `${Math.round(image.sizeBytes / 1024)} KB` : 'size pending'}</div>
+      <div className="fine-print">{image.model ?? 'default model'} · {image.width && image.height ? `${image.width}×${image.height}` : image.format} · {image.sizeBytes ? `${Math.round(image.sizeBytes / 1024)} KB` : 'preparing'}</div>
       <div className="flex flex-wrap gap-2">{image.tags?.slice(0, 4).map((tag) => <Button asChild size="sm" variant="outline" key={tag}><Link href={`/gallery?tag=${encodeURIComponent(tag)}`}>#{tag}</Link></Button>)}</div>
     </div>
   </article>;

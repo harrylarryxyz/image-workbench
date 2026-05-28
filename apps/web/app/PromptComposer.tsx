@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChangeEvent, DragEvent, RefObject } from 'react';
+import type { ChangeEvent, DragEvent, RefObject, Dispatch, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,7 @@ type PromptComposerProps = {
   makeVariants: () => void;
   variants: Variant[];
   advancedOpen: boolean;
-  setAdvancedOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setAdvancedOpen: Dispatch<SetStateAction<boolean>>;
   model: string;
   setModel: (value: string) => void;
   size: string;
@@ -41,16 +41,16 @@ type PromptComposerProps = {
 };
 
 export function PromptComposer(props: PromptComposerProps) {
-  return <Card className="composer-card gap-5 bg-card/85">
+  return <Card className="composer-card command-composer gap-5 bg-card/85">
     <CardHeader>
       <p className="eyebrow">Create Studio</p>
       <CardTitle>What shall we create together?</CardTitle>
       <CardDescription>默认只保留创作必需项；模型、尺寸、质量和格式统一收进高级设置。</CardDescription>
     </CardHeader>
     <CardContent className="space-y-5">
-      <div className="space-y-2">
+      <div className="space-y-2 composer-input-wrap">
         <Label htmlFor="prompt">画面描述</Label>
-        <Textarea id="prompt" value={props.prompt} onChange={(e) => props.setPrompt(e.target.value)} className="min-h-44 text-base leading-7" />
+        <Textarea id="prompt" value={props.prompt} onChange={(e) => props.setPrompt(e.target.value)} className="min-h-48 rounded-3xl border-white/10 bg-black/30 p-5 text-base leading-7 shadow-inner" placeholder="你想创作什么？描述主体、风格、场景或上传参考图继续编辑。" />
       </div>
       <ReferenceDropzone fileInputRef={props.fileInputRef} uploadingReference={props.uploadingReference} referenceName={props.referenceName} onReferenceFileChange={props.onReferenceFileChange} onDropReference={props.onDropReference} />
       <div className="flex flex-wrap gap-2">

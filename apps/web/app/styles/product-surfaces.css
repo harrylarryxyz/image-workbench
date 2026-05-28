@@ -12,6 +12,13 @@
 .lovart-hero .sub { margin: 0 auto; }
 .lovart-workbench { grid-template-columns: minmax(360px, 520px) minmax(0, 1fr); }
 .composer-card { border-radius: 28px; }
+.command-composer {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(139,138,255,.16), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+}
+.composer-input-wrap textarea { box-shadow: 0 22px 60px rgba(0,0,0,.28) inset; }
 .reference-dropzone {
   display: flex;
   align-items: center;
@@ -41,6 +48,16 @@
     linear-gradient(135deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
     radial-gradient(circle at 70% 10%, rgba(113,112,255,.16), transparent 34%);
   box-shadow: var(--shadow-panel);
+}
+.preview-stage::before {
+  content: "";
+  position: absolute;
+  inset: 18px 18px auto auto;
+  width: 140px;
+  height: 140px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(115,213,255,.1), transparent 68%);
+  pointer-events: none;
 }
 .preview-frame {
   min-height: 360px;

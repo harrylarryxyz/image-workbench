@@ -22,12 +22,14 @@ type CanvasAreaProps = {
 export function CanvasArea(props: CanvasAreaProps) {
   const { nodes, edges, setNodes, setEdges, setSelectedNodeId } = props;
 
-  return <div className="canvas-surface">
-    <ReactFlow nodes={nodes} edges={edges} onNodesChange={(changes) => setNodes((items) => applyNodeChanges(changes, items))} onEdgesChange={(changes) => setEdges((items) => applyEdgeChanges(changes, items))} onConnect={(params) => setEdges((items) => addEdge(params, items))} onNodeClick={(_, node) => setSelectedNodeId(node.id)} fitView>
-      <Background color="rgba(255,255,255,.14)" gap={22} />
-      <MiniMap pannable zoomable />
-      <Controls />
-    </ReactFlow>
+  return <div className="canvas-surface" style={{ width: '100%', height: 620, minHeight: 520 }}>
+    <div className="canvas-flow-frame" style={{ width: '100%', height: '100%' }}>
+      <ReactFlow style={{ width: '100%', height: '100%' }} nodes={nodes} edges={edges} onNodesChange={(changes) => setNodes((items) => applyNodeChanges(changes, items))} onEdgesChange={(changes) => setEdges((items) => applyEdgeChanges(changes, items))} onConnect={(params) => setEdges((items) => addEdge(params, items))} onNodeClick={(_, node) => setSelectedNodeId(node.id)} fitView>
+        <Background color="rgba(255,255,255,.14)" gap={22} />
+        <MiniMap pannable zoomable />
+        <Controls />
+      </ReactFlow>
+    </div>
     <CanvasDock {...props} />
   </div>;
 }

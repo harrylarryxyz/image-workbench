@@ -187,11 +187,11 @@ export default function CanvasPage() {
   return <section>
     <CanvasHero />
     {/* Canvas Dock lives in CanvasArea; keep this marker for product UI contract. */}
-    <div className="canvas-workbench">
+    <div className="canvas-workbench responsive-canvas-workbench">
       <CanvasArea nodes={nodes} edges={edges} setNodes={setNodes} setEdges={setEdges} setSelectedNodeId={setSelectedNodeId} selectedNode={selectedNode} activeProjectId={activeProjectId} selectedNodeId={selectedNodeId} addPromptNode={addPromptNode} addImageNode={addImageNode} addTaskNode={addTaskNode} duplicateSelected={duplicateSelected} rerunSelectedNode={rerunSelectedNode} createTaskFromCanvas={createTaskFromCanvas} />
       <CanvasInspector selectedNode={selectedNode} projectName={projectName} setProjectName={setProjectName} activeProjectId={activeProjectId} message={message} projects={projects} templates={templates} patchSelectedData={patchSelectedData} saveProject={saveProject} loadProjects={loadProjects} loadTemplates={loadTemplates} loadRuns={loadRuns} askAgentNext={askAgentNext} deleteProject={deleteProject} clearCanvas={clearCanvas} openProject={openProject} useTemplate={useTemplate} />
     </div>
-    <div className="grid gap-4 md:grid-cols-2 mt-4">
+    <div className="grid gap-4 md:grid-cols-2 mt-4 canvas-secondary-panels">
       <RunOutputPanel runItems={runItems} visibleRuns={visibleRuns} replayRun={replayRun} />
       <ImportExportPanel importText={importText} exported={exported} setImportText={setImportText} importCanvas={importCanvas} />
     </div>
