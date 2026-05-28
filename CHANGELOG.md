@@ -6,6 +6,8 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 ### Fixed
 
+- Mobile navigation now uses a top-left collapsed menu with the full route set instead of a fixed bottom bar whose `More` shortcut jumped straight to Settings and covered operation-heavy pages.
+- Canvas workflow actions now live outside the React Flow surface, preventing the node toolbar from covering the canvas preview, minimap, and zoom controls on phones.
 - Root App Router layout imports `globals.css` again, restoring compiled styles on every production Web route and preventing unstyled/misaligned pages after the responsive studio shell refactor.
 - Hidden reference upload inputs and mobile Canvas panels no longer widen the document, preventing desktop and phone layouts from gaining accidental horizontal scroll.
 - UI contract tests now guard the required root stylesheet import plus responsive overflow protections so future shell refactors cannot silently ship pages without global CSS or mobile-safe shrink constraints.

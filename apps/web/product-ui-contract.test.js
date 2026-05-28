@@ -90,10 +90,36 @@ test('responsive layout guards prevent hidden inputs and canvas panels from wide
   }
   assert.match(opsCanvas, /\.canvas-secondary-panels > \* \{ min-width: 0; \}/, 'canvas secondary grid children must be allowed to shrink');
   assert.match(opsCanvas, /grid-template-columns:\s*minmax\(0,\s*1fr\)/, 'mobile canvas grid should use minmax(0, 1fr) instead of bare 1fr');
-  assert.match(opsCanvas, /\.canvas-dock \{ contain: layout paint; max-width: calc\(100% - 20px\); \}/, 'mobile canvas dock should be contained and width-limited');
   assert.match(card, /flex min-w-0 flex-col/, 'Card root should not force flex/grid overflow');
   assert.match(card, /min-w-0 px-6/, 'Card content should shrink inside narrow grids');
   assert.match(textarea, /w-full min-w-0 rounded-md/, 'Textarea should shrink inside cards and panels');
+});
+
+test('mobile app shell uses a collapsed top-left menu instead of fixed bottom navigation', () => {
+  const navFrame = readPage('ui/NavFrame.tsx');
+  const responsive = readPage('styles/responsive.css');
+  const layoutCss = readPage('styles/layout.css');
+
+  assert.match(navFrame, /mobile-menu-toggle/, 'mobile navigation should expose a top-left collapsed menu button');
+  assert.match(navFrame, /mobile-menu-panel/, 'mobile navigation should render an expandable menu panel');
+  assert.doesNotMatch(navFrame, /mobile-bottom-nav/, 'mobile shell should not render a bottom navigation bar that blocks the operation area');
+  assert.doesNotMatch(navFrame, /\['More',\s*'\/settings'\]/, 'mobile navigation must not collapse every extra route into a More link that jumps to settings');
+  for (const href of ['/', '/gallery', '/canvas', '/prompts', '/tasks', '/agent', '/providers', '/ops', '/settings']) {
+    assert.match(navFrame, new RegExp(`['"]${href.replace('/', '\\/')}['"]`), `mobile menu should include ${href}`);
+  }
+  assert.doesNotMatch(responsive, /\.mobile-bottom-nav/, 'responsive CSS should not position a fixed mobile bottom navigation');
+  assert.doesNotMatch(layoutCss, /mobile-bottom-nav/, 'base layout CSS should not keep the old bottom nav surface');
+});
+
+test('canvas workflow toolbar lives outside the React Flow surface on mobile', () => {
+  const canvasArea = readPage('canvas/CanvasArea.tsx');
+  const opsCanvas = readPage('styles/ops-canvas.css');
+
+  assert.match(canvasArea, /canvas-area-stack/, 'canvas area should stack toolbar and canvas as separate surfaces');
+  assert.match(canvasArea, /<CanvasDock[^>]*\/>\s*<div className="canvas-surface"/, 'canvas toolbar should render before and outside the canvas surface');
+  assert.doesNotMatch(canvasArea, /<div className="canvas-surface"[\s\S]*<CanvasDock/, 'canvas dock must not be nested inside the React Flow surface');
+  assert.match(opsCanvas, /\.canvas-dock[\s\S]*position:\s*static/, 'canvas dock should be a normal toolbar, not an absolute overlay');
+  assert.doesNotMatch(opsCanvas, /\.canvas-dock[\s\S]*position:\s*absolute/, 'canvas dock must not be absolutely positioned over controls or minimap');
 });
 
 test('ops dashboard matches the metrics API response contract', () => {

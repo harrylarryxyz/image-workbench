@@ -32,6 +32,7 @@
 pre.error { border: 1px solid rgba(255,107,122,.22); border-radius: 14px; color: #ffc5cc; }
 
 .canvas-workbench { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; margin-top: 16px; align-items: stretch; }
+.canvas-area-stack { min-width: 0; display: grid; gap: 10px; align-content: start; }
 .canvas-surface {
   position: relative;
   height: 620px;
@@ -43,21 +44,21 @@ pre.error { border: 1px solid rgba(255,107,122,.22); border-radius: 14px; color:
 }
 .canvas-flow-frame { width: 100%; height: 100%; }
 .canvas-dock {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  z-index: 10;
+  position: static;
+  z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   align-items: center;
+  justify-content: flex-start;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: rgba(12, 13, 18, .82);
   backdrop-filter: blur(18px);
-  box-shadow: 0 16px 42px rgba(0,0,0,.34);
+  box-shadow: 0 16px 42px rgba(0,0,0,.22);
 }
+.canvas-dock > * { flex: 0 0 auto; }
 .canvas-inspector { min-height: 620px; }
 .canvas-dock .pill { padding: 9px 11px; }
 .canvas-secondary-panels { align-items: start; }
@@ -74,6 +75,6 @@ pre.error { border: 1px solid rgba(255,107,122,.22); border-radius: 14px; color:
 }
 @media (max-width: 720px) {
   .canvas-surface { height: 520px; border-radius: 22px; }
-  .canvas-dock { contain: layout paint; max-width: calc(100% - 20px); }
+  .canvas-dock { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; }
   .canvas-secondary-panels { grid-template-columns: minmax(0, 1fr); width: 100%; max-width: 100%; overflow-x: clip; }
 }

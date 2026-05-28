@@ -3,7 +3,7 @@
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
 }
-.mobile-topbar, .mobile-bottom-nav { display: none; }
+.mobile-topbar { display: none; }
 .sidebar {
   position: sticky;
   top: 0;

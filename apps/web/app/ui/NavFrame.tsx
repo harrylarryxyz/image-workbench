@@ -7,7 +7,6 @@ const navGroups = [
   { label: 'History', items: [['Tasks', '/tasks'], ['Agent', '/agent']] },
   { label: 'Admin', items: [['Providers', '/providers'], ['Ops', '/ops'], ['Settings', '/settings']] },
 ] as const;
-const mobileNav = [['Create', '/'], ['Assets', '/gallery'], ['Canvas', '/canvas'], ['More', '/settings']] as const;
 
 export function NavFrame() {
   return <>
@@ -31,11 +30,16 @@ export function NavFrame() {
       </div>
     </aside>
     <header className="mobile-topbar">
-      <div className="brand-lockup"><div className="brand-mark">IW</div><div><div className="logo">Image Workbench</div><div className="fine-print">AI design partner</div></div></div>
-      <Button asChild size="sm"><Link href="/">Create</Link></Button>
+      <details className="mobile-menu">
+        <summary className="mobile-menu-toggle" aria-label="Open navigation">☰ Menu</summary>
+        <nav className="mobile-menu-panel" aria-label="Mobile primary">
+          {navGroups.map((group) => <div className="mobile-menu-group" key={group.label}>
+            <div className="mobile-menu-group-label">{group.label}</div>
+            {group.items.map(([label, href]) => <Link className="mobile-menu-link" href={href} key={href}>{label}</Link>)}
+          </div>)}
+        </nav>
+      </details>
+      <div className="brand-lockup mobile-brand"><div className="brand-mark">IW</div><div><div className="logo">Image Workbench</div><div className="fine-print">AI design partner</div></div></div>
     </header>
-    <nav className="mobile-bottom-nav" aria-label="Mobile primary">
-      {mobileNav.map(([label, href]) => <Button asChild key={href} variant="ghost" size="sm" className="rounded-2xl"><Link href={href}>{label}</Link></Button>)}
-    </nav>
   </>;
 }
