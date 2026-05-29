@@ -2,9 +2,9 @@
 
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task. Enforce test-driven-development: write each focused failing test first, run it to observe RED, implement the minimum code, then rerun focused and broad verification.
 
-**Goal:** Build a route-isolated first Visual Stage slice that proves Creation Case draft, first-response routing, PC/mobile choreography, judgment-first feedback, comparison, and commit/export without replacing the deployed Create Studio entry.
+**Goal:** Build a route-isolated, Visual-master-first Visual Stage slice that proves Creation Case draft, first-response routing, PC/mobile choreography, judgment-first feedback, comparison, and commit/export without replacing the deployed Create Studio entry.
 
-**Architecture:** Add a new `/visual-stage` route under the web app as a controlled product prototype. Keep the first slice local/UI-only: no database schema, no provider changes, no production route replacement. Model a minimal Creation Case in frontend code, route it through Reference-first / Generate-first / Ask-first states, and reuse existing Tailwind/Shadcn/product primitives while adding focused contract and Playwright coverage.
+**Architecture:** Add a new `/visual-stage` route under the web app as a controlled product prototype. Keep the first slice local/UI-only: no database schema, no provider changes, no production route replacement. Start with a high-fidelity Visual Stage visual master that can pass product/aesthetic review with deterministic mock data, then deepen the minimal Creation Case model and route it through Reference-first / Generate-first / Ask-first states. Reuse existing Tailwind/Shadcn/product primitives while adding focused contract and Playwright coverage.
 
 **Tech Stack:** Next.js App Router, React client components, TypeScript, Tailwind v4, Shadcn-style primitives, Node `node:test` static product contract tests, Playwright E2E.
 
@@ -267,7 +267,9 @@ Do not implement in this task. Commit only after the next task makes the focused
 - Create: `apps/web/app/visual-stage/creation-case.ts`
 - Create: `apps/web/app/visual-stage/visual-stage-fixtures.ts`
 
-**Step 1: Implement minimum skeleton**
+**Step 1: Implement minimum visual master**
+
+This task is not an architecture-only skeleton. It must create a route-isolated **Visual Master first** surface: static/deterministic data is acceptable, but the first screen must already communicate aesthetic capability, stage-first choreography, Creation Case, router, feedback/comparison, and unblocker concepts.
 
 `page.tsx`:
 
@@ -289,13 +291,16 @@ Use existing primitives:
 - `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`
 - product/studio primitives where they help.
 
-Initial skeleton requirements:
+Initial visual master requirements:
 
 - hero/stage copy includes `Visual Stage` and `专业不降级，兴趣不劝退`;
-- one plain-language composer;
-- a compact Creation Case placeholder;
-- placeholder route labels for `Reference-first`, `Generate-first`, `Ask-first`;
-- champion/comparison placeholder language;
+- first screen is stage-first, not a settings/form dashboard;
+- one plain-language composer is usable immediately;
+- a compact Creation Case placeholder is visible near the stage;
+- placeholder route labels for `Reference-first`, `Generate-first`, `Ask-first` are visible as system routing, not user mode tabs;
+- champion/comparison placeholder language is visible and close to the stage;
+- reference territory board and `Unblocker Card` concept are represented without real provider calls;
+- mobile must preserve the stage, composer, Creation Case, Champion, and Comparison Set as first-class surfaces;
 - no real API calls.
 
 **Step 2: Verify GREEN**

@@ -30,6 +30,35 @@ test('primary product surfaces use studio/library/canvas language instead of deb
   assert.match(canvas, /Canvas Dock|bottom dock|画布工具栏|canvas-dock/, 'canvas should expose a canvas-style dock workflow');
 });
 
+test('visual stage route encodes the creation-case router product contract', () => {
+  const files = [
+    'visual-stage/page.tsx',
+    'visual-stage/VisualStageClient.tsx',
+    'visual-stage/creation-case.ts',
+    'visual-stage/visual-stage-fixtures.ts',
+  ];
+  const surface = files.map((relative) => `\n/* ${relative} */\n${readPage(relative)}`).join('\n');
+
+  for (const marker of [
+    'Visual Stage',
+    'Creation Case',
+    'Reference-first',
+    'Generate-first',
+    'Ask-first',
+    'Champion',
+    'Comparison Set',
+    'Unblocker Card',
+    '专业不降级，兴趣不劝退',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `visual stage missing ${marker}`);
+  }
+
+  assert.match(surface, /@\/components\/ui\/(button|textarea|card|badge)/, 'Visual Stage should compose shadcn-style primitives');
+  assert.doesNotMatch(surface, /JSON\.stringify\([^)]*,\s*null,\s*2\)/, 'Visual Stage must not expose raw JSON diagnostics');
+  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json/i, 'Visual Stage first surface must not expose provider/storage diagnostics');
+  assert.doesNotMatch(surface, /<(button|textarea)\b(?![^>]*data-slot)/, 'Visual Stage should use design-system action/input primitives');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',
