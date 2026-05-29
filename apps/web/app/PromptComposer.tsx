@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ChangeEvent, DragEvent, RefObject, Dispatch, SetStateAction } from 'react';
+import { StudioActionToolbar, StudioPanel, StudioPanelContent, StudioPanelHeader } from '@/components/product/studio';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AdvancedSettingsPanel } from './AdvancedSettingsPanel';
@@ -41,28 +41,28 @@ type PromptComposerProps = {
 };
 
 export function PromptComposer(props: PromptComposerProps) {
-  return <Card className="composer-card command-composer gap-5 bg-card/85">
-    <CardHeader>
-      <p className="eyebrow">Create Studio</p>
-      <CardTitle>What shall we create together?</CardTitle>
-      <CardDescription>默认只保留创作必需项；模型、尺寸、质量和格式统一收进高级设置。</CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-5">
-      <div className="space-y-2 composer-input-wrap">
+  return <StudioPanel>
+    <StudioPanelHeader
+      eyebrow="Create Studio"
+      title="What shall we create together?"
+      description="默认只保留创作必需项；模型、尺寸、质量和格式统一收进高级设置。"
+    />
+    <StudioPanelContent>
+      <div className="space-y-2">
         <Label htmlFor="prompt">画面描述</Label>
         <Textarea id="prompt" value={props.prompt} onChange={(e) => props.setPrompt(e.target.value)} className="min-h-48 rounded-3xl border-white/10 bg-black/30 p-5 text-base leading-7 shadow-inner" placeholder="你想创作什么？描述主体、风格、场景或上传参考图继续编辑。" />
       </div>
       <ReferenceDropzone fileInputRef={props.fileInputRef} uploadingReference={props.uploadingReference} referenceName={props.referenceName} onReferenceFileChange={props.onReferenceFileChange} onDropReference={props.onDropReference} />
-      <div className="flex flex-wrap gap-2">
+      <StudioActionToolbar>
         <Button type="button" variant="secondary" onClick={props.makeVariants}>生成 Prompt 变体</Button>
         <Button asChild type="button" variant="outline"><Link href="/prompts">Prompt Library</Link></Button>
         <Button asChild type="button" variant="outline"><Link href="/gallery">从素材库选择</Link></Button>
-      </div>
+      </StudioActionToolbar>
       <PromptVariants variants={props.variants} setPrompt={props.setPrompt} />
       <AdvancedSettingsPanel advancedOpen={props.advancedOpen} setAdvancedOpen={props.setAdvancedOpen} model={props.model} setModel={props.setModel} size={props.size} setSize={props.setSize} quality={props.quality} setQuality={props.setQuality} format={props.format} setFormat={props.setFormat} background={props.background} setBackground={props.setBackground} apiMode={props.apiMode} setApiMode={props.setApiMode} maskKey={props.maskKey} setMaskKey={props.setMaskKey} />
       <Button className="h-12 w-full rounded-full text-base" disabled={props.loading} onClick={props.submit}>
         {props.loading ? '正在创作…' : props.referenceKey.trim() ? '基于参考图创作' : '开始生成'}
       </Button>
-    </CardContent>
-  </Card>;
+    </StudioPanelContent>
+  </StudioPanel>;
 }

@@ -6,9 +6,22 @@ import assert from 'node:assert/strict';
 const appDir = join(process.cwd(), 'app');
 const readPage = (relative) => readFileSync(join(appDir, relative), 'utf8');
 const readWeb = (relative) => readFileSync(join(process.cwd(), relative), 'utf8');
+const createStudioFiles = [
+  'page.tsx',
+  'CreateHero.tsx',
+  'PromptComposer.tsx',
+  'ReferenceDropzone.tsx',
+  'AdvancedSettingsPanel.tsx',
+  'PromptVariants.tsx',
+  'PreviewStage.tsx',
+  'SupportGrid.tsx',
+];
+const readCreateStudioFiles = () => createStudioFiles.map((relative) => ({ relative, text: readPage(relative) }));
+const readCreateStudioSurface = () => readCreateStudioFiles().map(({ relative, text }) => `\n/* ${relative} */\n${text}`).join('\n');
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('primary product surfaces use studio/library/canvas language instead of debug-first pages', () => {
-  const generate = readPage('page.tsx');
+  const generate = readCreateStudioSurface();
   const gallery = readPage('gallery/page.tsx');
   const canvas = readPage('canvas/page.tsx');
 
@@ -39,7 +52,7 @@ test('public web pages do not expose debug diagnostics or engineering readiness 
 });
 
 test('create studio keeps advanced generation options collapsed and replaces reference key input with upload UX', () => {
-  const generate = readPage('page.tsx');
+  const generate = readCreateStudioSurface();
 
   assert.match(generate, /高级设置/, 'create form should group model, size, quality and format in an advanced settings accordion');
   assert.match(generate, /advancedOpen/, 'advanced settings should be controlled and default closed');
@@ -49,13 +62,35 @@ test('create studio keeps advanced generation options collapsed and replaces ref
   assert.match(generate, /apiFormPost<Uploaded>\('\/assets\/upload'/, 'create studio should upload reference files through the assets API');
 });
 
-test('create studio follows lovart-style hierarchy with prompt composer first, image stage second, and supporting modules below', () => {
-  const generate = readPage('page.tsx');
+test('create studio preserves product language and composes the create workflow from product modules', () => {
+  const generate = readCreateStudioSurface();
 
-  for (const marker of ['lovart-shell', 'composer-card', 'reference-dropzone', 'preview-stage', 'support-grid']) {
-    assert.match(generate, new RegExp(marker), `generate page missing ${marker}`);
+  for (const marker of ['Create Studio', '创作工作台', '预览画布', '上传参考图', '高级设置', 'What shall we create together?', '你想创作什么']) {
+    assert.match(generate, new RegExp(escapeRegExp(marker)), `create studio missing product language: ${marker}`);
   }
-  assert.match(generate, /What shall we create together\?|你想创作什么/, 'composer should ask for the user creative intent first');
+  for (const marker of ['<CreateHero', '<PromptComposer', '<ReferenceDropzone', '<AdvancedSettingsPanel', '<PromptVariants', '<PreviewStage', '<SupportGrid']) {
+    assert.match(generate, new RegExp(escapeRegExp(marker)), `create studio should compose ${marker}`);
+  }
+  assert.match(generate, /@\/components\/product\//, 'create studio should use shared product visual components');
+});
+
+test('create studio visual-master files use product components instead of legacy handcrafted visual classes', () => {
+  const productImport = /@\/components\/product\//;
+  const legacyVisualClass = /\b(?:lovart-|studio-|composer-card|command-composer|composer-input-wrap|reference-dropzone|preview-stage|preview-frame|preview-empty|compare-stage|support-grid|metric-grid|metric|image-action-toolbar|version-strip|variant-card)\b/;
+  const files = readCreateStudioFiles();
+
+  assert.match(readCreateStudioSurface(), productImport, 'Create Studio surface should import/use @/components/product/ shared visual components');
+  for (const { relative, text } of files) {
+    assert.doesNotMatch(text, legacyVisualClass, `${relative} should not use legacy handcrafted Create Studio visual classes`);
+  }
+});
+
+test('create studio visual-master CSS removes obsolete one-off selectors after Tailwind component migration', () => {
+  const css = `${readPage('styles/product-surfaces.css')}\n${readPage('styles/responsive.css')}`;
+  const obsoleteCreateSelectors = /\.(?:lovart-shell|lovart-hero|lovart-workbench|composer-card|command-composer|composer-input-wrap|reference-dropzone|support-grid|compare-stage|version-strip|variant-card)\b/;
+
+  assert.doesNotMatch(css, obsoleteCreateSelectors, 'Create Studio-only CSS selectors should be deleted after moving visuals to @/components/product/studio');
+  assert.match(css, /\.reference-file-input\b/, 'reference upload input clipping remains as the one scoped CSS exception');
 });
 
 test('create and edit surfaces keep raw JSON out of the public interface', () => {
@@ -70,7 +105,7 @@ test('shared visual language includes premium dark app shell and image-first com
   const css = readPage('globals.css');
   const layout = readPage('layout.tsx');
 
-  for (const marker of ['--surface-canvas', '--accent', '.studio-shell', '.preview-stage', '.image-card', '.canvas-dock', '.diagnostics']) {
+  for (const marker of ['--surface-canvas', '--accent', '.studio-hero', '.preview-stage', '.image-card', '.canvas-dock', '.diagnostics']) {
     assert.match(css, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `globals.css missing ${marker}`);
   }
   assert.match(layout, /import\s+['"]\.\/globals\.css['"]/, 'root layout must import globals.css so App Router pages ship the compiled stylesheet');
@@ -176,14 +211,13 @@ test('first refactor batch uses shadcn primitives instead of legacy button form 
 });
 
 test('generate and gallery refactor batch uses shadcn primitives for actions forms and cards', () => {
-  const files = [
-    'page.tsx',
-    'gallery/page.tsx',
-    'gallery/gallery-batch-actions.tsx',
+  const surfaces = [
+    ['page.tsx', readCreateStudioSurface()],
+    ['gallery/page.tsx', readPage('gallery/page.tsx')],
+    ['gallery/gallery-batch-actions.tsx', readPage('gallery/gallery-batch-actions.tsx')],
   ];
 
-  for (const relative of files) {
-    const text = readPage(relative);
+  for (const [relative, text] of surfaces) {
     assert.match(text, /@\/components\/ui\/(button|input|textarea|card|label|badge|select|native-select)/, `${relative} should import shadcn ui primitives`);
     assert.doesNotMatch(text, /className="(?:btn|pill|card|task-card|studio-panel|notice|status)(?:\s|"|$)/, `${relative} should not use legacy visual component classes`);
     assert.doesNotMatch(text, /<(button|input|textarea|select|label)\b(?![^>]*data-slot)/, `${relative} should use design-system form/action primitives instead of naked controls`);

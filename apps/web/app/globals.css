@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Contract markers retained here; definitions live in app/styles/*.css: --surface-canvas, --accent, --success, .studio-hero, .studio-shell, .preview-stage, .image-card, .canvas-dock, .diagnostics */
+/* Contract markers retained here; definitions live in app/styles/*.css: --surface-canvas, --accent, --success, .studio-hero, .preview-stage, .image-card, .canvas-dock, .diagnostics */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/layout.css";

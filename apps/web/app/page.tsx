@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { StudioWorkbenchGrid } from '@/components/product/studio';
 import { apiFormPost, apiPost } from '../lib/api';
 import { pollTaskUntilTerminal, subscribeTaskEvents } from '../lib/task-events';
 import { CreateHero } from './CreateHero';
@@ -140,13 +140,12 @@ export default function GeneratePage() {
     ['质量', quality],
   ], [referenceKey, model, size, quality]);
 
-  return <section className="lovart-shell">
-    {/* Create Studio markers after extraction: 创作工作台 预览画布 上传参考图 高级设置 composer-card reference-dropzone preview-stage support-grid What shall we create together? apiFormPost<Uploaded>('/assets/upload' */}
+  return <section className="grid gap-5">
     <CreateHero />
-    <div className="studio-shell lovart-workbench">
+    <StudioWorkbenchGrid>
       <PromptComposer prompt={prompt} setPrompt={setPrompt} fileInputRef={fileInputRef} uploadingReference={uploadingReference} referenceName={referenceName} onReferenceFileChange={onReferenceFileChange} onDropReference={onDropReference} makeVariants={makeVariants} variants={variants} advancedOpen={advancedOpen} setAdvancedOpen={setAdvancedOpen} model={model} setModel={setModel} size={size} setSize={setSize} quality={quality} setQuality={setQuality} format={format} setFormat={setFormat} background={background} setBackground={setBackground} apiMode={apiMode} setApiMode={setApiMode} maskKey={maskKey} setMaskKey={setMaskKey} loading={loading} referenceKey={referenceKey} submit={submit} />
       <PreviewStage result={result} primaryStatus={primaryStatus} previewUrl={previewUrl} referencePreview={referencePreview} prompt={prompt} firstImage={firstImage} versionChain={versionChain} metrics={metrics} />
-    </div>
+    </StudioWorkbenchGrid>
     <SupportGrid prompt={prompt} referenceKey={referenceKey} />
   </section>;
 }

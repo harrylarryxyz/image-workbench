@@ -71,7 +71,7 @@
   .mobile-menu-link::after { content: "›"; color: var(--text-soft); }
   .mobile-menu-link:hover { color: var(--text); background: rgba(255,255,255,.07); }
   .main { padding-top: 18px; }
-  .studio-shell, .lovart-workbench, .grid.two, .canvas-workbench, .lightbox-panel, .support-grid { grid-template-columns: 1fr; }
+  .grid.two, .canvas-workbench, .lightbox-panel { grid-template-columns: 1fr; }
   .preview-stage { position: static; min-height: auto; }
   .canvas-inspector { min-height: auto; }
   .page-header { align-items: flex-start; flex-direction: column; }

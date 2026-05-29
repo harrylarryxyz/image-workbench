@@ -4,6 +4,15 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 ## [Unreleased]
 
+### Added
+
+- Create Studio visual-master ADR, implementation plan, and reusable UI rules document for future Gallery and Canvas migration slices.
+- Product-level studio primitives that compose Tailwind/Shadcn surfaces for hero, composer panel, preview stage, compare frame, metrics, action toolbar, and support grid.
+
+### Changed
+
+- Create Studio now renders through shared product primitives instead of page-specific `lovart-*`/Create-only global CSS classes, with scoped contract tests preventing regressions.
+
 ### Fixed
 
 - Mobile navigation now uses a top-left collapsed menu with the full route set instead of a fixed bottom bar whose `More` shortcut jumped straight to Settings and covered operation-heavy pages.
