@@ -1,10 +1,14 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { apiFormPost, apiPost } from '@/lib/api';
+import { subscribeTaskEvents, pollTaskUntilTerminal } from '@/lib/task-events';
+import type { TaskImage, TaskResult, Uploaded } from '../create-types';
+import { imageUrl } from '../create-utils';
 import { cn } from '@/lib/utils';
 
 const vi = {
@@ -37,6 +41,22 @@ type ReferenceToken = {
   source: ReferenceSource;
   title: string;
   hint: string;
+  storageKey?: string;
+  assetUrl?: string;
+};
+
+type Draft = {
+  id: string;
+  taskId?: string;
+  status: string;
+  image?: TaskImage;
+  error?: string | null;
+};
+
+type CanvasItem = {
+  id: string;
+  title: string;
+  image?: TaskImage;
 };
 
 type AssistantMessage = {
@@ -46,6 +66,8 @@ type AssistantMessage = {
   body: string;
   chips?: string[];
   references?: ReferenceToken[];
+  draft?: Draft;
+  onCommitDraft?: (draft: Draft) => void;
 };
 
 const sourceLabel: Record<ReferenceSource, string> = {
@@ -81,6 +103,18 @@ const initialMessages: AssistantMessage[] = [
   },
 ];
 
+function humanError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const status = message.match(/failed:\s*(\d{3})/)?.[1];
+  if (status) return `生成请求失败：服务返回 ${status}，请稍后重试或检查配置。`;
+  return message.replace(/POST .* failed: /, '生成请求失败：');
+}
+
+function fileNameFromDraft(draft: Draft) {
+  const key = draft.image?.storageKey ?? draft.image?.assetUrl ?? '生成草稿';
+  return decodeURIComponent(key.split('?')[0]).split('/').pop() ?? '生成草稿';
+}
+
 function Glow({ className }: { className?: string }) {
   return <div aria-hidden="true" className={cn('pointer-events-none absolute rounded-full blur-3xl', className)} />;
 }
@@ -94,11 +128,31 @@ function PhoneFrame({ children }: { children: ReactNode }) {
 function ReferenceThumb({ reference, compact = false }: { reference: ReferenceToken; compact?: boolean }) {
   return <div className={cn('min-w-0 rounded-[1rem] border p-2', sourceClass[reference.source])}>
     <div className="flex min-w-0 items-center gap-2">
-      <div className={cn('shrink-0 rounded-[0.75rem] border border-current/15 bg-[linear-gradient(145deg,#fffaf2,#f8e3dd_48%,#e7f1ec)]', compact ? 'h-9 w-9' : 'h-12 w-12')} />
+      <div className={cn('shrink-0 overflow-hidden rounded-[0.75rem] border border-current/15 bg-[linear-gradient(145deg,#fffaf2,#f8e3dd_48%,#e7f1ec)]', compact ? 'h-9 w-9' : 'h-12 w-12')}>
+        {reference.assetUrl ? <img src={reference.assetUrl.startsWith('/assets/') ? `/api${reference.assetUrl}` : reference.assetUrl} alt="" className="h-full w-full object-cover" /> : null}
+      </div>
       <div className="min-w-0">
         <b className="block truncate text-xs">{reference.label}</b>
-        <span className="block truncate text-[0.68rem] opacity-75">{sourceLabel[reference.source]}</span>
+        <span className="block truncate text-[0.68rem] opacity-75">{reference.title}</span>
       </div>
+    </div>
+  </div>;
+}
+
+function DraftCard({ draft, onCommitDraft }: { draft: Draft; onCommitDraft?: (draft: Draft) => void }) {
+  const url = imageUrl(draft.image);
+  const done = draft.status === 'SUCCEEDED' && draft.image;
+  return <div className="mt-3 overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
+    <div className="grid aspect-square place-items-center bg-[linear-gradient(145deg,#fff1de,#f8e3dd)] text-xs text-[#9e574c]">
+      {url ? <img src={url} alt="真实生成草稿" className="h-full w-full object-cover" /> : draft.status === 'FAILED' ? '生成失败' : '生成中'}
+    </div>
+    <div className="grid gap-2 px-2 py-2 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[#253048]">{done ? fileNameFromDraft(draft) : '等待生成结果'}</span>
+        <span className="text-[#b96a5c]">{draft.status === 'SUCCEEDED' ? '生成完成' : draft.status}</span>
+      </div>
+      {draft.error ? <span className="text-[#9e574c]">{draft.error}</span> : null}
+      <Button type="button" size="sm" className={cn('h-8 text-xs', vi.primaryButton)} disabled={!done} onClick={() => onCommitDraft?.(draft)}>加入画布</Button>
     </div>
   </div>;
 }
@@ -125,22 +179,26 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
       </div> : null}
       {isReference ? <div className="mt-3 grid gap-2">
         {message.references?.map((reference) => <div key={reference.id} className="grid grid-cols-[4.5rem_1fr] gap-3">
-          <div className="aspect-[4/5] rounded-[1rem] border border-[#d6e7df] bg-[linear-gradient(145deg,#e7f1ec,#fffaf2_55%,#f8e3dd)]" />
+          <div className="aspect-[4/5] overflow-hidden rounded-[1rem] border border-[#d6e7df] bg-[linear-gradient(145deg,#e7f1ec,#fffaf2_55%,#f8e3dd)]">
+            {reference.assetUrl ? <img src={reference.assetUrl.startsWith('/assets/') ? `/api${reference.assetUrl}` : reference.assetUrl} alt="" className="h-full w-full object-cover" /> : null}
+          </div>
           <div className="grid content-center gap-1 text-xs text-[#6b7488]">
             <span>{reference.title}</span>
             <span>{reference.hint}</span>
           </div>
         </div>)}
       </div> : null}
-      {isDrafts ? <div className="mt-3 grid grid-cols-2 gap-2">
-        {['初稿一', '初稿二', '初稿三', '初稿四'].map((label, index) => <div key={label} className="overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
-          <div className={cn('aspect-square', index % 3 === 0 && 'bg-[linear-gradient(145deg,#fff1de,#f8e3dd)]', index % 3 === 1 && 'bg-[linear-gradient(145deg,#e7f1ec,#fffaf2)]', index % 3 === 2 && 'bg-[linear-gradient(145deg,#eef0f4,#fff1de)]')} />
-          <div className="flex items-center justify-between gap-2 px-2 py-2 text-xs">
-            <span className="text-[#253048]">{label}</span>
-            <span className="text-[#b96a5c]">加入画布</span>
-          </div>
-        </div>)}
-      </div> : null}
+      {isDrafts ? <>
+        {message.draft ? <DraftCard draft={message.draft} onCommitDraft={message.onCommitDraft} /> : <div className="mt-3 grid grid-cols-2 gap-2">
+          {['初稿一', '初稿二', '初稿三', '初稿四'].map((label, index) => <div key={label} className="overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
+            <div className={cn('aspect-square', index % 3 === 0 && 'bg-[linear-gradient(145deg,#fff1de,#f8e3dd)]', index % 3 === 1 && 'bg-[linear-gradient(145deg,#e7f1ec,#fffaf2)]', index % 3 === 2 && 'bg-[linear-gradient(145deg,#eef0f4,#fff1de)]')} />
+            <div className="flex items-center justify-between gap-2 px-2 py-2 text-xs">
+              <span className="text-[#253048]">{label}</span>
+              <span className="text-[#b96a5c]">加入画布</span>
+            </div>
+          </div>)}
+        </div>}
+      </> : null}
       {message.chips?.length ? <div className="mt-3 flex flex-wrap gap-1.5">
         {message.chips.map((chip) => <Badge key={chip} variant="outline" className={cn('rounded-full px-2 py-0.5 text-[0.68rem]', isUser ? 'border-[#fffaf2]/30 bg-[#fffaf2]/10 text-[#fffaf2]' : 'border-[#e9d8c4] bg-[#fff1de]/70 text-[#45506a]')}>{chip}</Badge>)}
       </div> : null}
@@ -148,7 +206,8 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
   </div>;
 }
 
-function CanvasPreview() {
+function CanvasPreview({ items }: { items: CanvasItem[] }) {
+  const latest = items[0];
   return <Card data-testid="mobile-canvas-preview" className={cn('rounded-[1.6rem]', vi.paperPanel)}>
     <CardContent className="p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -156,16 +215,21 @@ function CanvasPreview() {
           <b className="block text-[#253048]">轻量画布预告</b>
           <span className="text-xs text-[#6b7488]">生成草稿确认后才加入画布</span>
         </div>
-        <Badge variant="outline" className={cn('rounded-full px-3 py-1', vi.sagePill)}>不污染画布</Badge>
+        <Badge variant="outline" className={cn('rounded-full px-3 py-1', latest ? vi.coralPill : vi.sagePill)}>{latest ? '已加入画布' : '不污染画布'}</Badge>
       </div>
       <div className="relative min-h-56 overflow-hidden rounded-[1.35rem] border border-[#e9d8c4] bg-[#fff1de]/70 p-4">
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(104,85,66,0.16)_1px,transparent_0)] bg-[size:18px_18px] opacity-35" />
-        <div className="relative grid gap-3">
+        {latest ? <div className="relative grid gap-3">
+          <div className="overflow-hidden rounded-[1rem] border border-[#f2d6cf] bg-[#fffaf2] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">
+            <div className="aspect-[4/3] bg-[linear-gradient(145deg,#fff1de,#f8e3dd)]">{imageUrl(latest.image) ? <img src={imageUrl(latest.image) ?? ''} alt="已加入画布" className="h-full w-full object-cover" /> : null}</div>
+            <div className="px-3 py-2 text-xs text-[#253048]">{latest.title}</div>
+          </div>
+        </div> : <div className="relative grid gap-3">
           <div className="w-[72%] rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2] p-3 text-xs text-[#45506a] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">创作意图</div>
           <div className="ml-auto w-[70%] rounded-[1rem] border border-[#d6e7df] bg-[#e7f1ec] p-3 text-xs text-[#486e64] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">@图片 引用关系</div>
           <div className="w-[78%] rounded-[1rem] border border-[#f2d6cf] bg-[#f8e3dd] p-3 text-xs text-[#9e574c] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">对话流里的生成草稿</div>
           <div className="ml-auto w-[64%] rounded-[1rem] border border-[#253048]/20 bg-[#253048] p-3 text-xs text-[#fffaf2] shadow-[0_10px_24px_rgba(37,48,72,0.12)]">确认后加入画布</div>
-        </div>
+        </div>}
       </div>
     </CardContent>
   </Card>;
@@ -178,6 +242,10 @@ export function VisualStageClient() {
   const [generateMode, setGenerateMode] = useState(false);
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [showParams, setShowParams] = useState(false);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   function appendToken(reference: ReferenceToken) {
     setIntent((current) => {
@@ -186,18 +254,87 @@ export function VisualStageClient() {
     });
   }
 
+  function pushReference(reference: ReferenceToken) {
+    setReferences((current) => [...current, reference]);
+    appendToken(reference);
+    setShowMentionPicker(false);
+  }
+
   function addReference(source: ReferenceSource, title?: string, hint?: string) {
     const nextNumber = references.length + 1;
-    const reference: ReferenceToken = {
+    pushReference({
       id: `${source}-${nextNumber}`,
       label: `@图片${nextNumber}`,
       source,
       title: title ?? `本地新图片 ${nextNumber}`,
-      hint: hint ?? '＋号偏向添加本地新图片；当前为原型占位，后续接真实上传。',
+      hint: hint ?? '＋号偏向添加本地新图片；当前为轻量前端引用，上传后可参与真实生成。',
+    });
+  }
+
+  async function onLocalImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    const nextNumber = references.length + 1;
+    const fallbackReference: ReferenceToken = {
+      id: `local-${nextNumber}`,
+      label: `@图片${nextNumber}`,
+      source: 'local',
+      title: file.name,
+      hint: '本地图片上传中；上传完成后可作为真实参考图。',
     };
-    setReferences((current) => [...current, reference]);
-    appendToken(reference);
-    setShowMentionPicker(false);
+    try {
+      const form = new FormData();
+      form.set('file', file);
+      const uploaded = await apiFormPost<Uploaded>('/assets/upload', form);
+      pushReference({ ...fallbackReference, title: uploaded.originalName ?? file.name, hint: '本地图片已上传，出图时会作为参考图传入。', storageKey: uploaded.storageKey, assetUrl: uploaded.assetUrl });
+    } catch (error) {
+      pushReference({ ...fallbackReference, hint: humanError(error) });
+    }
+  }
+
+  function watchTask(id: string) {
+    let fallbackStarted = false;
+    const onTask = (task: TaskResult) => {
+      const image = task.images?.[0];
+      setDraft({ id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, error: task.errorMessage ?? task.error ?? null });
+    };
+    const fallback = async () => {
+      if (fallbackStarted) return;
+      fallbackStarted = true;
+      await pollTaskUntilTerminal<TaskResult>(id, onTask);
+    };
+    const unsubscribe = subscribeTaskEvents<TaskResult>(id, (task) => {
+      onTask(task);
+      if (['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(task.status ?? '')) unsubscribe();
+    }, fallback);
+  }
+
+  async function submit() {
+    if (!intent.trim() && !references.length) return;
+    setShowDrafts(true);
+    if (!generateMode) return;
+    setLoading(true);
+    setDraft({ id: 'pending', status: 'QUEUED' });
+    try {
+      const refKeys = references.map((reference) => reference.storageKey).filter(Boolean) as string[];
+      const endpoint = refKeys.length ? '/tasks/edit' : '/tasks/generate';
+      const payload = refKeys.length
+        ? { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', refKeys, count: 1, timeoutSec: 600 }
+        : { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 };
+      const created = await apiPost<TaskResult>(endpoint, payload);
+      setDraft({ id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: created.images?.[0] });
+      if (created.id) watchTask(created.id);
+    } catch (error) {
+      setDraft({ id: 'failed', status: 'FAILED', error: humanError(error) });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function commitDraft(nextDraft: Draft) {
+    if (!nextDraft.image) return;
+    setCanvasItems((current) => [{ id: nextDraft.image?.storageKey ?? nextDraft.id, title: fileNameFromDraft(nextDraft), image: nextDraft.image }, ...current]);
   }
 
   const messages = useMemo<AssistantMessage[]>(() => {
@@ -223,7 +360,7 @@ export function VisualStageClient() {
         tone: 'assistant',
         title: generateMode ? '出图前确认' : '我先这样理解',
         body: generateMode
-          ? '出图开关已打开：发送后会进入生成草稿状态。草稿先留在对话流，确认“加入画布”后再进入画布。'
+          ? '出图开关已打开：发送后会创建真实生成任务。草稿先留在对话流，确认“加入画布”后再进入画布。'
           : '当前是普通对话：我会先整理意图和参考关系，不会直接消耗生图额度。需要出图时再打开开关。',
         chips: [generateMode ? '出图已开启' : '普通对话', references.length ? '已包含 @图片 token' : '可继续补参考图', '草稿确认后进画布'],
       });
@@ -232,12 +369,14 @@ export function VisualStageClient() {
       next.push({
         id: 'drafts',
         tone: 'drafts',
-        title: '生成草稿占位',
-        body: '原型阶段先展示生成后的呈现方式，不接真实 AI，也不消耗生图额度。',
+        title: draft?.status === 'SUCCEEDED' ? '真实生成草稿' : '真实生成草稿',
+        body: draft?.status === 'SUCCEEDED' ? '生成完成。草稿先在对话流中，确认后再加入画布。' : loading ? '正在提交真实生成任务，完成后会在这里出现草稿。' : '已进入真实生成流程，等待任务返回。',
+        draft: draft ?? { id: 'pending', status: 'QUEUED' },
+        onCommitDraft: commitDraft,
       });
     }
     return next;
-  }, [generateMode, intent, references, showDrafts]);
+  }, [draft, generateMode, intent, loading, references, showDrafts]);
 
   return <section data-testid="visual-stage-shell" data-vi="warm-editorial-board-v1" aria-label={vi.system} className={vi.shell}>
     <div aria-hidden="true" className={vi.wash} />
@@ -260,7 +399,7 @@ export function VisualStageClient() {
             本切片固定移动端创作助手：＋添加本地新图片，@引用素材图片或对话历史图片；默认普通对话，打开出图后才进入生成草稿。
           </p>
         </div>
-        <CanvasPreview />
+        <CanvasPreview items={canvasItems} />
       </div>
 
       <PhoneFrame>
@@ -306,6 +445,7 @@ export function VisualStageClient() {
             </div> : null}
 
             <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2] p-2 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
+              <input ref={fileInputRef} aria-label="选择本地新图片" type="file" accept="image/*" className="sr-only" onChange={onLocalImageChange} />
               {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex gap-2 overflow-x-auto pb-1">
                 {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact />)}
               </div> : null}
@@ -318,13 +458,13 @@ export function VisualStageClient() {
               />
               <div className="flex items-center justify-between gap-2 pt-2">
                 <div className="flex items-center gap-1.5">
-                  <Button type="button" variant="outline" size="icon" aria-label="添加本地新图片" className={cn('h-9 w-9 text-lg', vi.softButton)} onClick={() => addReference('local')}>＋</Button>
+                  <Button type="button" variant="outline" size="icon" aria-label="添加本地新图片" className={cn('h-9 w-9 text-lg', vi.softButton)} onClick={() => fileInputRef.current?.click()}>＋</Button>
                   <Button type="button" variant="outline" size="icon" aria-label="引用素材或历史图片" className={cn('h-9 w-9 text-base', vi.softButton)} onClick={() => setShowMentionPicker((current) => !current)}>@</Button>
                   <Button type="button" variant="outline" size="sm" className={cn('h-9 px-3 text-xs', vi.softButton)} onClick={() => setShowParams(true)}>参数</Button>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Button type="button" variant="outline" size="sm" aria-pressed={generateMode} className={cn('h-9 px-3 text-xs', generateMode ? vi.coralPill : vi.sagePill)} onClick={() => setGenerateMode((current) => !current)}>{generateMode ? '出图开' : '出图关'}</Button>
-                  <Button type="button" size="sm" className={cn('h-9 px-4', vi.primaryButton)} disabled={!intent.trim() && !references.length} onClick={() => setShowDrafts(true)}>{generateMode ? '发送出图' : '发送'}</Button>
+                  <Button type="button" size="sm" className={cn('h-9 px-4', vi.primaryButton)} disabled={loading || (!intent.trim() && !references.length)} onClick={submit}>{loading ? '提交中' : generateMode ? '发送出图' : '发送'}</Button>
                 </div>
               </div>
             </div>

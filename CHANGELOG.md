@@ -6,6 +6,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 - Prototyped the `/visual-stage` mobile-first 创作助手 slice in the Warm Editorial Board VI: Chinese-first copy, conversational generation entry, reference image state, mock draft cards, and a lightweight canvas preview without wiring real AI or generation calls.
 - Updated `/visual-stage` into an immersive mobile creation surface with no old project shell, `＋` local-image attachment, advanced `@图片` reference tokens for assets/history, default ordinary chat, explicit generation toggle, parameter drawer, fixed scrollable thread, and draft-before-canvas behavior.
+- Wired the `/visual-stage` MVP loop into existing Workbench capabilities: local reference upload, `@图片` token insertion, real `/tasks/generate` or `/tasks/edit` task creation, task stream/poll fallback, chat-thread draft results, and explicit “加入画布” confirmation.
 
 ### Added
 
