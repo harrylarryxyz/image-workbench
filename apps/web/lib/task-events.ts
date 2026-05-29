@@ -32,10 +32,11 @@ export async function pollTaskUntilTerminal<T extends { status?: string }>(
   taskId: string,
   onTask: (task: T) => void,
   maxAttempts = 90,
+  initialDelayMs = 0,
 ) {
   const terminal = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
   for (let i = 0; i < maxAttempts; i += 1) {
-    await new Promise((resolve) => setTimeout(resolve, i < 6 ? 2000 : 5000));
+    if (i > 0 || initialDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, i === 0 ? initialDelayMs : i < 6 ? 2000 : 5000));
     const task = await apiGet<T>(`/tasks/${taskId}`);
     onTask(task);
     if (task.status && terminal.has(task.status)) return;

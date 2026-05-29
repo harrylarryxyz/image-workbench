@@ -39,14 +39,15 @@ test('Visual Stage supports + local image and @ advanced reference tokens on mob
   });
   await page.locator('input[type="file"][aria-label="选择本地新图片"]').setInputFiles({ name: 'prototype-ref.png', mimeType: 'image/png', buffer: tinyPng });
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片1');
+  await expect(page.getByTestId('composer-reference-tokens').getByText('@图片1')).toBeVisible();
   await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/@图片1/);
-  await expect(page.getByTestId('creation-assistant-thread')).toContainText('本地新图片');
+  await expect(page.getByTestId('creation-assistant-thread')).not.toContainText('本地图片已上传');
 
   await page.getByRole('button', { name: '引用素材或历史图片' }).click();
   await expect(page.getByTestId('mention-reference-picker')).toContainText('素材库：海报氛围图');
   await page.getByRole('button', { name: /素材库：海报氛围图/ }).click();
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片2');
-  await expect(page.getByTestId('creation-assistant-thread')).toContainText('素材图片');
+  await expect(page.getByTestId('creation-assistant-thread')).not.toContainText('素材库：海报氛围图');
 
   await page.getByLabel('描述你想创作的画面').fill('@图片1 保留构图，@图片2 借鉴色调，做一张温柔高级的护肤品宣传图');
   await expect(page.getByTestId('creation-assistant-thread')).not.toContainText('我先这样理解');
@@ -93,20 +94,29 @@ test('Visual Stage keeps draft typing out of the thread, clears composer after s
   await expect(thread).toContainText('第一句：先做一张品牌海报');
   await expect(thread).toContainText('第二句：改成温润纸面感');
   await expect(thread.locator('> div').last()).toContainText('针对「第二句：改成温润纸面感」');
+  await expect(thread.locator('> div').last()).toBeInViewport();
 });
 
 test('Visual Stage keeps generated draft visible when generation toggle is turned off and truncates long generated filenames', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const longName = 'this-is-a-very-long-generated-filename-that-should-never-push-the-draft-card-outside-of-the-phone-frame-because-it-is-truncated.png';
+  let statusPolls = 0;
 
   await page.route('**/api/tasks/generate', async (route) => {
     await route.fulfill({ json: { id: 'task_long_filename', type: 'image.generate', status: 'QUEUED' } });
   });
   await page.route('**/api/tasks/task_long_filename/events', async (route) => {
+    await route.fulfill({ status: 500, body: 'stream unavailable' });
+  });
+  await page.route('**/api/tasks/task_long_filename', async (route) => {
+    statusPolls += 1;
     await route.fulfill({
-      status: 200,
-      contentType: 'text/event-stream',
-      body: `event: task.snapshot\ndata: {"id":"task_long_filename","type":"image.generate","status":"SUCCEEDED","images":[{"storageKey":"local://outputs/default/${longName}","assetUrl":"/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2F${longName}","format":"png","sizeBytes":1234}]}\n\n`,
+      json: {
+        id: 'task_long_filename',
+        type: 'image.generate',
+        status: 'SUCCEEDED',
+        images: [{ storageKey: `local://outputs/default/${longName}`, assetUrl: `/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2F${longName}`, format: 'png', sizeBytes: 1234 }],
+      },
     });
   });
 
@@ -115,6 +125,7 @@ test('Visual Stage keeps generated draft visible when generation toggle is turne
   await page.getByRole('button', { name: '出图关' }).click();
   await page.getByRole('button', { name: '发送出图' }).click();
   await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成完成');
+  expect(statusPolls).toBeGreaterThan(0);
 
   await page.getByRole('button', { name: '出图开' }).click();
   await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成完成');
@@ -134,9 +145,15 @@ test('Visual Stage reference tray supports deletion, shows only tokens, and scro
   }
 
   const tray = page.getByTestId('composer-reference-tokens');
+  const composer = page.getByTestId('creation-assistant-composer');
   await expect(tray).toContainText('@图片6');
+  await expect(tray.getByText('@图片6')).toBeVisible();
   await expect(tray).not.toContainText('素材库：海报氛围图');
   expect(await tray.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+
+  const trayBox = await tray.boundingBox();
+  const composerBox = await composer.boundingBox();
+  expect(trayBox && composerBox ? trayBox.x + trayBox.width <= composerBox.x + composerBox.width + 1 : false).toBe(true);
 
   const firstToken = tray.getByTestId('reference-token').first();
   const firstBox = await firstToken.boundingBox();
@@ -186,7 +203,7 @@ test('Visual Stage restores a pending generation after refresh and shows complet
   await page.getByLabel('描述你想创作的画面').fill('生成一张温润纸面风格的香水海报');
   await page.getByRole('button', { name: '出图关' }).click();
   await page.getByRole('button', { name: '发送出图' }).click();
-  await expect(page.getByTestId('creation-assistant-thread')).toContainText('等待任务返回');
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('真实生成草稿');
 
   await page.reload();
   await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成一张温润纸面风格的香水海报');

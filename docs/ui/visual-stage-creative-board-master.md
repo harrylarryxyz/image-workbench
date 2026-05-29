@@ -120,7 +120,7 @@ Mobile must not become a crude stacked desktop:
 - Default send is ordinary conversation. Generation only happens after an explicit 出图 switch; generated drafts stay in the chat thread until the user confirms adding them to the canvas.
 - MVP implementation should reuse existing Workbench upload/task APIs: local image → `/assets/upload`; generation with references → `/tasks/edit`; text-only generation → `/tasks/generate`; task updates through SSE with polling fallback.
 - Ordinary conversation must produce a visible Chinese 助手建议 response even when 出图 is off; Visual Stage session state should persist locally so refresh preserves chat, references, draft status, and canvas preview.
-- Composer draft text must never be mirrored into the chat thread before send; sending clears the composer, generated draft cards are independent of the current 出图 toggle, and reference trays show compact `@图片N` tokens with deletion plus horizontal scrolling instead of full filenames.
+- Composer draft text must never be mirrored into the chat thread before send; sending clears the composer, generated draft cards are independent of the current 出图 toggle, polling should immediately reconcile terminal task state when SSE is unavailable, refresh should auto-scroll the thread to the latest exchange, adding reference images must not create automatic chat descriptions, and reference trays show visible compact `@图片N` chips with deletion plus horizontal scrolling instead of preview thumbnails or full filenames.
 - Public UI must show human Chinese statuses such as 生成中、生成完成、加入画布; it must not expose raw HTTP response bodies, provider routes, storage keys, or task JSON.
 
 ## Regression hooks

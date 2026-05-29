@@ -192,16 +192,21 @@ function PhoneFrame({ children }: { children: ReactNode }) {
 
 function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void }) {
   const src = assetSrc(reference.assetUrl);
-  return <div data-testid={tray ? 'reference-token' : undefined} className={cn('rounded-[1rem] border p-2', sourceClass[reference.source], tray ? 'w-[5.4rem] shrink-0' : 'min-w-0')}>
+  if (tray) {
+    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[5.6rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
+      <span className="min-w-0 flex-1 truncate font-semibold">{reference.label}</span>
+      {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
+    </div>;
+  }
+  return <div className={cn('rounded-[1rem] border p-2', sourceClass[reference.source], 'min-w-0')}>
     <div className="flex min-w-0 items-center gap-2">
       <div className={cn('shrink-0 overflow-hidden rounded-[0.75rem] border border-current/15 bg-[linear-gradient(145deg,#fffaf2,#f8e3dd_48%,#e7f1ec)]', compact ? 'h-9 w-9' : 'h-12 w-12')}>
         {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : null}
       </div>
       <div className="min-w-0 flex-1">
         <b className="block truncate text-xs">{reference.label}</b>
-        {!tray ? <span className="block truncate text-[0.68rem] opacity-75">{reference.title}</span> : null}
+        <span className="block truncate text-[0.68rem] opacity-75">{reference.title}</span>
       </div>
-      {tray && onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-6 w-6 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
     </div>
   </div>;
 }
@@ -314,6 +319,7 @@ export function VisualStageClient() {
   const [loading, setLoading] = useState(false);
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const threadRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -444,17 +450,16 @@ export function VisualStageClient() {
 
   const messages = useMemo<AssistantMessage[]>(() => {
     const next = [...initialMessages, ...conversation, ...draftMessages];
-    if (references.length) {
-      next.push({
-        id: 'reference',
-        tone: 'reference',
-        title: '已添加到输入框',
-        body: `${references.map((item) => item.label).join('、')} 已作为 token 放进描述里，发送后会和文字一起进入对话流。`,
-        references,
-      });
-    }
     return next;
-  }, [conversation, draftMessages, references]);
+  }, [conversation, draftMessages]);
+
+  useEffect(() => {
+    const thread = threadRef.current;
+    if (!thread) return;
+    requestAnimationFrame(() => {
+      thread.scrollTop = thread.scrollHeight;
+    });
+  }, [messages.length]);
 
   return <section data-testid="visual-stage-shell" data-vi="warm-editorial-board-v1" aria-label={vi.system} className={vi.shell}>
     <div aria-hidden="true" className={vi.wash} />
@@ -492,7 +497,7 @@ export function VisualStageClient() {
             </div>
           </div>
 
-          <div data-testid="creation-assistant-thread" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#fff1de]/45 px-3 py-4">
+          <div ref={threadRef} data-testid="creation-assistant-thread" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#fff1de]/45 px-3 py-4">
             {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
           </div>
 
@@ -524,7 +529,7 @@ export function VisualStageClient() {
 
             <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2] p-2 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
               <input ref={fileInputRef} aria-label="选择本地新图片" type="file" accept="image/*" className="sr-only" onChange={onLocalImageChange} />
-              {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex gap-2 overflow-x-auto overscroll-x-contain pb-1">
+              {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex max-w-full gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1">
                 {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact tray onRemove={removeReference} />)}
               </div> : null}
               <Textarea
