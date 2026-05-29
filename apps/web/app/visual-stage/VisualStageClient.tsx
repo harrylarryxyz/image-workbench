@@ -30,6 +30,7 @@ export function VisualStageClient() {
   const [started, setStarted] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackCandidates, setFeedbackCandidates] = useState<ComparisonCandidate[]>([]);
+  const [committed, setCommitted] = useState(false);
   const creationCase = useMemo(() => deriveCreationCase(started ? intent : ''), [intent, started]);
   const champion = creationCase.champion ?? visualStageComparisonPlaceholders[0];
   const comparisonBase = creationCase.comparisons.length ? creationCase.comparisons : visualStageComparisonPlaceholders.slice(1);
@@ -41,6 +42,7 @@ export function VisualStageClient() {
     setStarted(true);
     setFeedbackMessage('');
     setFeedbackCandidates([]);
+    setCommitted(false);
   }
 
   function addJudgmentFeedback(label: string, summary: string) {
@@ -160,6 +162,7 @@ export function VisualStageClient() {
               </div>)}
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setCommitted(true)} disabled={!started || creationCase.route === 'ask-first'}>用这个 · Commit champion</Button>
               <Button variant="secondary" size="sm" onClick={() => addJudgmentFeedback('更克制版', '减少霓虹与装饰，保留黑金质感和专业可信。')}>更克制</Button>
               <Button variant="outline" size="sm" onClick={() => addJudgmentFeedback('更大胆版', '强化对比和视觉冲击，但不牺牲用途清晰度。')}>更大胆</Button>
               <Button variant="outline" size="sm" onClick={() => addJudgmentFeedback('不要霓虹版', '移除赛博霓虹，把高级感转向材质、留白和光影。')}>不要霓虹</Button>
@@ -168,6 +171,32 @@ export function VisualStageClient() {
             <p data-testid="visual-stage-feedback-status" className="min-h-5 text-sm text-primary">{feedbackMessage}</p>
           </CardContent>
         </Card>
+
+        {committed ? <Card data-testid="visual-stage-delivery-package" className="rounded-[1.5rem] border-primary/30 bg-primary/10">
+          <CardHeader>
+            <CardTitle>Delivery Package · 交付包</CardTitle>
+            <CardDescription>完成条件是 Champion 可用于具体用途；这里先生成本地 mock 交付摘要，不接真实下载或生产存储。</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm leading-6">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <b>Selected champion</b>
+              <p className="mt-1 text-muted-foreground">{champion.label} — {champion.summary}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <b>Use context / 用途</b>
+              <p className="mt-1 text-muted-foreground">{creationCase.anchors.find((anchor) => anchor.key === 'useContext')?.value ?? '社媒海报 / use context 待补齐'}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <b>Assumptions / 假设</b>
+              <p className="mt-1 text-muted-foreground">{(creationCase.assumptions.length ? creationCase.assumptions : ['无额外假设']).join('；')}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">来源/权利提示：本阶段仅记录创作案摘要与 mock 资产，不写入生产存储。</p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm">导出 mock 包</Button>
+              <Button variant="outline" size="sm">继续做变体</Button>
+            </div>
+          </CardContent>
+        </Card> : null}
 
         <Card className="rounded-[1.5rem] border-white/10 bg-white/[0.035]">
           <CardHeader>

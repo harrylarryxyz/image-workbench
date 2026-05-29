@@ -88,3 +88,14 @@ test('Visual Stage keeps comparison available on mobile after routing', async ({
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test('Visual Stage commits champion into a delivery package', async ({ page }) => {
+  await startVisualStage(page, '为冷萃品牌做黑金极简社媒海报，面向年轻咖啡爱好者，突出瓶身和冰块');
+  await page.getByRole('button', { name: /用这个|Commit champion/i }).click();
+
+  await expect(page.getByTestId('visual-stage-delivery-package')).toContainText(/Delivery Package|交付包/);
+  await expect(page.getByTestId('visual-stage-delivery-package')).toContainText(/社媒|海报|use context|用途/);
+  await expect(page.getByTestId('visual-stage-delivery-package')).toContainText(/Assumptions|假设/);
+  await expect(page.getByRole('button', { name: /导出/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /继续做变体/ })).toBeVisible();
+});
