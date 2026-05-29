@@ -59,6 +59,27 @@ test('visual stage route encodes the creation-case router product contract', () 
   assert.doesNotMatch(surface, /<(button|textarea)\b(?![^>]*data-slot)/, 'Visual Stage should use design-system action/input primitives');
 });
 
+test('visual direction board presents divergent art directions for review', () => {
+  const surface = readPage('visual-directions/page.tsx');
+
+  for (const marker of [
+    'Visual Direction Board',
+    'Lunar Precision',
+    'Cinema Studio',
+    'Atelier Gallery',
+    'Creative Board',
+    'Velvet Suite',
+    'Warm Craft',
+    '先选艺术方向',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `visual direction board missing ${marker}`);
+  }
+
+  assert.match(surface, /@\/components\/ui\/(badge|card)/, 'Visual direction board should use design-system primitives');
+  assert.doesNotMatch(surface, /JSON\.stringify\([^)]*,\s*null,\s*2\)/, 'Visual direction board must not expose raw JSON diagnostics');
+  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json/i, 'Visual direction board must not expose provider/storage diagnostics');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',

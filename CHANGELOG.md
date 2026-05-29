@@ -6,6 +6,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 ### Added
 
+- Route-isolated `/visual-directions` art-direction board with six divergent polished styles — Lunar Precision, Cinema Studio, Atelier Gallery, Creative Board, Velvet Suite, and Warm Craft — so visual taste can be selected before committing to a single design-system theme.
 - Route-isolated `/visual-stage` Visual Master first surface with Creation Case, Reference-first / Generate-first / Ask-first routing language, Champion + Comparison Set, reference territories, and static product-contract guardrails.
 - Deterministic `/visual-stage` Creation Case router for sparse avatar, clear poster, and hard-blocker likeness prompts, with judgment-first feedback, mobile-visible comparison, and local mock delivery package flow.
 - Visual Stage product-philosophy PRD, accepted ADR, PC/mobile interaction/visual spec, discovery log, and first-slice implementation plan for the unified Creation Case routing model.
