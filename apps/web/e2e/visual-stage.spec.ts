@@ -79,6 +79,10 @@ test('Visual Stage supports + local image and @ advanced reference tokens on mob
 
 test('Visual Stage keeps draft typing out of the thread, clears composer after send, and refreshes to the latest exchange', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/agent/visual-stage/reply', async (route) => {
+    const body = route.request().postDataJSON();
+    await route.fulfill({ json: { provider: 'local', title: '助手建议', body: `针对「${body.intent}」：建议补充主体、比例和发布渠道。`, chips: ['普通对话', '建议补充'] } });
+  });
   await page.goto('/visual-stage');
   await page.getByLabel('描述你想创作的画面').fill('第一句：先做一张品牌海报');
   await expect(page.getByTestId('creation-assistant-thread')).not.toContainText('第一句：先做一张品牌海报');
@@ -163,8 +167,33 @@ test('Visual Stage reference tray supports deletion, shows only tokens, and scro
   await expect(tray).not.toContainText('@图片1');
 });
 
-test('Visual Stage ordinary chat sends a real assistant suggestion and persists conversation after refresh', async ({ page }) => {
+test('Visual Stage uses the server LLM assistant reply instead of the old local template when chatting', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/agent/visual-stage/reply', async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.intent).toContain('护肤品海报');
+    expect(body.generateMode).toBe(false);
+    await route.fulfill({ json: { provider: 'llm', title: '创作判断', body: '建议先固定温润纸面感、主体层级和发布比例，再决定是否出图。', chips: ['真实助手', '先定方向'] } });
+  });
+
+  await page.goto('/visual-stage');
+  await page.getByLabel('描述你想创作的画面').fill('做一张温润纸面感护肤品海报');
+  await page.getByRole('button', { name: '发送' }).click();
+
+  const thread = page.getByTestId('creation-assistant-thread');
+  await expect(thread).toContainText('创作判断');
+  await expect(thread).toContainText('建议先固定温润纸面感');
+  await expect(thread).toContainText('真实助手');
+  await expect(thread).not.toContainText('针对「做一张温润纸面感护肤品海报」');
+  await expect(page.getByTestId('visual-stage-shell')).not.toContainText(forbiddenMainFlow);
+});
+
+
+test('Visual Stage ordinary chat persists assistant conversation after refresh', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/agent/visual-stage/reply', async (route) => {
+    await route.fulfill({ json: { provider: 'local', title: '助手建议', body: '建议补充主体、比例和发布渠道。', chips: ['普通对话', '建议补充'] } });
+  });
 
   await page.goto('/visual-stage');
   await page.getByLabel('描述你想创作的画面').fill('我想做一张温润杂志感护肤品海报，适合小红书首图');
@@ -211,9 +240,53 @@ test('Visual Stage restores a pending generation after refresh and shows complet
   await expect(page.getByRole('button', { name: '加入画布' })).toBeVisible();
 });
 
+test('Visual Stage supports comparison drafts, champion selection, continue-edit, and reference roles', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/assets/upload', async (route) => {
+    await route.fulfill({ json: { storageKey: 'local://uploads/default/role-ref.png', assetUrl: '/assets/file?key=local%3A%2F%2Fuploads%2Fdefault%2Frole-ref.png', originalName: 'role-ref.png', format: 'png', sizeBytes: tinyPng.length } });
+  });
+  await page.route('**/api/agent/visual-stage/reply', async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.references[0].role).toBe('构图');
+    await route.fulfill({ json: { provider: 'llm', title: '创作判断', body: '参考图作为构图锚点，生成后先选冠军图。', chips: ['真实助手', '构图锚点'] } });
+  });
+  await page.route('**/api/tasks/edit', async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.count).toBeGreaterThanOrEqual(2);
+    await route.fulfill({ json: { id: 'task_comparison_set', type: 'image.edit', status: 'QUEUED' } });
+  });
+  await page.route('**/api/tasks/task_comparison_set/events', async (route) => route.fulfill({ status: 500, body: 'stream unavailable' }));
+  await page.route('**/api/tasks/task_comparison_set', async (route) => {
+    await route.fulfill({ json: { id: 'task_comparison_set', type: 'image.edit', status: 'SUCCEEDED', images: [
+      { storageKey: 'local://outputs/default/draft-a.png', assetUrl: '/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2Fdraft-a.png', format: 'png', sizeBytes: 1234 },
+      { storageKey: 'local://outputs/default/draft-b.png', assetUrl: '/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2Fdraft-b.png', format: 'png', sizeBytes: 1234 },
+    ] } });
+  });
+
+  await page.goto('/visual-stage');
+  await page.locator('input[type="file"][aria-label="选择本地新图片"]').setInputFiles({ name: 'role-ref.png', mimeType: 'image/png', buffer: tinyPng });
+  await page.getByRole('button', { name: /用途/ }).click();
+  await expect(page.getByTestId('composer-reference-tokens')).toContainText('构图');
+  await page.getByLabel('描述你想创作的画面').fill('@图片1 做一张温润海报');
+  await page.getByRole('button', { name: '出图关' }).click();
+  await page.getByRole('button', { name: '发送出图' }).click();
+
+  await expect(page.getByTestId('draft-card')).toContainText('比较草稿');
+  await page.getByRole('button', { name: '选择第 2 张为冠军图' }).click();
+  await expect(page.getByTestId('draft-card')).toContainText('冠军图 2');
+  await page.getByRole('button', { name: '继续改' }).click();
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/继续优化冠军图 2/);
+  await page.getByRole('button', { name: '加入画布' }).click();
+  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('draft-b.png');
+});
+
+
 test('Visual Stage uploads local reference, creates a real draft task, then commits draft into canvas preview', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
+  await page.route('**/api/agent/visual-stage/reply', async (route) => {
+    await route.fulfill({ json: { provider: 'local', title: '助手建议', body: '参考图已进入生成上下文。', chips: ['已带参考图'] } });
+  });
   await page.route('**/api/assets/upload', async (route) => {
     await route.fulfill({
       json: {

@@ -41,6 +41,7 @@ type ReferenceToken = {
   source: ReferenceSource;
   title: string;
   hint: string;
+  role?: string;
   storageKey?: string;
   assetUrl?: string;
 };
@@ -50,6 +51,8 @@ type Draft = {
   taskId?: string;
   status: string;
   image?: TaskImage;
+  images?: TaskImage[];
+  championIndex?: number;
   error?: string | null;
 };
 
@@ -68,6 +71,8 @@ type AssistantMessage = {
   references?: ReferenceToken[];
   draft?: Draft;
   onCommitDraft?: (draft: Draft) => void;
+  onSelectChampion?: (draft: Draft, index: number) => void;
+  onContinueEdit?: (draft: Draft) => void;
   createdAt?: number;
 };
 
@@ -148,17 +153,17 @@ function assetSrc(assetUrl?: string) {
   return assetUrl;
 }
 
-function createAssistantSuggestion(intent: string, references: ReferenceToken[], generateMode: boolean): ConversationEntry {
+function createAssistantSuggestion(intent: string, references: ReferenceToken[], generateMode: boolean, createdAt = Date.now()): ConversationEntry {
   const hasReference = references.length > 0;
   const useCase = /小红书|封面|海报|宣传|首图/.test(intent) ? '使用场景已经比较明确' : '使用场景还可以再补一句';
   const referenceHint = hasReference ? `已识别 ${references.map((item) => item.label).join('、')}，出图时会把这些参考图作为画面锚点。` : '建议补充一张参考图或一句风格锚点，这样第一张会更接近你想要的感觉。';
   return {
-    id: `assistant-${Date.now()}`,
+    id: `assistant-${createdAt}`,
     tone: 'assistant',
     title: generateMode ? '出图前建议' : '助手建议',
     body: `针对「${intent}」：${useCase}。${referenceHint} 建议补充：主体、画面比例、发布渠道和不能改变的元素。${generateMode ? '我会先生成草稿，确认后再加入画布。' : '如果只是讨论，我不会消耗生图额度；打开出图后再生成。'}`,
     chips: [generateMode ? '准备出图' : '普通对话', hasReference ? '已带参考图' : '建议补参考', '建议补充'],
-    createdAt: Date.now(),
+    createdAt,
   };
 }
 
@@ -194,9 +199,10 @@ function PhoneFrame({ children }: { children: ReactNode }) {
 function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void }) {
   const src = assetSrc(reference.assetUrl);
   if (tray) {
-    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[5.6rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
+    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[6.8rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
       <span className="min-w-0 flex-1 truncate font-semibold">{reference.label}</span>
       {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
+      <Button type="button" variant="ghost" size="sm" aria-label={`${reference.label} 用途`} className="h-6 shrink-0 rounded-full px-1.5 text-[0.62rem] opacity-80" onClick={() => onRemove?.(`${reference.id}:role`)}>{reference.role ?? '用途'}</Button>
     </div>;
   }
   return <div className={cn('rounded-[1rem] border p-2', sourceClass[reference.source], 'min-w-0')}>
@@ -212,20 +218,33 @@ function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: 
   </div>;
 }
 
-function DraftCard({ draft, onCommitDraft }: { draft: Draft; onCommitDraft?: (draft: Draft) => void }) {
-  const url = imageUrl(draft.image);
-  const done = draft.status === 'SUCCEEDED' && draft.image;
+function DraftCard({ draft, onCommitDraft, onSelectChampion, onContinueEdit }: { draft: Draft; onCommitDraft?: (draft: Draft) => void; onSelectChampion?: (draft: Draft, index: number) => void; onContinueEdit?: (draft: Draft) => void }) {
+  const images = draft.images?.length ? draft.images : draft.image ? [draft.image] : [];
+  const championIndex = Math.min(draft.championIndex ?? 0, Math.max(images.length - 1, 0));
+  const champion = images[championIndex];
+  const url = imageUrl(champion);
+  const done = draft.status === 'SUCCEEDED' && champion;
+  const displayDraft = { ...draft, image: champion };
   return <div data-testid="draft-card" className="mt-3 min-w-0 overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
     <div className="grid aspect-square place-items-center bg-[linear-gradient(145deg,#fff1de,#f8e3dd)] text-xs text-[#9e574c]">
       {url ? <img src={url} alt="真实生成草稿" className="h-full w-full object-cover" /> : draft.status === 'FAILED' ? '生成失败' : '生成中'}
     </div>
     <div className="grid gap-2 px-2 py-2 text-xs">
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[#253048]" title={fileNameFromDraft(draft)}>{done ? fileNameFromDraft(draft) : '等待生成结果'}</span>
+        <span className="min-w-0 truncate text-[#253048]" title={fileNameFromDraft(displayDraft)}>{done ? fileNameFromDraft(displayDraft) : '等待生成结果'}</span>
         <span className="text-[#b96a5c]">{draft.status === 'SUCCEEDED' ? '生成完成' : draft.status}</span>
       </div>
+      {images.length > 1 ? <div className="grid gap-2">
+        <div className="flex items-center justify-between text-[#6b7488]"><span>比较草稿</span><b className="text-[#9e574c]">冠军图 {championIndex + 1}</b></div>
+        <div className="grid grid-cols-2 gap-2">
+          {images.map((image, index) => <Button key={image.storageKey ?? index} type="button" variant="outline" size="sm" aria-label={`选择第 ${index + 1} 张为冠军图`} className={cn('h-8 rounded-full text-xs', index === championIndex ? vi.coralPill : vi.softButton)} onClick={() => onSelectChampion?.(draft, index)}>第 {index + 1} 张</Button>)}
+        </div>
+      </div> : null}
       {draft.error ? <span className="text-[#9e574c]">{draft.error}</span> : null}
-      <Button type="button" size="sm" className={cn('h-8 text-xs', vi.primaryButton)} disabled={!done} onClick={() => onCommitDraft?.(draft)}>加入画布</Button>
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant="outline" size="sm" className={cn('h-8 text-xs', vi.softButton)} disabled={!done} onClick={() => onContinueEdit?.(displayDraft)}>继续改</Button>
+        <Button type="button" size="sm" className={cn('h-8 text-xs', vi.primaryButton)} disabled={!done} onClick={() => onCommitDraft?.(displayDraft)}>加入画布</Button>
+      </div>
     </div>
   </div>;
 }
@@ -262,7 +281,7 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
         </div>)}
       </div> : null}
       {isDrafts ? <>
-        {message.draft ? <DraftCard draft={message.draft} onCommitDraft={message.onCommitDraft} /> : <div className="mt-3 grid grid-cols-2 gap-2">
+        {message.draft ? <DraftCard draft={message.draft} onCommitDraft={message.onCommitDraft} onSelectChampion={message.onSelectChampion} onContinueEdit={message.onContinueEdit} /> : <div className="mt-3 grid grid-cols-2 gap-2">
           {['初稿一', '初稿二', '初稿三', '初稿四'].map((label, index) => <div key={label} className="overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
             <div className={cn('aspect-square', index % 3 === 0 && 'bg-[linear-gradient(145deg,#fff1de,#f8e3dd)]', index % 3 === 1 && 'bg-[linear-gradient(145deg,#e7f1ec,#fffaf2)]', index % 3 === 2 && 'bg-[linear-gradient(145deg,#eef0f4,#fff1de)]')} />
             <div className="flex items-center justify-between gap-2 px-2 py-2 text-xs">
@@ -368,6 +387,16 @@ export function VisualStageClient() {
   }
 
   function removeReference(id: string) {
+    if (id.endsWith(':role')) {
+      const targetId = id.replace(':role', '');
+      const roles = ['构图', '人物', '色调', '风格', '产品', '背景'];
+      setReferences((current) => current.map((reference) => {
+        if (reference.id !== targetId) return reference;
+        const nextIndex = (roles.indexOf(reference.role ?? '') + 1) % roles.length;
+        return { ...reference, role: roles[nextIndex] };
+      }));
+      return;
+    }
     const removed = references.find((reference) => reference.id === id);
     setReferences((current) => current.filter((reference) => reference.id !== id));
     if (removed) setIntent((current) => current.replaceAll(removed.label, '').replace(/\s{2,}/g, ' ').trimStart());
@@ -398,9 +427,11 @@ export function VisualStageClient() {
   function watchTask(id: string) {
     let fallbackStarted = false;
     const onTask = (task: TaskResult) => {
-      const image = task.images?.[0];
-      setDraft({ id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, error: task.errorMessage ?? task.error ?? null });
-      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? '生成完成。草稿先在对话流中，确认后再加入画布。' : '已进入真实生成流程，等待任务返回。', draft: { id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, error: task.errorMessage ?? task.error ?? null } } : message));
+      const images = task.images ?? [];
+      const image = images[0];
+      const nextDraft = { id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, images, championIndex: 0, error: task.errorMessage ?? task.error ?? null };
+      setDraft(nextDraft);
+      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? '生成完成。先选冠军图，确认后再加入画布。' : '已进入真实生成流程，等待任务返回。', draft: { ...message.draft, ...nextDraft, championIndex: message.draft.championIndex ?? 0 }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
     };
     const fallback = async () => {
       if (fallbackStarted) return;
@@ -413,6 +444,19 @@ export function VisualStageClient() {
     }, fallback);
   }
 
+  async function requestAssistantSuggestion(userBody: string, refs: ReferenceToken[], wantsGeneration: boolean, createdAt: number) {
+    try {
+      const reply = await apiPost<{ provider: 'llm' | 'local'; title: string; body: string; chips?: string[] }>('/agent/visual-stage/reply', {
+        intent: userBody,
+        references: refs.map((reference) => ({ label: reference.label, title: reference.title, hint: reference.hint, role: reference.role })),
+        generateMode: wantsGeneration,
+      });
+      setConversation((current) => [...current, { id: `assistant-${createdAt + 1}`, tone: 'assistant', title: reply.title, body: reply.body, chips: reply.chips ?? [reply.provider === 'llm' ? '真实助手' : '本地兜底'], createdAt: createdAt + 1 }]);
+    } catch {
+      setConversation((current) => [...current, createAssistantSuggestion(userBody, refs, wantsGeneration, createdAt + 1)]);
+    }
+  }
+
   async function submit() {
     if (!intent.trim() && !references.length) return;
     const userBody = intent.trim() || references.map((reference) => reference.label).join('、');
@@ -420,8 +464,8 @@ export function VisualStageClient() {
     setConversation((current) => [
       ...current,
       { id: `user-${timestamp}`, tone: 'user', body: userBody, createdAt: timestamp },
-      createAssistantSuggestion(userBody, references, generateMode),
     ]);
+    void requestAssistantSuggestion(userBody, references, generateMode, timestamp);
     setShowDrafts(true);
     setIntent('');
     if (!generateMode) return;
@@ -431,12 +475,13 @@ export function VisualStageClient() {
       const refKeys = references.map((reference) => reference.storageKey).filter(Boolean) as string[];
       const endpoint = refKeys.length ? '/tasks/edit' : '/tasks/generate';
       const payload = refKeys.length
-        ? { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', refKeys, count: 1, timeoutSec: 600 }
+        ? { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', refKeys, count: 2, timeoutSec: 600 }
         : { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 };
       const created = await apiPost<TaskResult>(endpoint, payload);
-      const initialDraft = { id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: created.images?.[0] };
+      const initialImages = created.images ?? [];
+      const initialDraft = { id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: initialImages[0], images: initialImages, championIndex: 0 };
       setDraft(initialDraft);
-      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft, createdAt: Date.now() }]);
+      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit, createdAt: Date.now() }]);
       if (created.id) watchTask(created.id);
     } catch (error) {
       setDraft({ id: 'failed', status: 'FAILED', error: humanError(error) });
@@ -448,6 +493,17 @@ export function VisualStageClient() {
   function commitDraft(nextDraft: Draft) {
     if (!nextDraft.image) return;
     setCanvasItems((current) => [{ id: nextDraft.image?.storageKey ?? nextDraft.id, title: fileNameFromDraft(nextDraft), image: nextDraft.image }, ...current]);
+  }
+
+  function selectChampion(nextDraft: Draft, index: number) {
+    setDraft((current) => current && (current.id === nextDraft.id || current.taskId === nextDraft.taskId) ? { ...current, championIndex: index, image: current.images?.[index] ?? current.image } : current);
+    setDraftMessages((current) => current.map((message) => message.draft.id === nextDraft.id || message.draft.taskId === nextDraft.taskId ? { ...message, draft: { ...message.draft, championIndex: index, image: message.draft.images?.[index] ?? message.draft.image } } : message));
+  }
+
+  function continueEdit(nextDraft: Draft) {
+    const championIndex = nextDraft.championIndex ?? 0;
+    setIntent(`继续优化冠军图 ${championIndex + 1}：保留当前主体和构图，调整为更温润、更适合发布的版本`);
+    setGenerateMode(true);
   }
 
   const messages = useMemo<AssistantMessage[]>(() => {

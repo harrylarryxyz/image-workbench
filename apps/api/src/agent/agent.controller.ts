@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { PrismaService } from '../prisma.service';
 import { TasksService } from '../tasks/tasks.service';
 import { getRequestContext } from '../auth/request-context';
+import { createVisualStageAssistantReply } from './visual-stage-assistant';
 
 function variants(prompt: string) {
   const base = prompt.trim() || 'A refined product image concept';
@@ -50,6 +51,15 @@ export class AgentController {
     const ctx = getRequestContext(req);
     const rows = await (this.prisma as any).agentSuggestion.findMany({ where: { workspaceId: ctx.workspaceId }, orderBy: { createdAt: 'desc' }, take: 80 });
     return rows.map((row: any) => ({ ...row, createdAt: row.createdAt.toISOString(), appliedAt: row.appliedAt?.toISOString?.() ?? null }));
+  }
+
+  @Post('visual-stage/reply')
+  async visualStageReply(@Body() body: any) {
+    return createVisualStageAssistantReply({
+      intent: String(body?.intent ?? ''),
+      references: Array.isArray(body?.references) ? body.references : [],
+      generateMode: Boolean(body?.generateMode),
+    });
   }
 
   @Post('prompt-variants')
