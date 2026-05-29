@@ -51,7 +51,7 @@ test('visual stage route encodes the creation-case router product contract', () 
     '发送',
     '参数',
     '生成草稿',
-    '轻量画布预告',
+    'Creation Board',
     '草稿确认后进画布',
     '中文优先',
   ]) {

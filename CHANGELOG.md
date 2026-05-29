@@ -10,6 +10,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 - Fixed the first Visual Stage MVP usability gaps: ordinary chat now creates a visible 助手建议 response, Visual Stage state is restored after refresh, and pending generation tasks resume through polling so completed drafts can appear even if SSE is unavailable.
 - Wired the `/visual-stage` real creative assistant and draft decision loop: OpenAI-compatible `/agent/visual-stage/reply` with local Chinese fallback, server-side secret isolation, reference role metadata, comparison draft sets, champion selection, continue-edit prompts, and explicit champion commit into the lightweight canvas preview.
 - Tightened Visual Stage chat/reference UX: typing no longer appears in the thread before send, send clears the composer, refresh preserves and auto-scrolls to the latest exchange, generated drafts remain visible when 出图 is toggled off, polling can reconcile already-finished tasks immediately when SSE is unavailable, long draft filenames truncate safely, reference images no longer create automatic chat descriptions, and the reference tray uses visible `@图片N` chips with token-only horizontal scrolling plus deletion.
+- Upgraded `/visual-stage` into a Creation Board MVP: confirmed champion images now carry the source intent, reference-role summary, branch count, main-image framing, “把主图作为参考” reuse, and reference-role guidance is injected into assistant/generation prompts without exposing storage keys or provider details.
 
 ### Added
 

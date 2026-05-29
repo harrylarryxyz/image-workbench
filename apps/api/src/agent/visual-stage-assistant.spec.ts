@@ -1,5 +1,21 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { createVisualStageAssistantReply } from './visual-stage-assistant';
+import { buildReferenceGuidance, createVisualStageAssistantReply } from './visual-stage-assistant';
+
+describe('buildReferenceGuidance', () => {
+  it('turns reference roles into user-readable generation guidance without storage keys', () => {
+    const guidance = buildReferenceGuidance([
+      { label: '@图片1', role: '产品', title: 'secret-product.png', hint: 'local://uploads/default/secret-product.png' },
+      { label: '@图片2', role: '色调', title: 'mood.png', hint: '只取暖色气质' },
+      { label: '@图片3', role: '背景', title: 'bg.png', hint: '背景氛围' },
+    ]);
+
+    expect(guidance).toContain('@图片1 作为产品参考，优先保持主体和关键细节');
+    expect(guidance).toContain('@图片2 只作为色调参考');
+    expect(guidance).toContain('@图片3 作为背景参考');
+    expect(guidance).not.toContain('local://');
+    expect(guidance).not.toContain('secret-product.png');
+  });
+});
 
 describe('createVisualStageAssistantReply', () => {
   const originalFetch = global.fetch;

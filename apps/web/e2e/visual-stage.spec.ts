@@ -18,7 +18,7 @@ test('Visual Stage mobile-first creation assistant prototype renders without deb
   await expect(page.getByRole('button', { name: '添加本地新图片' })).toBeVisible();
   await expect(page.getByRole('button', { name: '引用素材或历史图片' })).toBeVisible();
   await expect(page.getByRole('button', { name: '出图关' })).toBeVisible();
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('轻量画布预告');
+  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('Creation Board');
   await expect(page.getByTestId('visual-stage-shell')).not.toContainText(forbiddenMainFlow);
 });
 
@@ -278,6 +278,52 @@ test('Visual Stage supports comparison drafts, champion selection, continue-edit
   await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/继续优化冠军图 2/);
   await page.getByRole('button', { name: '加入画布' }).click();
   await expect(page.getByTestId('mobile-canvas-preview')).toContainText('draft-b.png');
+});
+
+test('Visual Stage Creation Board tracks intent, references, champion, branches, and reuses board image as reference', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/assets/upload', async (route) => {
+    await route.fulfill({ json: { storageKey: 'local://uploads/default/board-product.png', assetUrl: '/assets/file?key=local%3A%2F%2Fuploads%2Fdefault%2Fboard-product.png', originalName: 'board-product.png', format: 'png', sizeBytes: tinyPng.length } });
+  });
+  await page.route('**/api/agent/visual-stage/reply', async (route) => {
+    await route.fulfill({ json: { provider: 'llm', title: '创作判断', body: '我会参考 @图片1 的产品，保持主体。', chips: ['产品保真'] } });
+  });
+  await page.route('**/api/tasks/edit', async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.prompt).toContain('参考使用规则：@图片1 作为产品参考，优先保持主体和关键细节');
+    await route.fulfill({ json: { id: 'task_board_case', type: 'image.edit', status: 'QUEUED' } });
+  });
+  await page.route('**/api/tasks/task_board_case/events', async (route) => route.fulfill({ status: 500, body: 'stream unavailable' }));
+  await page.route('**/api/tasks/task_board_case', async (route) => {
+    await route.fulfill({ json: { id: 'task_board_case', type: 'image.edit', status: 'SUCCEEDED', images: [
+      { storageKey: 'local://outputs/default/board-a.png', assetUrl: '/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2Fboard-a.png', format: 'png', sizeBytes: 1234 },
+      { storageKey: 'local://outputs/default/board-b.png', assetUrl: '/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2Fboard-b.png', format: 'png', sizeBytes: 1234 },
+    ] } });
+  });
+
+  await page.goto('/visual-stage');
+  await page.locator('input[type="file"][aria-label="选择本地新图片"]').setInputFiles({ name: 'board-product.png', mimeType: 'image/png', buffer: tinyPng });
+  for (let i = 0; i < 5; i += 1) {
+    await page.getByRole('button', { name: /用途/ }).click();
+  }
+  await expect(page.getByTestId('composer-reference-tokens')).toContainText('产品');
+  await page.getByLabel('描述你想创作的画面').fill('@图片1 做一张温润纸面感产品海报');
+  await page.getByRole('button', { name: '出图关' }).click();
+  await page.getByRole('button', { name: '发送出图' }).click();
+  await page.getByRole('button', { name: '选择第 2 张为冠军图' }).click();
+  await page.getByRole('button', { name: '继续改' }).click();
+  await page.getByRole('button', { name: '加入画布' }).click();
+
+  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('Creation Board');
+  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('做一张温润纸面感产品海报');
+  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('@图片1 · 产品');
+  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('主图 · board-b.png');
+  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('分支 1');
+
+  await page.getByRole('button', { name: '把主图作为参考' }).click();
+  await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片2');
+  await expect(page.getByTestId('composer-reference-tokens')).toContainText('风格');
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/@图片2/);
 });
 
 

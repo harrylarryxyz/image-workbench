@@ -38,7 +38,7 @@ function localReply(input: VisualStageAssistantInput): VisualStageAssistantReply
   const hasReferences = input.references.length > 0;
   const useCase = /小红书|封面|海报|宣传|首图|banner|Banner/i.test(intent) ? '使用场景已经比较明确' : '使用场景还可以再补一句';
   const referenceHint = hasReferences
-    ? `已看到 ${input.references.map((item) => item.label).filter(Boolean).join('、')}，建议明确每张图负责构图、人物、色调、风格或产品中的哪一类。`
+    ? `已看到 ${input.references.map((item) => item.label).filter(Boolean).join('、')}，${buildReferenceGuidance(input.references)}建议按用途分工生成。`
     : '建议补充一张参考图，或用一句话说明风格锚点。';
   return {
     provider: 'local',
@@ -46,6 +46,26 @@ function localReply(input: VisualStageAssistantInput): VisualStageAssistantReply
     body: `针对「${intent}」：${useCase}。${referenceHint} 下一步优先锁定主体、比例、发布渠道和不能改变的元素。${input.generateMode ? '我会先生成草稿，确认后再加入画布。' : '如果只是讨论，不会消耗生图额度；打开出图后再生成。'}`,
     chips: [input.generateMode ? '准备出图' : '普通对话', hasReferences ? '已带参考图' : '建议补参考', '可继续细化'],
   };
+}
+
+export function buildReferenceGuidance(references: VisualStageReference[]) {
+  const roleCopy: Record<string, string> = {
+    构图: '作为构图参考，优先学习画面结构、景别和留白关系',
+    人物: '作为人物参考，优先保持人物姿态、气质和身份一致性',
+    色调: '只作为色调参考，提取冷暖、明暗和饱和度气质，不改变主体',
+    风格: '只作为风格参考，提取材质、镜头感和设计语言，不复制具体内容',
+    产品: '作为产品参考，优先保持主体和关键细节',
+    背景: '作为背景参考，服务主体但不抢画面中心',
+  };
+  const lines = references
+    .map((reference) => {
+      const label = sanitizeText(reference.label, '@图片');
+      const role = sanitizeText(reference.role, '参考');
+      const rule = roleCopy[role] ?? '作为参考图使用，先确认它负责的用途再生成';
+      return `${label} ${rule}`;
+    })
+    .filter(Boolean);
+  return lines.length ? `参考使用规则：${lines.join('；')}。` : '';
 }
 
 export async function createVisualStageAssistantReply(input: VisualStageAssistantInput): Promise<VisualStageAssistantReply> {
@@ -77,6 +97,7 @@ export async function createVisualStageAssistantReply(input: VisualStageAssistan
             content: JSON.stringify({
               intent: input.intent,
               generateMode: input.generateMode,
+              referenceGuidance: buildReferenceGuidance(input.references),
               references: input.references.map((item) => ({ label: item.label, role: item.role, title: item.title, hint: item.hint })),
             }),
           },

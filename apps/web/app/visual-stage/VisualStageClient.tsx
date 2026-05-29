@@ -60,6 +60,9 @@ type CanvasItem = {
   id: string;
   title: string;
   image?: TaskImage;
+  intent?: string;
+  references?: ReferenceToken[];
+  branchCount?: number;
 };
 
 type AssistantMessage = {
@@ -112,6 +115,8 @@ const sourceClass: Record<ReferenceSource, string> = {
   history: 'border-[#e9d8c4] bg-[#fff1de] text-[#45506a]',
 };
 
+const referenceRoles = ['构图', '人物', '色调', '风格', '产品', '背景'];
+
 const advancedReferences: Omit<ReferenceToken, 'id' | 'label'>[] = [
   { source: 'asset', title: '素材库：海报氛围图', hint: '引用素材图片，后续可扩展为素材库检索' },
   { source: 'history', title: '对话历史：上一张初稿', hint: '引用对话历史图片，后续可扩展为历史图选择器' },
@@ -144,6 +149,19 @@ function fileNameFromDraft(draft: Draft) {
   const key = draft.image?.storageKey ?? draft.image?.assetUrl ?? '生成草稿';
   const name = decodeURIComponent(key.split('?')[0]).split('/').pop() ?? '生成草稿';
   return name.length > 34 ? `${name.slice(0, 18)}…${name.slice(-12)}` : name;
+}
+
+function buildReferenceGuidance(references: ReferenceToken[]) {
+  const roleCopy: Record<string, string> = {
+    构图: '作为构图参考，优先学习画面结构、景别和留白关系',
+    人物: '作为人物参考，优先保持人物姿态、气质和身份一致性',
+    色调: '只作为色调参考，提取冷暖、明暗和饱和度气质，不改变主体',
+    风格: '只作为风格参考，提取材质、镜头感和设计语言，不复制具体内容',
+    产品: '作为产品参考，优先保持主体和关键细节',
+    背景: '作为背景参考，服务主体但不抢画面中心',
+  };
+  const lines = references.map((reference) => `${reference.label} ${roleCopy[reference.role ?? ''] ?? '作为参考图使用，先确认它负责的用途再生成'}`);
+  return lines.length ? `参考使用规则：${lines.join('；')}。` : '';
 }
 
 function assetSrc(assetUrl?: string) {
@@ -199,7 +217,7 @@ function PhoneFrame({ children }: { children: ReactNode }) {
 function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void }) {
   const src = assetSrc(reference.assetUrl);
   if (tray) {
-    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[6.8rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
+    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[8.25rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
       <span className="min-w-0 flex-1 truncate font-semibold">{reference.label}</span>
       {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
       <Button type="button" variant="ghost" size="sm" aria-label={`${reference.label} 用途`} className="h-6 shrink-0 rounded-full px-1.5 text-[0.62rem] opacity-80" onClick={() => onRemove?.(`${reference.id}:role`)}>{reference.role ?? '用途'}</Button>
@@ -298,24 +316,35 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
   </div>;
 }
 
-function CanvasPreview({ items }: { items: CanvasItem[] }) {
+function CanvasPreview({ items, onReuse }: { items: CanvasItem[]; onReuse?: (item: CanvasItem) => void }) {
   const latest = items[0];
   return <Card data-testid="mobile-canvas-preview" className={cn('rounded-[1.6rem]', vi.paperPanel)}>
     <CardContent className="p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <b className="block text-[#253048]">轻量画布预告</b>
-          <span className="text-xs text-[#6b7488]">生成草稿确认后才加入画布</span>
+          <b className="block text-[#253048]">Creation Board</b>
+          <span className="text-xs text-[#6b7488]">创作案画布：意图、参考、冠军图和分支都在这里沉淀</span>
         </div>
         <Badge variant="outline" className={cn('rounded-full px-3 py-1', latest ? vi.coralPill : vi.sagePill)}>{latest ? '已加入画布' : '不污染画布'}</Badge>
       </div>
       <div className="relative min-h-56 overflow-hidden rounded-[1.35rem] border border-[#e9d8c4] bg-[#fff1de]/70 p-4">
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(104,85,66,0.16)_1px,transparent_0)] bg-[size:18px_18px] opacity-35" />
         {latest ? <div className="relative grid gap-3">
+          <div className="rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2] p-3 text-xs text-[#45506a] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">
+            <b className="mb-1 block text-[#253048]">创作目标</b>
+            <span>{latest.intent ?? '已确认的创作目标'}</span>
+          </div>
+          {latest.references?.length ? <div className="flex gap-2 overflow-x-auto pb-1">
+            {latest.references.map((reference) => <Badge key={reference.id} variant="outline" className={cn('shrink-0 rounded-full px-2 py-1 text-[0.68rem]', vi.sagePill)}>{reference.label} · {reference.role ?? '参考'}</Badge>)}
+          </div> : null}
           <div className="overflow-hidden rounded-[1rem] border border-[#f2d6cf] bg-[#fffaf2] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">
             <div className="aspect-[4/3] bg-[linear-gradient(145deg,#fff1de,#f8e3dd)]">{imageUrl(latest.image) ? <img src={imageUrl(latest.image) ?? ''} alt="已加入画布" className="h-full w-full object-cover" /> : null}</div>
-            <div className="px-3 py-2 text-xs text-[#253048]">{latest.title}</div>
+            <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-[#253048]">
+              <span className="min-w-0 truncate">主图 · {latest.title}</span>
+              <Badge variant="outline" className={cn('shrink-0 rounded-full px-2 py-0.5', vi.coralPill)}>分支 {latest.branchCount ?? 0}</Badge>
+            </div>
           </div>
+          <Button type="button" variant="outline" size="sm" className={cn('h-8 rounded-full text-xs', vi.softButton)} onClick={() => latest && onReuse?.(latest)}>把主图作为参考</Button>
         </div> : <div className="relative grid gap-3">
           <div className="w-[72%] rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2] p-3 text-xs text-[#45506a] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">创作意图</div>
           <div className="ml-auto w-[70%] rounded-[1rem] border border-[#d6e7df] bg-[#e7f1ec] p-3 text-xs text-[#486e64] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">@图片 引用关系</div>
@@ -339,6 +368,8 @@ export function VisualStageClient() {
   const [loading, setLoading] = useState(false);
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const lastIntentRef = useRef('');
+  const lastReferencesRef = useRef<ReferenceToken[]>([]);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -387,13 +418,17 @@ export function VisualStageClient() {
   }
 
   function removeReference(id: string) {
+    if (id.includes(':role:')) {
+      const [targetId, , role] = id.split(':');
+      setReferences((current) => current.map((reference) => reference.id === targetId ? { ...reference, role } : reference));
+      return;
+    }
     if (id.endsWith(':role')) {
       const targetId = id.replace(':role', '');
-      const roles = ['构图', '人物', '色调', '风格', '产品', '背景'];
       setReferences((current) => current.map((reference) => {
         if (reference.id !== targetId) return reference;
-        const nextIndex = (roles.indexOf(reference.role ?? '') + 1) % roles.length;
-        return { ...reference, role: roles[nextIndex] };
+        const nextIndex = (referenceRoles.indexOf(reference.role ?? '') + 1) % referenceRoles.length;
+        return { ...reference, role: referenceRoles[nextIndex] };
       }));
       return;
     }
@@ -474,9 +509,12 @@ export function VisualStageClient() {
     try {
       const refKeys = references.map((reference) => reference.storageKey).filter(Boolean) as string[];
       const endpoint = refKeys.length ? '/tasks/edit' : '/tasks/generate';
+      const prompt = `${intent.trim()}\n${buildReferenceGuidance(references)}`.trim();
+      lastIntentRef.current = intent.trim();
+      lastReferencesRef.current = references;
       const payload = refKeys.length
-        ? { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', refKeys, count: 2, timeoutSec: 600 }
-        : { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 };
+        ? { prompt, model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', refKeys, count: 2, timeoutSec: 600 }
+        : { prompt, model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 };
       const created = await apiPost<TaskResult>(endpoint, payload);
       const initialImages = created.images ?? [];
       const initialDraft = { id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: initialImages[0], images: initialImages, championIndex: 0 };
@@ -492,7 +530,13 @@ export function VisualStageClient() {
 
   function commitDraft(nextDraft: Draft) {
     if (!nextDraft.image) return;
-    setCanvasItems((current) => [{ id: nextDraft.image?.storageKey ?? nextDraft.id, title: fileNameFromDraft(nextDraft), image: nextDraft.image }, ...current]);
+    setCanvasItems((current) => [{ id: nextDraft.image?.storageKey ?? nextDraft.id, title: fileNameFromDraft(nextDraft), image: nextDraft.image, intent: lastIntentRef.current, references: lastReferencesRef.current, branchCount: current.length + 1 }, ...current]);
+  }
+
+  function reuseCanvasImage(item: CanvasItem) {
+    if (!item.image) return;
+    const nextNumber = references.length + 1;
+    pushReference({ id: `canvas-${nextNumber}`, label: `@图片${nextNumber}`, source: 'history', title: item.title, hint: '来自 Creation Board 主图，可继续作为风格或成片参考。', role: '风格', storageKey: item.image.storageKey, assetUrl: item.image.assetUrl });
   }
 
   function selectChampion(nextDraft: Draft, index: number) {
@@ -540,7 +584,7 @@ export function VisualStageClient() {
             本切片固定移动端创作助手：＋添加本地新图片，@引用素材图片或对话历史图片；默认普通对话，打开出图后才进入生成草稿。
           </p>
         </div>
-        <CanvasPreview items={canvasItems} />
+        <CanvasPreview items={canvasItems} onReuse={reuseCanvasImage} />
       </div>
 
       <PhoneFrame>
