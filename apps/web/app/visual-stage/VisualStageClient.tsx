@@ -6,14 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { deriveCreationCase } from './creation-case';
+import { deriveCreationCase, type ComparisonCandidate, type RouteState } from './creation-case';
 import { referenceTerritoryFixtures, visualStageComparisonPlaceholders, visualStageScaffolds } from './visual-stage-fixtures';
 
-const routeLabels = [
-  { label: 'Reference-first', detail: '模糊审美先看方向，不把用户推入 prompt craft。' },
-  { label: 'Generate-first', detail: '锚点足够时先给可判断首稿。' },
-  { label: 'Ask-first', detail: '只阻塞硬事实和权利风险，舞台不断电。' },
+const routeLabels: { route: RouteState; label: string; detail: string }[] = [
+  { route: 'reference-first', label: 'Reference-first', detail: '模糊审美先看方向，不把用户推入 prompt craft。' },
+  { route: 'generate-first', label: 'Generate-first', detail: '锚点足够时先给可判断首稿。' },
+  { route: 'ask-first', label: 'Ask-first', detail: '只阻塞硬事实和权利风险，舞台不断电。' },
 ];
+
+const routeDisplay: Record<RouteState, string> = {
+  'reference-first': 'Reference-first',
+  'generate-first': 'Generate-first',
+  'ask-first': 'Ask-first',
+};
 
 function GlowOrb({ className }: { className?: string }) {
   return <div aria-hidden="true" className={cn('pointer-events-none absolute rounded-full blur-3xl', className)} />;
@@ -22,7 +28,28 @@ function GlowOrb({ className }: { className?: string }) {
 export function VisualStageClient() {
   const [intent, setIntent] = useState('');
   const [started, setStarted] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackCandidates, setFeedbackCandidates] = useState<ComparisonCandidate[]>([]);
   const creationCase = useMemo(() => deriveCreationCase(started ? intent : ''), [intent, started]);
+  const champion = creationCase.champion ?? visualStageComparisonPlaceholders[0];
+  const comparisonBase = creationCase.comparisons.length ? creationCase.comparisons : visualStageComparisonPlaceholders.slice(1);
+  const comparisons = [...feedbackCandidates, ...comparisonBase].slice(0, 4);
+  const territories = creationCase.referenceTerritories.length ? creationCase.referenceTerritories : referenceTerritoryFixtures;
+  const generateDisabled = !started || creationCase.route === 'ask-first';
+
+  function startCase() {
+    setStarted(true);
+    setFeedbackMessage('');
+    setFeedbackCandidates([]);
+  }
+
+  function addJudgmentFeedback(label: string, summary: string) {
+    setFeedbackCandidates((previous) => [
+      { id: `feedback-${label}`, label, summary },
+      ...previous.filter((candidate) => candidate.label !== label),
+    ].slice(0, 2));
+    setFeedbackMessage('反馈已记录 · Case updated · 创作案已更新');
+  }
 
   return <section data-testid="visual-stage-shell" className="relative min-w-0 overflow-hidden pb-10 text-foreground">
     <GlowOrb className="-right-24 top-4 h-72 w-72 bg-primary/20" />
@@ -62,7 +89,7 @@ export function VisualStageClient() {
                   <div className="flex flex-wrap gap-2">
                     {visualStageScaffolds.map((scaffold) => <Badge key={scaffold} variant="outline" className="rounded-full border-white/10 bg-white/[0.03] text-muted-foreground">{scaffold}</Badge>)}
                   </div>
-                  <Button onClick={() => setStarted(true)} className="rounded-full px-5" disabled={!intent.trim()}>整理创作案 · Start Visual Stage</Button>
+                  <Button onClick={startCase} className="rounded-full px-5" disabled={!intent.trim()}>整理创作案 · Start Visual Stage</Button>
                 </div>
               </CardContent>
             </Card>
@@ -76,16 +103,26 @@ export function VisualStageClient() {
               <CardDescription>紧凑显示系统理解、锚点状态、路由理由和下一步，不把整张表单压给用户。</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className="rounded-full bg-primary/15 text-primary">Route · {routeDisplay[creationCase.route]}</Badge>
+                <Badge variant="outline" className="rounded-full border-white/10">{creationCase.nextAction}</Badge>
+              </div>
               <p className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm leading-6 text-muted-foreground">{creationCase.intentSummary}</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {creationCase.anchors.map((anchor) => <div key={anchor.key} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                   <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{anchor.label}</span>
                   <p className="mt-1 text-sm font-medium">{anchor.value ?? 'Missing / 待补齐'}</p>
+                  <span className={cn('mt-2 inline-flex rounded-full px-2 py-0.5 text-[0.68rem]', anchor.hardBlocker ? 'bg-destructive/15 text-destructive' : 'bg-white/10 text-muted-foreground')}>{anchor.hardBlocker ? 'Hard blocker' : anchor.state}</span>
                 </div>)}
               </div>
               <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm leading-6">
                 {creationCase.routeReason}
               </div>
+              <div data-testid="visual-stage-assumptions" className="grid gap-2 rounded-2xl border border-white/10 bg-black/20 p-3 text-xs text-muted-foreground">
+                <b className="text-foreground">Assumptions / 假设</b>
+                {(creationCase.assumptions.length ? creationCase.assumptions : ['No assumptions yet / 暂无假设']).map((assumption) => <span key={assumption}>{assumption}</span>)}
+              </div>
+              <Button className="rounded-full" disabled={generateDisabled}>开始生成 · Generate mock draft</Button>
             </CardContent>
           </Card>
 
@@ -95,7 +132,7 @@ export function VisualStageClient() {
               <CardDescription>三路路由是产品状态，不是用户需要先选的模式。</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
-              {routeLabels.map((route) => <div key={route.label} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              {routeLabels.map((route) => <div key={route.label} className={cn('rounded-2xl border p-3', creationCase.route === route.route ? 'border-primary/30 bg-primary/10' : 'border-white/10 bg-black/20')}>
                 <b className="text-sm">{route.label}</b>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">{route.detail}</p>
               </div>)}
@@ -105,16 +142,30 @@ export function VisualStageClient() {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.55fr)]">
-        <Card className="rounded-[1.5rem] border-white/10 bg-white/[0.035]">
+        <Card data-testid="visual-stage-champion" className="rounded-[1.5rem] border-white/10 bg-white/[0.035]">
           <CardHeader>
-            <CardTitle data-testid="visual-stage-champion">Champion + Comparison Set</CardTitle>
+            <CardTitle>Champion + Comparison Set</CardTitle>
             <CardDescription>当前最佳与 2–4 个有意义备选保持可见，反馈从判断开始。</CardDescription>
           </CardHeader>
-          <CardContent data-testid="visual-stage-comparison" className="grid gap-3 md:grid-cols-2">
-            {visualStageComparisonPlaceholders.map((candidate) => <div key={candidate.id} className={cn('rounded-2xl border p-4', candidate.active ? 'border-primary/30 bg-primary/10' : 'border-white/10 bg-black/20')}>
-              <b>{candidate.label}</b>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{candidate.summary}</p>
-            </div>)}
+          <CardContent className="grid gap-4">
+            <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+              <b>{champion.label}</b>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{champion.summary}</p>
+            </div>
+            <div data-testid="visual-stage-comparison" className="grid gap-3 md:grid-cols-2">
+              <div className="md:col-span-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">Comparison Set · 对比备选</div>
+              {comparisons.map((candidate) => <div key={candidate.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <b>{candidate.label}</b>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{candidate.summary}</p>
+              </div>)}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => addJudgmentFeedback('更克制版', '减少霓虹与装饰，保留黑金质感和专业可信。')}>更克制</Button>
+              <Button variant="outline" size="sm" onClick={() => addJudgmentFeedback('更大胆版', '强化对比和视觉冲击，但不牺牲用途清晰度。')}>更大胆</Button>
+              <Button variant="outline" size="sm" onClick={() => addJudgmentFeedback('不要霓虹版', '移除赛博霓虹，把高级感转向材质、留白和光影。')}>不要霓虹</Button>
+              <Button variant="outline" size="sm" onClick={() => addJudgmentFeedback('更商业版', '强化产品、卖点和投放场景，避免艺术化过头。')}>更商业</Button>
+            </div>
+            <p data-testid="visual-stage-feedback-status" className="min-h-5 text-sm text-primary">{feedbackMessage}</p>
           </CardContent>
         </Card>
 
@@ -124,13 +175,17 @@ export function VisualStageClient() {
             <CardDescription>参考是方向簇，不是模板库；Ask-first 会显示 Unblocker Card。</CardDescription>
           </CardHeader>
           <CardContent data-testid="reference-territories" className="grid gap-3">
-            <div className="rounded-2xl border border-primary/25 bg-primary/10 p-3">
-              <b className="text-sm">Unblocker Card · 不让舞台死掉</b>
+            <div data-testid="visual-stage-unblocker" className="rounded-2xl border border-primary/25 bg-primary/10 p-3">
+              <b className="text-sm">{creationCase.blocker?.title ?? 'Unblocker Card · 不让舞台死掉'}</b>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">缺少主体、来源或权利信息时，只补齐关键锚点，不把用户退回问卷。</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(creationCase.blocker?.actions ?? ['上传照片', '抽象头像']).map((action) => <Badge key={action} variant="outline" className="rounded-full border-white/10">{action}</Badge>)}
+              </div>
             </div>
-            {referenceTerritoryFixtures.map((territory) => <div key={territory.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+            {territories.map((territory) => <div key={territory.id} className="rounded-2xl border border-white/10 bg-black/20 p-3">
               <b className="text-sm">{territory.label}</b>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">{territory.reason}</p>
+              <p className="mt-2 text-[0.68rem] text-muted-foreground">{territory.cues.join(' · ')}</p>
             </div>)}
           </CardContent>
         </Card>
