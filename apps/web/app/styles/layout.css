@@ -63,6 +63,23 @@
   line-height: 1.45;
 }
 .main { min-width: 0; padding: 26px clamp(18px, 3vw, 36px) 42px; }
+.full-bleed-page {
+  margin: -26px calc(clamp(18px, 3vw, 36px) * -1) -42px;
+}
+body:has(.immersive-visual-stage-page) .sidebar,
+body:has(.immersive-visual-stage-page) .mobile-topbar {
+  display: none;
+}
+body:has(.immersive-visual-stage-page) .shell {
+  display: block;
+  min-height: 100vh;
+}
+body:has(.immersive-visual-stage-page) .main {
+  padding: 0;
+}
+body:has(.immersive-visual-stage-page) .full-bleed-page {
+  margin: 0;
+}
 .page-header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
 .page-header-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 

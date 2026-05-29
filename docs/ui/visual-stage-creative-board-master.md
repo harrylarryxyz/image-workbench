@@ -114,6 +114,10 @@ Mobile must not become a crude stacked desktop:
 - Creation Case remains legible in compact cards;
 - Reference Canvas and Comparison Set remain available without a separate history page;
 - horizontal overflow must stay at zero.
+- `/visual-stage` can use an immersive route-isolated shell: old project title, sidebar, and mobile menu must not appear on the review surface.
+- Image references support two entry paths: `＋` is biased toward local new-image upload; `@` is the advanced path for referencing asset-library images or conversation-history images.
+- Reference images appear as `@图片1`, `@图片2` tokens inside the composer text, so the user can write instructions around them.
+- Default send is ordinary conversation. Generation only happens after an explicit 出图 switch; generated drafts stay in the chat thread until the user confirms adding them to the canvas.
 
 ## Regression hooks
 

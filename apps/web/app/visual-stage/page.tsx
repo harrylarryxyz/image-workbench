@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function VisualStagePage() {
-  return <VisualStageClient />;
+  return <div className="full-bleed-page immersive-visual-stage-page"><VisualStageClient /></div>;
 }

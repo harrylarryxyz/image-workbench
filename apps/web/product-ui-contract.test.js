@@ -44,10 +44,15 @@ test('visual stage route encodes the creation-case router product contract', () 
     '移动端优先',
     '创作助手',
     '描述你想要的画面、用途或修改想法',
-    '参考图',
-    '生成初稿',
+    '＋添加本地新图片',
+    '@引用素材图片或对话历史图片',
+    '@图片1',
+    '出图关',
+    '发送',
+    '参数',
+    '生成草稿',
     '轻量画布预告',
-    '结果会进入画布',
+    '草稿确认后进画布',
     '中文优先',
   ]) {
     assert.match(surface, new RegExp(escapeRegExp(marker)), `visual stage missing ${marker}`);
