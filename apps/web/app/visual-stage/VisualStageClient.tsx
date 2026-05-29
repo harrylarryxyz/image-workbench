@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -70,6 +70,27 @@ type AssistantMessage = {
   onCommitDraft?: (draft: Draft) => void;
 };
 
+type ConversationEntry = {
+  id: string;
+  tone: 'user' | 'assistant';
+  title?: string;
+  body: string;
+  chips?: string[];
+  references?: ReferenceToken[];
+};
+
+type PersistedVisualStageSession = {
+  intent: string;
+  references: ReferenceToken[];
+  generateMode: boolean;
+  showDrafts: boolean;
+  draft: Draft | null;
+  canvasItems: CanvasItem[];
+  conversation: ConversationEntry[];
+};
+
+const sessionStorageKey = 'image-workbench.visual-stage.session.v1';
+
 const sourceLabel: Record<ReferenceSource, string> = {
   local: '本地新图片',
   asset: '素材图片',
@@ -113,6 +134,39 @@ function humanError(error: unknown) {
 function fileNameFromDraft(draft: Draft) {
   const key = draft.image?.storageKey ?? draft.image?.assetUrl ?? '生成草稿';
   return decodeURIComponent(key.split('?')[0]).split('/').pop() ?? '生成草稿';
+}
+
+function createAssistantSuggestion(intent: string, references: ReferenceToken[], generateMode: boolean): ConversationEntry {
+  const hasReference = references.length > 0;
+  const useCase = /小红书|封面|海报|宣传|首图/.test(intent) ? '使用场景已经比较明确' : '使用场景还可以再补一句';
+  const referenceHint = hasReference ? `已识别 ${references.map((item) => item.label).join('、')}，出图时会把这些参考图作为画面锚点。` : '建议补充一张参考图或一句风格锚点，这样第一张会更接近你想要的感觉。';
+  return {
+    id: `assistant-${Date.now()}`,
+    tone: 'assistant',
+    title: generateMode ? '出图前建议' : '助手建议',
+    body: `${useCase}。${referenceHint} 建议补充：主体、画面比例、发布渠道和不能改变的元素。${generateMode ? '我会先生成草稿，确认后再加入画布。' : '如果只是讨论，我不会消耗生图额度；打开出图后再生成。'}`,
+    chips: [generateMode ? '准备出图' : '普通对话', hasReference ? '已带参考图' : '建议补参考', '建议补充'],
+    references,
+  };
+}
+
+function loadPersistedSession(): Partial<PersistedVisualStageSession> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(sessionStorageKey);
+    return raw ? JSON.parse(raw) as Partial<PersistedVisualStageSession> : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedSession(session: PersistedVisualStageSession) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(sessionStorageKey, JSON.stringify(session));
+  } catch {
+    // localStorage can be unavailable in private mode; keep the live session usable.
+  }
 }
 
 function Glow({ className }: { className?: string }) {
@@ -245,7 +299,27 @@ export function VisualStageClient() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(false);
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
+  const [conversation, setConversation] = useState<ConversationEntry[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const persisted = loadPersistedSession();
+    if (!persisted) return;
+    setIntent(persisted.intent ?? '');
+    setReferences(persisted.references ?? []);
+    setGenerateMode(Boolean(persisted.generateMode));
+    setShowDrafts(Boolean(persisted.showDrafts));
+    setDraft(persisted.draft ?? null);
+    setCanvasItems(persisted.canvasItems ?? []);
+    setConversation(persisted.conversation ?? []);
+    if (persisted.draft?.taskId && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(persisted.draft.status)) watchTask(persisted.draft.taskId);
+    // Hydrate client-only persisted session once after SSR.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    savePersistedSession({ intent, references, generateMode, showDrafts, draft, canvasItems, conversation });
+  }, [canvasItems, conversation, draft, generateMode, intent, references, showDrafts]);
 
   function appendToken(reference: ReferenceToken) {
     setIntent((current) => {
@@ -312,6 +386,12 @@ export function VisualStageClient() {
 
   async function submit() {
     if (!intent.trim() && !references.length) return;
+    const userBody = intent.trim() || references.map((reference) => reference.label).join('、');
+    setConversation((current) => [
+      ...current,
+      { id: `user-${Date.now()}`, tone: 'user', body: userBody, references },
+      createAssistantSuggestion(userBody, references, generateMode),
+    ]);
     setShowDrafts(true);
     if (!generateMode) return;
     setLoading(true);
@@ -338,7 +418,7 @@ export function VisualStageClient() {
   }
 
   const messages = useMemo<AssistantMessage[]>(() => {
-    const next = [...initialMessages];
+    const next = [...initialMessages, ...conversation];
     if (references.length) {
       next.push({
         id: 'reference',
@@ -376,7 +456,7 @@ export function VisualStageClient() {
       });
     }
     return next;
-  }, [draft, generateMode, intent, loading, references, showDrafts]);
+  }, [conversation, draft, generateMode, intent, loading, references, showDrafts]);
 
   return <section data-testid="visual-stage-shell" data-vi="warm-editorial-board-v1" aria-label={vi.system} className={vi.shell}>
     <div aria-hidden="true" className={vi.wash} />

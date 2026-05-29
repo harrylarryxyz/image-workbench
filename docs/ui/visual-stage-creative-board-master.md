@@ -119,6 +119,7 @@ Mobile must not become a crude stacked desktop:
 - Reference images appear as `@图片1`, `@图片2` tokens inside the composer text, so the user can write instructions around them.
 - Default send is ordinary conversation. Generation only happens after an explicit 出图 switch; generated drafts stay in the chat thread until the user confirms adding them to the canvas.
 - MVP implementation should reuse existing Workbench upload/task APIs: local image → `/assets/upload`; generation with references → `/tasks/edit`; text-only generation → `/tasks/generate`; task updates through SSE with polling fallback.
+- Ordinary conversation must produce a visible Chinese 助手建议 response even when 出图 is off; Visual Stage session state should persist locally so refresh preserves chat, references, draft status, and canvas preview.
 - Public UI must show human Chinese statuses such as 生成中、生成完成、加入画布; it must not expose raw HTTP response bodies, provider routes, storage keys, or task JSON.
 
 ## Regression hooks

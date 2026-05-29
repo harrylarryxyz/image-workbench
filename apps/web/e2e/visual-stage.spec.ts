@@ -76,6 +76,54 @@ test('Visual Stage supports + local image and @ advanced reference tokens on mob
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+test('Visual Stage ordinary chat sends a real assistant suggestion and persists conversation after refresh', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto('/visual-stage');
+  await page.getByLabel('描述你想创作的画面').fill('我想做一张温润杂志感护肤品海报，适合小红书首图');
+  await page.getByRole('button', { name: '发送' }).click();
+
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('我想做一张温润杂志感护肤品海报');
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('助手建议');
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('建议补充');
+
+  await page.reload();
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('我想做一张温润杂志感护肤品海报');
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('助手建议');
+});
+
+test('Visual Stage restores a pending generation after refresh and shows completed draft from polling', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.route('**/api/tasks/generate', async (route) => {
+    await route.fulfill({ json: { id: 'task_resume_visual_stage', type: 'image.generate', status: 'QUEUED' } });
+  });
+  await page.route('**/api/tasks/task_resume_visual_stage/events', async (route) => {
+    await route.fulfill({ status: 500, body: 'stream unavailable' });
+  });
+  await page.route('**/api/tasks/task_resume_visual_stage', async (route) => {
+    await route.fulfill({
+      json: {
+        id: 'task_resume_visual_stage',
+        type: 'image.generate',
+        status: 'SUCCEEDED',
+        images: [{ storageKey: 'local://outputs/default/resumed-draft.png', assetUrl: '/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2Fresumed-draft.png', format: 'png', sizeBytes: 1234 }],
+      },
+    });
+  });
+
+  await page.goto('/visual-stage');
+  await page.getByLabel('描述你想创作的画面').fill('生成一张温润纸面风格的香水海报');
+  await page.getByRole('button', { name: '出图关' }).click();
+  await page.getByRole('button', { name: '发送出图' }).click();
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('等待任务返回');
+
+  await page.reload();
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成一张温润纸面风格的香水海报');
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成完成');
+  await expect(page.getByRole('button', { name: '加入画布' })).toBeVisible();
+});
+
 test('Visual Stage uploads local reference, creates a real draft task, then commits draft into canvas preview', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
