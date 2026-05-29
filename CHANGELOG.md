@@ -8,6 +8,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 - Updated `/visual-stage` into an immersive mobile creation surface with no old project shell, `＋` local-image attachment, advanced `@图片` reference tokens for assets/history, default ordinary chat, explicit generation toggle, parameter drawer, fixed scrollable thread, and draft-before-canvas behavior.
 - Wired the `/visual-stage` MVP loop into existing Workbench capabilities: local reference upload, `@图片` token insertion, real `/tasks/generate` or `/tasks/edit` task creation, task stream/poll fallback, chat-thread draft results, and explicit “加入画布” confirmation.
 - Fixed the first Visual Stage MVP usability gaps: ordinary chat now creates a visible 助手建议 response, Visual Stage state is restored after refresh, and pending generation tasks resume through polling so completed drafts can appear even if SSE is unavailable.
+- Tightened Visual Stage chat/reference UX: typing no longer appears in the thread before send, send clears the composer, refresh preserves the latest exchange order, generated drafts remain visible when 出图 is toggled off, long draft filenames truncate safely, and the reference tray supports token-only horizontal scrolling plus deletion.
 
 ### Added
 

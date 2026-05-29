@@ -33,7 +33,7 @@ const vi = {
 };
 
 type ReferenceSource = 'local' | 'asset' | 'history';
-type MessageTone = 'user' | 'assistant' | 'suggestion' | 'reference' | 'drafts';
+type MessageTone = 'user' | 'assistant' | 'suggestion' | 'reference' | 'drafts' | 'notice';
 
 type ReferenceToken = {
   id: string;
@@ -79,12 +79,15 @@ type ConversationEntry = {
   references?: ReferenceToken[];
 };
 
+type DraftMessage = AssistantMessage & { tone: 'drafts'; draft: Draft };
+
 type PersistedVisualStageSession = {
   intent: string;
   references: ReferenceToken[];
   generateMode: boolean;
   showDrafts: boolean;
   draft: Draft | null;
+  draftMessages: DraftMessage[];
   canvasItems: CanvasItem[];
   conversation: ConversationEntry[];
 };
@@ -133,7 +136,15 @@ function humanError(error: unknown) {
 
 function fileNameFromDraft(draft: Draft) {
   const key = draft.image?.storageKey ?? draft.image?.assetUrl ?? '生成草稿';
-  return decodeURIComponent(key.split('?')[0]).split('/').pop() ?? '生成草稿';
+  const name = decodeURIComponent(key.split('?')[0]).split('/').pop() ?? '生成草稿';
+  return name.length > 34 ? `${name.slice(0, 18)}…${name.slice(-12)}` : name;
+}
+
+function assetSrc(assetUrl?: string) {
+  if (!assetUrl) return undefined;
+  if (assetUrl.startsWith('/api/')) return assetUrl;
+  if (assetUrl.startsWith('/assets/')) return `/api${assetUrl}`;
+  return assetUrl;
 }
 
 function createAssistantSuggestion(intent: string, references: ReferenceToken[], generateMode: boolean): ConversationEntry {
@@ -144,7 +155,7 @@ function createAssistantSuggestion(intent: string, references: ReferenceToken[],
     id: `assistant-${Date.now()}`,
     tone: 'assistant',
     title: generateMode ? '出图前建议' : '助手建议',
-    body: `${useCase}。${referenceHint} 建议补充：主体、画面比例、发布渠道和不能改变的元素。${generateMode ? '我会先生成草稿，确认后再加入画布。' : '如果只是讨论，我不会消耗生图额度；打开出图后再生成。'}`,
+    body: `针对「${intent}」：${useCase}。${referenceHint} 建议补充：主体、画面比例、发布渠道和不能改变的元素。${generateMode ? '我会先生成草稿，确认后再加入画布。' : '如果只是讨论，我不会消耗生图额度；打开出图后再生成。'}`,
     chips: [generateMode ? '准备出图' : '普通对话', hasReference ? '已带参考图' : '建议补参考', '建议补充'],
     references,
   };
@@ -179,16 +190,18 @@ function PhoneFrame({ children }: { children: ReactNode }) {
   </div>;
 }
 
-function ReferenceThumb({ reference, compact = false }: { reference: ReferenceToken; compact?: boolean }) {
-  return <div className={cn('min-w-0 rounded-[1rem] border p-2', sourceClass[reference.source])}>
+function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void }) {
+  const src = assetSrc(reference.assetUrl);
+  return <div data-testid={tray ? 'reference-token' : undefined} className={cn('rounded-[1rem] border p-2', sourceClass[reference.source], tray ? 'w-[5.4rem] shrink-0' : 'min-w-0')}>
     <div className="flex min-w-0 items-center gap-2">
       <div className={cn('shrink-0 overflow-hidden rounded-[0.75rem] border border-current/15 bg-[linear-gradient(145deg,#fffaf2,#f8e3dd_48%,#e7f1ec)]', compact ? 'h-9 w-9' : 'h-12 w-12')}>
-        {reference.assetUrl ? <img src={reference.assetUrl.startsWith('/assets/') ? `/api${reference.assetUrl}` : reference.assetUrl} alt="" className="h-full w-full object-cover" /> : null}
+        {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : null}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <b className="block truncate text-xs">{reference.label}</b>
-        <span className="block truncate text-[0.68rem] opacity-75">{reference.title}</span>
+        {!tray ? <span className="block truncate text-[0.68rem] opacity-75">{reference.title}</span> : null}
       </div>
+      {tray && onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-6 w-6 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
     </div>
   </div>;
 }
@@ -196,13 +209,13 @@ function ReferenceThumb({ reference, compact = false }: { reference: ReferenceTo
 function DraftCard({ draft, onCommitDraft }: { draft: Draft; onCommitDraft?: (draft: Draft) => void }) {
   const url = imageUrl(draft.image);
   const done = draft.status === 'SUCCEEDED' && draft.image;
-  return <div className="mt-3 overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
+  return <div data-testid="draft-card" className="mt-3 min-w-0 overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
     <div className="grid aspect-square place-items-center bg-[linear-gradient(145deg,#fff1de,#f8e3dd)] text-xs text-[#9e574c]">
       {url ? <img src={url} alt="真实生成草稿" className="h-full w-full object-cover" /> : draft.status === 'FAILED' ? '生成失败' : '生成中'}
     </div>
     <div className="grid gap-2 px-2 py-2 text-xs">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[#253048]">{done ? fileNameFromDraft(draft) : '等待生成结果'}</span>
+        <span className="min-w-0 truncate text-[#253048]" title={fileNameFromDraft(draft)}>{done ? fileNameFromDraft(draft) : '等待生成结果'}</span>
         <span className="text-[#b96a5c]">{draft.status === 'SUCCEEDED' ? '生成完成' : draft.status}</span>
       </div>
       {draft.error ? <span className="text-[#9e574c]">{draft.error}</span> : null}
@@ -234,7 +247,7 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
       {isReference ? <div className="mt-3 grid gap-2">
         {message.references?.map((reference) => <div key={reference.id} className="grid grid-cols-[4.5rem_1fr] gap-3">
           <div className="aspect-[4/5] overflow-hidden rounded-[1rem] border border-[#d6e7df] bg-[linear-gradient(145deg,#e7f1ec,#fffaf2_55%,#f8e3dd)]">
-            {reference.assetUrl ? <img src={reference.assetUrl.startsWith('/assets/') ? `/api${reference.assetUrl}` : reference.assetUrl} alt="" className="h-full w-full object-cover" /> : null}
+            {assetSrc(reference.assetUrl) ? <img src={assetSrc(reference.assetUrl)} alt="" className="h-full w-full object-cover" /> : null}
           </div>
           <div className="grid content-center gap-1 text-xs text-[#6b7488]">
             <span>{reference.title}</span>
@@ -297,6 +310,7 @@ export function VisualStageClient() {
   const [showMentionPicker, setShowMentionPicker] = useState(false);
   const [showParams, setShowParams] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [draftMessages, setDraftMessages] = useState<DraftMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
@@ -310,6 +324,7 @@ export function VisualStageClient() {
     setGenerateMode(Boolean(persisted.generateMode));
     setShowDrafts(Boolean(persisted.showDrafts));
     setDraft(persisted.draft ?? null);
+    setDraftMessages(persisted.draftMessages ?? []);
     setCanvasItems(persisted.canvasItems ?? []);
     setConversation(persisted.conversation ?? []);
     if (persisted.draft?.taskId && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(persisted.draft.status)) watchTask(persisted.draft.taskId);
@@ -318,8 +333,8 @@ export function VisualStageClient() {
   }, []);
 
   useEffect(() => {
-    savePersistedSession({ intent, references, generateMode, showDrafts, draft, canvasItems, conversation });
-  }, [canvasItems, conversation, draft, generateMode, intent, references, showDrafts]);
+    savePersistedSession({ intent, references, generateMode, showDrafts, draft, draftMessages, canvasItems, conversation });
+  }, [canvasItems, conversation, draft, draftMessages, generateMode, intent, references, showDrafts]);
 
   function appendToken(reference: ReferenceToken) {
     setIntent((current) => {
@@ -343,6 +358,12 @@ export function VisualStageClient() {
       title: title ?? `本地新图片 ${nextNumber}`,
       hint: hint ?? '＋号偏向添加本地新图片；当前为轻量前端引用，上传后可参与真实生成。',
     });
+  }
+
+  function removeReference(id: string) {
+    const removed = references.find((reference) => reference.id === id);
+    setReferences((current) => current.filter((reference) => reference.id !== id));
+    if (removed) setIntent((current) => current.replaceAll(removed.label, '').replace(/\s{2,}/g, ' ').trimStart());
   }
 
   async function onLocalImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -372,6 +393,7 @@ export function VisualStageClient() {
     const onTask = (task: TaskResult) => {
       const image = task.images?.[0];
       setDraft({ id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, error: task.errorMessage ?? task.error ?? null });
+      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? '生成完成。草稿先在对话流中，确认后再加入画布。' : '已进入真实生成流程，等待任务返回。', draft: { id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, error: task.errorMessage ?? task.error ?? null } } : message));
     };
     const fallback = async () => {
       if (fallbackStarted) return;
@@ -393,6 +415,7 @@ export function VisualStageClient() {
       createAssistantSuggestion(userBody, references, generateMode),
     ]);
     setShowDrafts(true);
+    setIntent('');
     if (!generateMode) return;
     setLoading(true);
     setDraft({ id: 'pending', status: 'QUEUED' });
@@ -403,7 +426,9 @@ export function VisualStageClient() {
         ? { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', refKeys, count: 1, timeoutSec: 600 }
         : { prompt: intent.trim(), model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 };
       const created = await apiPost<TaskResult>(endpoint, payload);
-      setDraft({ id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: created.images?.[0] });
+      const initialDraft = { id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: created.images?.[0] };
+      setDraft(initialDraft);
+      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft }]);
       if (created.id) watchTask(created.id);
     } catch (error) {
       setDraft({ id: 'failed', status: 'FAILED', error: humanError(error) });
@@ -418,7 +443,7 @@ export function VisualStageClient() {
   }
 
   const messages = useMemo<AssistantMessage[]>(() => {
-    const next = [...initialMessages, ...conversation];
+    const next = [...initialMessages, ...conversation, ...draftMessages];
     if (references.length) {
       next.push({
         id: 'reference',
@@ -428,35 +453,8 @@ export function VisualStageClient() {
         references,
       });
     }
-    if (intent.trim()) {
-      next.push({
-        id: 'user-intent',
-        tone: 'user',
-        body: intent.trim(),
-        references,
-      });
-      next.push({
-        id: 'assistant-brief',
-        tone: 'assistant',
-        title: generateMode ? '出图前确认' : '我先这样理解',
-        body: generateMode
-          ? '出图开关已打开：发送后会创建真实生成任务。草稿先留在对话流，确认“加入画布”后再进入画布。'
-          : '当前是普通对话：我会先整理意图和参考关系，不会直接消耗生图额度。需要出图时再打开开关。',
-        chips: [generateMode ? '出图已开启' : '普通对话', references.length ? '已包含 @图片 token' : '可继续补参考图', '草稿确认后进画布'],
-      });
-    }
-    if (showDrafts && generateMode) {
-      next.push({
-        id: 'drafts',
-        tone: 'drafts',
-        title: draft?.status === 'SUCCEEDED' ? '真实生成草稿' : '真实生成草稿',
-        body: draft?.status === 'SUCCEEDED' ? '生成完成。草稿先在对话流中，确认后再加入画布。' : loading ? '正在提交真实生成任务，完成后会在这里出现草稿。' : '已进入真实生成流程，等待任务返回。',
-        draft: draft ?? { id: 'pending', status: 'QUEUED' },
-        onCommitDraft: commitDraft,
-      });
-    }
     return next;
-  }, [conversation, draft, generateMode, intent, loading, references, showDrafts]);
+  }, [conversation, draftMessages, references]);
 
   return <section data-testid="visual-stage-shell" data-vi="warm-editorial-board-v1" aria-label={vi.system} className={vi.shell}>
     <div aria-hidden="true" className={vi.wash} />
@@ -483,7 +481,7 @@ export function VisualStageClient() {
       </div>
 
       <PhoneFrame>
-        <div className="flex h-[780px] max-h-[calc(100vh-2rem)] min-h-[720px] flex-col bg-[#fffaf2]">
+        <div data-testid="visual-stage-phone" className="flex h-[780px] max-h-[calc(100vh-2rem)] min-h-[720px] flex-col bg-[#fffaf2]">
           <div className="shrink-0 border-b border-[#e9d8c4] bg-[#fffaf2]/92 px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -526,8 +524,8 @@ export function VisualStageClient() {
 
             <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2] p-2 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
               <input ref={fileInputRef} aria-label="选择本地新图片" type="file" accept="image/*" className="sr-only" onChange={onLocalImageChange} />
-              {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex gap-2 overflow-x-auto pb-1">
-                {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact />)}
+              {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex gap-2 overflow-x-auto overscroll-x-contain pb-1">
+                {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact tray onRemove={removeReference} />)}
               </div> : null}
               <Textarea
                 aria-label="描述你想创作的画面"
