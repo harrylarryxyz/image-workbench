@@ -15,8 +15,8 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 ### Changed
 
-- `/visual-stage` now locks the user-selected **D · Creative Board** direction as a bright board-first visual master, replacing the dark precision shell with a Figma/Miro-like Reference Canvas, colored pinned cards, and a documented `bright but disciplined` rule set.
-- `/visual-stage` Creative Board colors now use a documented VI system with deep title tones, mid content tones, pale ambient gradients/dots, muted contrast accents, and regression/audit checks against pure-black surfaces or low-contrast text.
+- `/visual-stage` now locks the user-selected **D · Creative Board** direction as a board-first visual master and refines it into the **Warm Editorial Board / 温润编辑式创作板** standard: paper material, visible Reference Canvas, Champion + Comparison Set, and professional creative warmth without random color.
+- `/visual-stage` Creative Board colors now follow the approved **Warm Editorial Board / 温润编辑式创作板** VI standard: warm paper surfaces, ink-blue hierarchy, restrained coral action accents, sage reference states, and the fixed `70% Paper / 20% Ink / 7% Coral / 3% Sage` proportion.
 - Create Studio now renders through shared product primitives instead of page-specific `lovart-*`/Create-only global CSS classes, with scoped contract tests preventing regressions.
 
 ### Fixed

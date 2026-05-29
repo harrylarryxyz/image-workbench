@@ -62,9 +62,9 @@ test('visual stage route encodes the creation-case router product contract', () 
   assert.doesNotMatch(surface, /<(button|textarea)\b(?![^>]*data-slot)/, 'Visual Stage should use design-system action/input primitives');
 });
 
-test('visual stage locks the chosen D Creative Board art direction', () => {
+test('visual stage locks the approved Warm Editorial Board art direction', () => {
   const docPath = join(process.cwd(), '..', '..', 'docs', 'ui', 'visual-stage-creative-board-master.md');
-  assert.ok(existsSync(docPath), 'Visual Stage D direction should have a reusable visual-master rules doc');
+  assert.ok(existsSync(docPath), 'Visual Stage should have a reusable Warm Editorial Board visual-master rules doc');
   const doc = readFileSync(docPath, 'utf8');
   const surface = ['visual-stage/page.tsx', 'visual-stage/VisualStageClient.tsx', 'visual-stage/visual-stage-fixtures.ts']
     .map((relative) => `\n/* ${relative} */\n${readPage(relative)}`)
@@ -72,39 +72,45 @@ test('visual stage locks the chosen D Creative Board art direction', () => {
 
   for (const marker of [
     'D · Creative Board',
-    'Figma / Miro 式轻快创意板',
+    'Warm Editorial Board',
+    '温润编辑式创作板',
     'Board-first Visual Stage',
     'Mood before settings',
     'Reference Canvas',
-    'bright but disciplined',
+    '70% Paper / 20% Ink / 7% Coral / 3% Sage',
   ]) {
-    assert.match(`${doc}\n${surface}`, new RegExp(escapeRegExp(marker)), `Creative Board visual master missing ${marker}`);
+    assert.match(`${doc}\n${surface}`, new RegExp(escapeRegExp(marker)), `Warm Editorial Board visual master missing ${marker}`);
   }
 
   assert.doesNotMatch(surface, /Linear \/ Raycast|Lunar Precision|Cinema Studio|Atelier Gallery|Velvet Suite|Warm Craft/, 'Visual Stage implementation should not mix competing direction labels after D is selected');
 });
 
-test('visual stage uses an ordered VI color system instead of random high-saturation colors', () => {
+test('visual stage applies semantic Warm Editorial Board VI tokens instead of random high-saturation colors', () => {
   const docPath = join(process.cwd(), '..', '..', 'docs', 'ui', 'visual-stage-creative-board-master.md');
-  assert.ok(existsSync(docPath), 'Visual Stage D direction should document color hierarchy rules');
+  assert.ok(existsSync(docPath), 'Visual Stage should document Warm Editorial Board color hierarchy rules');
   const doc = readFileSync(docPath, 'utf8');
   const surface = readPage('visual-stage/VisualStageClient.tsx');
 
   for (const marker of [
     'VI color system',
-    'deep title tone',
-    'mid content tone',
-    'pale ambient tone',
-    'controlled contrast accents',
+    'Paper 0',
+    'Ink 900',
+    'Coral 600',
+    'Sage 600',
     'no pure black UI surfaces',
+    'UI is the frame, not the artwork',
   ]) {
-    assert.match(`${doc}\n${surface}`, new RegExp(escapeRegExp(marker)), `Creative Board VI system missing ${marker}`);
+    assert.match(`${doc}\n${surface}`, new RegExp(escapeRegExp(marker)), `Warm Editorial Board VI system missing ${marker}`);
   }
 
   assert.match(surface, /const\s+vi\s*=/, 'Visual Stage should centralize palette tokens instead of scattering colors');
-  assert.match(surface, /data-vi="creative-board-v2"/, 'Visual Stage shell should expose the applied VI version for audits');
+  assert.match(surface, /data-vi="warm-editorial-board-v1"/, 'Visual Stage shell should expose the applied VI version for audits');
+  assert.match(surface, /paper:\s*\{[\s\S]*?#fffaf2[\s\S]*?#fff1de[\s\S]*?#e9d8c4/i, 'Visual Stage should define paper tokens for the warm surface system');
+  assert.match(surface, /ink:\s*\{[\s\S]*?#253048[\s\S]*?#45506a[\s\S]*?#6b7488/i, 'Visual Stage should define ink tokens for titles and readable copy');
+  assert.match(surface, /coral:\s*\{[\s\S]*?#b96a5c[\s\S]*?#f8e3dd/i, 'Visual Stage should define coral tokens for restrained creative accents');
+  assert.match(surface, /sage:\s*\{[\s\S]*?#5b8277[\s\S]*?#e7f1ec/i, 'Visual Stage should define sage tokens for reference/confirmation');
   assert.doesNotMatch(surface, /\b(?:bg|text|border|hover:bg)-black\b|rgba\(0,\s*0,\s*0|#000(?:000)?\b/i, 'Visual Stage should avoid pure-black surfaces/text and black-on-black readability traps');
-  assert.doesNotMatch(surface, /#(?:00d084|ffd02f|ff75c3|8b5cf6)\b/i, 'Visual Stage should not reuse the previous loose high-saturation sticker palette');
+  assert.doesNotMatch(surface, /#(?:00d084|ffd02f|ff75c3|8b5cf6|8e7cc3|e3b65f)\b/i, 'Visual Stage should not reuse the previous loose high-saturation sticker palette');
 });
 
 test('visual direction board presents divergent art directions for review', () => {

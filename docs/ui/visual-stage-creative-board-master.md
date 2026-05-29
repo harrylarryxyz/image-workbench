@@ -3,78 +3,113 @@
 ## Source of truth
 
 - Selected direction: **D · Creative Board**.
-- Direction language: **Figma / Miro 式轻快创意板**.
+- Approved art system: **Warm Editorial Board / 温润编辑式创作板**.
 - Product posture: **Board-first Visual Stage**.
-- Durable rule: **bright but disciplined** — open, colorful, and exploratory without becoming toy-like or losing professional hierarchy.
+- Durable rule: **温润纸面创作板** — professional order first, gentle creative warmth second.
+- Color ratio: **70% Paper / 20% Ink / 7% Coral / 3% Sage**.
 
-## Why this direction
+## Why this refinement
 
-D solves the Visual Stage problem better than a dark control-room theme because the core product job is not parameter control first. It is helping users escape prompt paralysis by making intent, references, alternatives, and judgment visible as a creative board.
+D was selected because Visual Stage must solve prompt paralysis through visible intent, references, alternatives, and judgment. The first colorful Creative Board pass still felt messy because color acted as decoration. The approved refinement changes the metaphor from a loose multicolor sticky wall to a designer's morning worktable: warm paper, clear ink, restrained coral action, and sage reference confidence.
 
 The chosen feeling:
 
-- **Mood before settings**: users judge direction before seeing professional depth.
-- **Reference Canvas**: references are clustered territories, not a template gallery or single-image imitation target.
-- **Champion visible**: the current best option is pinned clearly.
-- **Comparison stays nearby**: alternatives remain recoverable on desktop and mobile.
-- **Professional not downgraded**: color and playfulness are controlled by hierarchy, spacing, and restrained text density.
+- **Mood before settings**: users judge direction before professional controls become important.
+- **Reference Canvas**: references are clustered territories, not a template gallery or one-image imitation target.
+- **Champion visible**: the current best option is pinned clearly and visually calmer than the surrounding exploration.
+- **Comparison stays nearby**: alternatives remain recoverable on desktop and mobile without becoming a rainbow of cards.
+- **Professional not downgraded**: playfulness comes from paper material, layout rhythm, and one restrained accent family.
 
-## Visual rules
+## VI color system
 
-Use these rules for `/visual-stage` and later surfaces that inherit this art direction:
+The Warm Editorial Board palette has semantic ownership. Do not add new families unless this document is revised first.
 
-1. Prefer a light, board-like canvas over dark command-center chrome.
-2. Treat color as a **VI color system**, not scattered decoration:
-   - **deep title tone**: ink blue / plum for titles, primary CTA, selected Champion, and structural emphasis;
-   - **mid content tone**: softened teal, amber, lavender, and coral for content blocks and semantic state;
-   - **pale ambient tone**: cream, mint wash, blush wash, and lilac wash for page background, hero gradients, and dotted board texture;
-   - **controlled contrast accents**: muted cross-color pairings for title/content contrast, never high-saturation neon.
-3. Keep hierarchy readable through depth: deep = title/action, mid = content block, pale = background and ambient decoration.
-4. Maintain explicit semantic color mapping:
-   - teal: reference / ready / growth;
-   - amber: assumption / exploration;
-   - lavender/plum: champion / depth;
-   - coral: blocker / risk / missing anchor.
-5. Use **no pure black UI surfaces**. Avoid `bg-black`, `text-black`, black-on-black traps, near-equal foreground/background pairs, and sudden pure-black blocks inside the bright board.
-6. Keep surfaces tactile: rounded cards, soft shadows, sticker-like pinned blocks, subtle gradient dots, and enough contrast for mobile reading.
-7. Preserve product hierarchy:
+### Paper — surface and atmosphere
+
+- **Paper 0** `#fffaf2`: primary card and content surface.
+- **Paper 1** `#fff1de`: page wash, input background, soft separators.
+- **Paper 2** `#e9d8c4`: borders, dividers, board pins.
+- **Paper 3** `#d9c2a7`: subdued structural marks and texture dots.
+
+Rules:
+
+- Paper carries most of the page; it is the visible material of the product.
+- Background is a warm paper gradient plus low-opacity dot texture.
+- Ambient light may use coral/sage at low opacity only; it must not become the content hierarchy.
+
+### Ink — structure and trust
+
+- **Ink 900** `#253048`: H1, primary CTA, Champion container, strongest labels.
+- **Ink 800** `#303b55`: active hover and secondary title depth.
+- **Ink 700** `#45506a`: strong body headings and selected state text.
+- **Ink 500** `#6b7488`: readable body copy.
+- **Ink 300** `#9ba4b3`: placeholder and quiet metadata.
+
+Rules:
+
+- Ink replaces pure black. Use **no pure black UI surfaces**.
+- Ink establishes order; it is not decorative.
+- Text contrast must be readable on Paper surfaces and Sage/Coral pale surfaces.
+
+### Coral — creative action and feedback
+
+- **Coral 600** `#b96a5c`: title keyword, action accent, selected feedback.
+- **Coral 700** `#9e574c`: readable coral text.
+- **Coral 150** `#f2d6cf`: soft border and underline.
+- **Coral 100** `#f8e3dd`: blocker/action pale background.
+
+Rules:
+
+- Coral is the only warm creative accent.
+- Use it for action, missing anchors, and title point-work, not broad decoration.
+- Never turn every card into coral; Coral should stay under roughly 7% of the first screen.
+
+### Sage — reference and confirmation
+
+- **Sage 600** `#5b8277`: reference/confirmation accent.
+- **Sage 700** `#486e64`: readable sage text.
+- **Sage 150** `#d6e7df`: soft border.
+- **Sage 100** `#e7f1ec`: Reference Canvas pale background.
+
+Rules:
+
+- Sage belongs to Reference Canvas, known anchors, and aligned/ready status.
+- Sage should signal calm confirmation, not generic success-green.
+- Do not mix Sage with multiple extra color families.
+
+## Page application rules
+
+1. **UI is the frame, not the artwork**. The interface must not compete with generated images or visual drafts.
+2. Use depth to communicate hierarchy:
+   - deep = title/action/Champion;
+   - mid = body copy, route labels, selected states;
+   - pale = page background, card surface, ambient board texture.
+3. Use Coral for title keywords and action feedback; use Sage for references and confirmation.
+4. Keep cards primarily Paper. Different cards should not each receive a unique saturated background.
+5. Use rounded cards, soft Ink shadows, warm borders, and subtle dots as the tactile system.
+6. Avoid provider route, storage key, raw task payload, debug labels, and other internal language.
+7. Preserve Visual Stage product hierarchy:
    - stage and visual proof first;
    - composer immediately reachable;
    - Creation Case compact;
-   - Reference Canvas and Champion + Comparison side-by-side where space allows;
+   - Reference Canvas and Champion + Comparison Set visible;
    - Inspection/debug hidden.
-8. Keep copy in user language. Avoid provider route, storage key, raw task payload, or debug labels.
 
-## Allowed building blocks
+## Forbidden color and material patterns
 
-- `components/ui/*` Shadcn-style primitives for buttons, cards, badges, and textareas.
-- Tailwind utilities for board material, grid texture, colored pins, and responsive choreography.
-- Local Visual Stage helpers only when they encode the selected art direction, e.g. board blobs and pinned note cards.
-
-## Disallowed after D selection
-
-Do not mix competing visual-direction labels into `/visual-stage` implementation:
-
-- Lunar Precision
-- Cinema Studio
-- Atelier Gallery
-- Velvet Suite
-- Warm Craft
-- Linear / Raycast as a product metaphor
-
-Do not return to:
-
-- dark-only admin dashboard;
-- prompt-first form as the hero;
-- mode picker before any useful visual feedback;
-- template gallery as default start;
-- decorative color without information hierarchy.
+- Pure black: `#000`, `#000000`, `bg-black`, `text-black`, or black-heavy shadows.
+- Random high-saturation sticker colors, including prior loose purple/yellow/neon families.
+- A card-per-color layout.
+- High-saturation gradients as ordinary section backgrounds.
+- Low-contrast foreground/background pairs.
+- Debug/admin status-light visuals.
+- UI decoration that visually overpowers the Champion or Comparison Set.
 
 ## Mobile invariants
 
 Mobile must not become a crude stacked desktop:
 
-- the board proof remains visible before deep details;
+- the Warm Editorial Board identity remains visible before deep details;
 - composer remains reachable near the first screen;
 - Creation Case remains legible in compact cards;
 - Reference Canvas and Comparison Set remain available without a separate history page;
@@ -85,10 +120,16 @@ Mobile must not become a crude stacked desktop:
 `apps/web/product-ui-contract.test.js` locks these markers:
 
 - `D · Creative Board`
-- `Figma / Miro 式轻快创意板`
+- `Warm Editorial Board`
+- `温润编辑式创作板`
 - `Board-first Visual Stage`
 - `Mood before settings`
 - `Reference Canvas`
-- `bright but disciplined`
+- `70% Paper / 20% Ink / 7% Coral / 3% Sage`
+- `Paper 0`
+- `Ink 900`
+- `Coral 600`
+- `Sage 600`
+- `UI is the frame, not the artwork`
 
-The contract also rejects competing direction names in `/visual-stage` after the user selected D.
+The contract also rejects pure-black surfaces, the previous loose high-saturation sticker palette, and competing direction labels in `/visual-stage` after D selection.
