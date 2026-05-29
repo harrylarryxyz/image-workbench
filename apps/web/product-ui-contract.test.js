@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -41,6 +41,9 @@ test('visual stage route encodes the creation-case router product contract', () 
 
   for (const marker of [
     'Visual Stage',
+    'D · Creative Board',
+    'Mood before settings',
+    'Reference Canvas',
     'Creation Case',
     'Reference-first',
     'Generate-first',
@@ -57,6 +60,28 @@ test('visual stage route encodes the creation-case router product contract', () 
   assert.doesNotMatch(surface, /JSON\.stringify\([^)]*,\s*null,\s*2\)/, 'Visual Stage must not expose raw JSON diagnostics');
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json/i, 'Visual Stage first surface must not expose provider/storage diagnostics');
   assert.doesNotMatch(surface, /<(button|textarea)\b(?![^>]*data-slot)/, 'Visual Stage should use design-system action/input primitives');
+});
+
+test('visual stage locks the chosen D Creative Board art direction', () => {
+  const docPath = join(process.cwd(), '..', '..', 'docs', 'ui', 'visual-stage-creative-board-master.md');
+  assert.ok(existsSync(docPath), 'Visual Stage D direction should have a reusable visual-master rules doc');
+  const doc = readFileSync(docPath, 'utf8');
+  const surface = ['visual-stage/page.tsx', 'visual-stage/VisualStageClient.tsx', 'visual-stage/visual-stage-fixtures.ts']
+    .map((relative) => `\n/* ${relative} */\n${readPage(relative)}`)
+    .join('\n');
+
+  for (const marker of [
+    'D · Creative Board',
+    'Figma / Miro 式轻快创意板',
+    'Board-first Visual Stage',
+    'Mood before settings',
+    'Reference Canvas',
+    'bright but disciplined',
+  ]) {
+    assert.match(`${doc}\n${surface}`, new RegExp(escapeRegExp(marker)), `Creative Board visual master missing ${marker}`);
+  }
+
+  assert.doesNotMatch(surface, /Linear \/ Raycast|Lunar Precision|Cinema Studio|Atelier Gallery|Velvet Suite|Warm Craft/, 'Visual Stage implementation should not mix competing direction labels after D is selected');
 });
 
 test('visual direction board presents divergent art directions for review', () => {
