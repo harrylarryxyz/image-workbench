@@ -24,20 +24,26 @@ The chosen feeling:
 Use these rules for `/visual-stage` and later surfaces that inherit this art direction:
 
 1. Prefer a light, board-like canvas over dark command-center chrome.
-2. Use black as the discipline anchor: primary CTA, selected champion, key labels.
-3. Use color as meaning-bearing material, not decoration:
-   - green: reference / ready / growth;
-   - yellow: assumption / exploration;
-   - purple: champion / depth;
-   - pink: blocker / risk / missing anchor.
-4. Keep surfaces tactile: rounded cards, soft shadows, sticker-like pinned blocks, subtle grid background.
-5. Preserve product hierarchy:
+2. Treat color as a **VI color system**, not scattered decoration:
+   - **deep title tone**: ink blue / plum for titles, primary CTA, selected Champion, and structural emphasis;
+   - **mid content tone**: softened teal, amber, lavender, and coral for content blocks and semantic state;
+   - **pale ambient tone**: cream, mint wash, blush wash, and lilac wash for page background, hero gradients, and dotted board texture;
+   - **controlled contrast accents**: muted cross-color pairings for title/content contrast, never high-saturation neon.
+3. Keep hierarchy readable through depth: deep = title/action, mid = content block, pale = background and ambient decoration.
+4. Maintain explicit semantic color mapping:
+   - teal: reference / ready / growth;
+   - amber: assumption / exploration;
+   - lavender/plum: champion / depth;
+   - coral: blocker / risk / missing anchor.
+5. Use **no pure black UI surfaces**. Avoid `bg-black`, `text-black`, black-on-black traps, near-equal foreground/background pairs, and sudden pure-black blocks inside the bright board.
+6. Keep surfaces tactile: rounded cards, soft shadows, sticker-like pinned blocks, subtle gradient dots, and enough contrast for mobile reading.
+7. Preserve product hierarchy:
    - stage and visual proof first;
    - composer immediately reachable;
    - Creation Case compact;
    - Reference Canvas and Champion + Comparison side-by-side where space allows;
    - Inspection/debug hidden.
-6. Keep copy in user language. Avoid provider route, storage key, raw task payload, or debug labels.
+8. Keep copy in user language. Avoid provider route, storage key, raw task payload, or debug labels.
 
 ## Allowed building blocks
 

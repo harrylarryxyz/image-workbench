@@ -84,6 +84,29 @@ test('visual stage locks the chosen D Creative Board art direction', () => {
   assert.doesNotMatch(surface, /Linear \/ Raycast|Lunar Precision|Cinema Studio|Atelier Gallery|Velvet Suite|Warm Craft/, 'Visual Stage implementation should not mix competing direction labels after D is selected');
 });
 
+test('visual stage uses an ordered VI color system instead of random high-saturation colors', () => {
+  const docPath = join(process.cwd(), '..', '..', 'docs', 'ui', 'visual-stage-creative-board-master.md');
+  assert.ok(existsSync(docPath), 'Visual Stage D direction should document color hierarchy rules');
+  const doc = readFileSync(docPath, 'utf8');
+  const surface = readPage('visual-stage/VisualStageClient.tsx');
+
+  for (const marker of [
+    'VI color system',
+    'deep title tone',
+    'mid content tone',
+    'pale ambient tone',
+    'controlled contrast accents',
+    'no pure black UI surfaces',
+  ]) {
+    assert.match(`${doc}\n${surface}`, new RegExp(escapeRegExp(marker)), `Creative Board VI system missing ${marker}`);
+  }
+
+  assert.match(surface, /const\s+vi\s*=/, 'Visual Stage should centralize palette tokens instead of scattering colors');
+  assert.match(surface, /data-vi="creative-board-v2"/, 'Visual Stage shell should expose the applied VI version for audits');
+  assert.doesNotMatch(surface, /\b(?:bg|text|border|hover:bg)-black\b|rgba\(0,\s*0,\s*0|#000(?:000)?\b/i, 'Visual Stage should avoid pure-black surfaces/text and black-on-black readability traps');
+  assert.doesNotMatch(surface, /#(?:00d084|ffd02f|ff75c3|8b5cf6)\b/i, 'Visual Stage should not reuse the previous loose high-saturation sticker palette');
+});
+
 test('visual direction board presents divergent art directions for review', () => {
   const surface = readPage('visual-directions/page.tsx');
 
