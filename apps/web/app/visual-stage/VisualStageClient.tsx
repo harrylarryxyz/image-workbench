@@ -3,14 +3,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { deriveCreationCase, type AnchorState, type ComparisonCandidate, type RouteState } from './creation-case';
-import { referenceTerritoryFixtures, visualStageComparisonPlaceholders, visualStageScaffolds } from './visual-stage-fixtures';
 
 const vi = {
-  system: 'Warm Editorial Board · 温润编辑式创作板 · VI color system · Paper 0 · Ink 900 · Coral 600 · Sage 600 · no pure black UI surfaces · UI is the frame, not the artwork',
+  system: 'warm-editorial-board-v1 · 温润编辑式创作板 · 中文优先 · Paper 0 · Ink 900 · Coral 600 · Sage 600 · no pure black UI surfaces · UI is the frame, not the artwork',
   ratio: '70% Paper / 20% Ink / 7% Coral / 3% Sage',
   tokens: {
     paper: { 0: '#fffaf2', 1: '#fff1de', 2: '#e9d8c4', 3: '#d9c2a7' },
@@ -18,328 +16,223 @@ const vi = {
     coral: { 700: '#9e574c', 600: '#b96a5c', 150: '#f2d6cf', 100: '#f8e3dd' },
     sage: { 700: '#486e64', 600: '#5b8277', 150: '#d6e7df', 100: '#e7f1ec' },
   },
-  shell: 'relative min-w-0 overflow-hidden bg-[#fff1de] pb-10 text-[#253048]',
-  pageGrid: 'absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(104,85,66,0.16)_1px,transparent_0)] bg-[size:24px_24px] opacity-40 [mask-image:linear-gradient(to_bottom,rgba(37,48,72,0.76),rgba(37,48,72,0.08))]',
-  pageWash: 'absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(185,106,92,0.18),transparent_32%),radial-gradient(circle_at_82%_18%,rgba(91,130,119,0.18),transparent_30%),radial-gradient(circle_at_52%_88%,rgba(233,216,196,0.58),transparent_36%),linear-gradient(135deg,#fff1de_0%,#fffaf2_46%,#f7eadb_100%)]',
-  paperPanel: 'border-[#e9d8c4]/90 bg-[#fffaf2]/90 shadow-[0_18px_45px_rgba(37,48,72,0.09)] backdrop-blur',
-  elevatedPanel: 'border-[#e9d8c4]/90 bg-[#fffaf2]/94 shadow-[0_28px_70px_rgba(37,48,72,0.12),0_8px_24px_rgba(37,48,72,0.08)]',
-  title: 'text-[#253048]',
-  copy: 'text-[#6b7488]',
-  quietCopy: 'text-[#6b7488]',
-  hairline: 'border-[#e9d8c4]/90',
-  inkPill: 'bg-[#253048] text-[#fffaf2]',
+  shell: 'relative min-w-0 overflow-hidden bg-[#fff1de] text-[#253048]',
+  wash: 'absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(185,106,92,0.16),transparent_32%),radial-gradient(circle_at_86%_18%,rgba(91,130,119,0.18),transparent_30%),linear-gradient(145deg,#fff1de_0%,#fffaf2_52%,#f7eadb_100%)]',
+  grain: 'absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(104,85,66,0.13)_1px,transparent_0)] bg-[size:22px_22px] opacity-35 [mask-image:linear-gradient(to_bottom,rgba(37,48,72,0.62),rgba(37,48,72,0.04))]',
+  paperPanel: 'border-[#e9d8c4]/90 bg-[#fffaf2]/92 shadow-[0_18px_45px_rgba(37,48,72,0.09)] backdrop-blur',
+  raisedPanel: 'border-[#e9d8c4]/90 bg-[#fffaf2]/95 shadow-[0_24px_64px_rgba(37,48,72,0.12),0_8px_24px_rgba(37,48,72,0.08)]',
+  primaryButton: 'rounded-full bg-[#253048] text-[#fffaf2] shadow-[0_14px_26px_rgba(37,48,72,0.20)] hover:bg-[#303b55]',
+  softButton: 'rounded-full border-[#d9c2a7]/90 bg-[#fffaf2]/70 text-[#253048] hover:bg-[#fff1de]',
   coralPill: 'border-[#f2d6cf] bg-[#f8e3dd] text-[#9e574c]',
   sagePill: 'border-[#d6e7df] bg-[#e7f1ec] text-[#486e64]',
-  primaryButton: 'rounded-full bg-[#253048] text-[#fffaf2] shadow-[0_16px_28px_rgba(37,48,72,0.20)] hover:bg-[#303b55]',
-  secondaryButton: 'rounded-full border-[#d9c2a7]/80 text-[#253048] hover:bg-[#fff1de]',
-  accentText: 'text-[#b96a5c] underline decoration-[#f2d6cf] decoration-[0.18em] underline-offset-[-0.06em]',
+  inkPill: 'bg-[#253048] text-[#fffaf2]',
 };
 
-const routeLabels: { route: RouteState; label: string; detail: string }[] = [
-  { route: 'reference-first', label: 'Reference-first', detail: '模糊审美先看方向，用创意板而不是 prompt 课。' },
-  { route: 'generate-first', label: 'Generate-first', detail: '锚点足够时先贴出可判断首稿。' },
-  { route: 'ask-first', label: 'Ask-first', detail: '只阻塞硬事实和权利风险，舞台不断电。' },
-];
+type MessageTone = 'user' | 'assistant' | 'suggestion' | 'reference' | 'drafts';
 
-const routeDisplay: Record<RouteState, string> = {
-  'reference-first': 'Reference-first',
-  'generate-first': 'Generate-first',
-  'ask-first': 'Ask-first',
+type AssistantMessage = {
+  id: string;
+  tone: MessageTone;
+  title?: string;
+  body: string;
+  chips?: string[];
 };
 
-const routeTone: Record<RouteState, string> = {
-  'reference-first': 'border-[#d6e7df] bg-[#e7f1ec] text-[#486e64]',
-  'generate-first': 'border-[#253048]/18 bg-[#eef0f4] text-[#253048]',
-  'ask-first': 'border-[#f2d6cf] bg-[#f8e3dd] text-[#9e574c]',
-};
+const quickPrompts = ['做封面', '换风格', '改背景', '参考这张', '出几版'];
 
-const anchorTone: Record<AnchorState, string> = {
-  known: 'bg-[#e7f1ec] text-[#486e64]',
-  assumed: 'bg-[#fff1de] text-[#45506a]',
-  missing: 'bg-[#f8e3dd] text-[#9e574c]',
-};
-
-const scaffoldTone = [
-  'border-[#e9d8c4] bg-[#fff1de] text-[#45506a]',
-  'border-[#d6e7df] bg-[#e7f1ec] text-[#486e64]',
-  'border-[#f2d6cf] bg-[#f8e3dd] text-[#9e574c]',
-];
-const territoryTone = ['bg-[#e7f1ec]', 'bg-[#fff1de]', 'bg-[#f8e3dd]'];
-const comparisonTone = [
-  'border-l-[#253048] bg-[#fffaf2]',
-  'border-l-[#b96a5c] bg-[#fffaf2]',
-  'border-l-[#5b8277] bg-[#fffaf2]',
-  'border-l-[#d9c2a7] bg-[#fffaf2]',
-];
-
-const boardPins = [
+const initialMessages: AssistantMessage[] = [
   {
-    eyebrow: 'Reference Canvas',
-    title: '方向先可见',
-    className: 'left-5 top-6 w-36 -rotate-3 border-[#d6e7df] bg-[#e7f1ec] text-[#486e64] md:w-44',
+    id: 'welcome',
+    tone: 'assistant',
+    title: '创作助手',
+    body: '直接描述你想要的画面、用途或修改想法。你也可以先添加参考图，我会把描述和参考整理成一个可生成的创作案。',
+    chips: ['自然语言开始', '参考图可选', '先看效果再细化'],
   },
   {
-    eyebrow: 'Mood before settings',
-    title: '先判断气质',
-    className: 'right-4 top-10 w-32 rotate-3 border-[#e9d8c4] bg-[#fff1de] text-[#45506a] md:w-40',
-  },
-  {
-    eyebrow: 'Champion',
-    title: '保留最佳',
-    className: 'bottom-7 left-8 w-36 rotate-2 border-[#253048]/20 bg-[#eef0f4] text-[#253048] md:w-44',
-  },
-  {
-    eyebrow: 'Comparison Set',
-    title: '分支不丢',
-    className: 'bottom-9 right-6 w-36 -rotate-2 border-[#f2d6cf] bg-[#f8e3dd] text-[#9e574c] md:w-44',
+    id: 'example',
+    tone: 'suggestion',
+    title: '示例',
+    body: '比如：做一张温柔高级的护肤品宣传图，适合小红书封面，背景干净，有一点杂志感。',
   },
 ];
 
-const feedbackActions = [
-  { label: '更克制版', summary: '减少装饰面积，保留墨蓝秩序、纸面温度和少量珊瑚点睛。', button: '更克制', variant: 'secondary' as const },
-  { label: '更有记忆点版', summary: '只强化标题关键词与构图节奏，不增加随机彩色块。', button: '更有记忆点', variant: 'outline' as const },
-  { label: '少一点装饰版', summary: '降低背景光晕和贴纸感，让作品区更像主角。', button: '少装饰', variant: 'outline' as const },
-  { label: '更商业版', summary: '强化主体、卖点和投放场景，让创作板更可落地。', button: '更商业', variant: 'outline' as const },
-];
-
-function BoardGlow({ className }: { className?: string }) {
+function Glow({ className }: { className?: string }) {
   return <div aria-hidden="true" className={cn('pointer-events-none absolute rounded-full blur-3xl', className)} />;
 }
 
-function BoardPin({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('absolute rounded-[1.35rem] border p-4 shadow-[0_16px_40px_rgba(37,48,72,0.10)]', className)}>{children}</div>;
+function PhoneFrame({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-[430px] rounded-[2.25rem] border border-[#d9c2a7]/80 bg-[#fffaf2]/72 p-2 shadow-[0_28px_80px_rgba(37,48,72,0.16)] md:max-w-[460px]">
+    <div className="overflow-hidden rounded-[1.8rem] border border-[#e9d8c4] bg-[#fffaf2] shadow-[inset_0_1px_0_rgba(255,250,242,0.9)]">{children}</div>
+  </div>;
+}
+
+function MessageBubble({ message }: { message: AssistantMessage }) {
+  const isUser = message.tone === 'user';
+  const isReference = message.tone === 'reference';
+  const isDrafts = message.tone === 'drafts';
+  return <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+    <div
+      className={cn(
+        'max-w-[88%] rounded-[1.35rem] border p-3 text-sm leading-6 shadow-[0_10px_26px_rgba(37,48,72,0.07)]',
+        isUser && 'border-[#253048]/15 bg-[#253048] text-[#fffaf2]',
+        message.tone === 'assistant' && 'border-[#e9d8c4] bg-[#fffaf2] text-[#45506a]',
+        message.tone === 'suggestion' && 'border-[#d6e7df] bg-[#e7f1ec] text-[#486e64]',
+        isReference && 'border-[#d6e7df] bg-[#e7f1ec]/86 text-[#486e64]',
+        isDrafts && 'w-full max-w-full border-[#f2d6cf] bg-[#f8e3dd]/70 text-[#45506a]',
+      )}
+    >
+      {message.title ? <b className={cn('mb-1 block text-xs', isUser ? 'text-[#fffaf2]' : 'text-[#253048]')}>{message.title}</b> : null}
+      <p>{message.body}</p>
+      {isReference ? <div className="mt-3 grid grid-cols-[4.5rem_1fr] gap-3">
+        <div className="aspect-[4/5] rounded-[1rem] border border-[#d6e7df] bg-[linear-gradient(145deg,#e7f1ec,#fffaf2_55%,#f8e3dd)]" />
+        <div className="grid content-center gap-1 text-xs text-[#6b7488]">
+          <span>已添加参考图</span>
+          <span>下一步可描述：保留什么、改变什么。</span>
+        </div>
+      </div> : null}
+      {isDrafts ? <div className="mt-3 grid grid-cols-2 gap-2">
+        {['初稿一', '初稿二', '初稿三', '初稿四'].map((label, index) => <div key={label} className="overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
+          <div className={cn('aspect-square', index % 3 === 0 && 'bg-[linear-gradient(145deg,#fff1de,#f8e3dd)]', index % 3 === 1 && 'bg-[linear-gradient(145deg,#e7f1ec,#fffaf2)]', index % 3 === 2 && 'bg-[linear-gradient(145deg,#eef0f4,#fff1de)]')} />
+          <div className="flex items-center justify-between gap-2 px-2 py-2 text-xs">
+            <span className="text-[#253048]">{label}</span>
+            <span className="text-[#b96a5c]">加到画布</span>
+          </div>
+        </div>)}
+      </div> : null}
+      {message.chips?.length ? <div className="mt-3 flex flex-wrap gap-1.5">
+        {message.chips.map((chip) => <Badge key={chip} variant="outline" className={cn('rounded-full px-2 py-0.5 text-[0.68rem]', isUser ? 'border-[#fffaf2]/30 bg-[#fffaf2]/10 text-[#fffaf2]' : 'border-[#e9d8c4] bg-[#fff1de]/70 text-[#45506a]')}>{chip}</Badge>)}
+      </div> : null}
+    </div>
+  </div>;
+}
+
+function CanvasPreview() {
+  return <Card data-testid="mobile-canvas-preview" className={cn('rounded-[1.6rem]', vi.paperPanel)}>
+    <CardContent className="p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <b className="block text-[#253048]">轻量画布预告</b>
+          <span className="text-xs text-[#6b7488]">生成后自动形成创作路径</span>
+        </div>
+        <Badge variant="outline" className={cn('rounded-full px-3 py-1', vi.sagePill)}>可后续编辑</Badge>
+      </div>
+      <div className="relative min-h-56 overflow-hidden rounded-[1.35rem] border border-[#e9d8c4] bg-[#fff1de]/70 p-4">
+        <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(104,85,66,0.16)_1px,transparent_0)] bg-[size:18px_18px] opacity-35" />
+        <div className="relative grid gap-3">
+          <div className="w-[72%] rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2] p-3 text-xs text-[#45506a] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">创作意图</div>
+          <div className="ml-auto w-[70%] rounded-[1rem] border border-[#d6e7df] bg-[#e7f1ec] p-3 text-xs text-[#486e64] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">参考图 / 建议方向</div>
+          <div className="w-[78%] rounded-[1rem] border border-[#f2d6cf] bg-[#f8e3dd] p-3 text-xs text-[#9e574c] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">生成初稿</div>
+          <div className="ml-auto w-[64%] rounded-[1rem] border border-[#253048]/20 bg-[#253048] p-3 text-xs text-[#fffaf2] shadow-[0_10px_24px_rgba(37,48,72,0.12)]">选为主图</div>
+        </div>
+      </div>
+    </CardContent>
+  </Card>;
 }
 
 export function VisualStageClient() {
   const [intent, setIntent] = useState('');
-  const [started, setStarted] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [feedbackCandidates, setFeedbackCandidates] = useState<ComparisonCandidate[]>([]);
-  const [committed, setCommitted] = useState(false);
-  const creationCase = useMemo(() => deriveCreationCase(started ? intent : ''), [intent, started]);
-  const champion = creationCase.champion ?? visualStageComparisonPlaceholders[0];
-  const comparisonBase = creationCase.comparisons.length ? creationCase.comparisons : visualStageComparisonPlaceholders.slice(1);
-  const comparisons = [...feedbackCandidates, ...comparisonBase].slice(0, 4);
-  const territories = creationCase.referenceTerritories.length ? creationCase.referenceTerritories : referenceTerritoryFixtures;
-  const generateDisabled = !started || creationCase.route === 'ask-first' || creationCase.anchors.some((anchor) => anchor.hardBlocker && anchor.state === 'missing');
+  const [hasReference, setHasReference] = useState(false);
+  const [showDrafts, setShowDrafts] = useState(false);
 
-  function startCase() {
-    setStarted(true);
-    setFeedbackMessage('');
-    setFeedbackCandidates([]);
-    setCommitted(false);
-  }
+  const messages = useMemo<AssistantMessage[]>(() => {
+    const next = [...initialMessages];
+    if (hasReference) {
+      next.push({
+        id: 'reference',
+        tone: 'reference',
+        title: '参考图',
+        body: '参考图已经放进当前创作案。',
+      });
+    }
+    if (intent.trim()) {
+      next.push({
+        id: 'user-intent',
+        tone: 'user',
+        body: intent.trim(),
+      });
+      next.push({
+        id: 'assistant-brief',
+        tone: 'assistant',
+        title: '我先这样理解',
+        body: '你想先得到一组可判断的初稿。我会保留你的核心描述，把用途、气质、参考图和下一步生成动作整理在一起。',
+        chips: ['可直接出初稿', hasReference ? '已包含参考图' : '可继续补参考图', '结果会进入画布'],
+      });
+    }
+    if (showDrafts) {
+      next.push({
+        id: 'drafts',
+        tone: 'drafts',
+        title: '初稿占位',
+        body: '原型阶段先展示生成后的呈现方式，不接真实 AI，也不消耗生图额度。',
+      });
+    }
+    return next;
+  }, [hasReference, intent, showDrafts]);
 
-  function addJudgmentFeedback(label: string, summary: string) {
-    setFeedbackCandidates((previous) => [
-      { id: `feedback-${label}`, label, summary },
-      ...previous.filter((candidate) => candidate.label !== label),
-    ].slice(0, 2));
-    setFeedbackMessage('反馈已记录 · Case updated · 创作案已更新');
+  function addQuickPrompt(prompt: string) {
+    setIntent((current) => current.trim() ? `${current}，${prompt}` : prompt);
   }
 
   return <section data-testid="visual-stage-shell" data-vi="warm-editorial-board-v1" aria-label={vi.system} className={vi.shell}>
-    <div aria-hidden="true" className={vi.pageWash} />
-    <div aria-hidden="true" className={vi.pageGrid} />
-    <BoardGlow className="-left-24 top-10 h-80 w-80 bg-[#f8e3dd]/70" />
-    <BoardGlow className="right-0 top-16 h-80 w-80 bg-[#e7f1ec]/78" />
-    <BoardGlow className="bottom-10 left-1/3 h-72 w-72 bg-[#fff1de]/88" />
+    <div aria-hidden="true" className={vi.wash} />
+    <div aria-hidden="true" className={vi.grain} />
+    <Glow className="-left-20 top-10 h-72 w-72 bg-[#f8e3dd]/72" />
+    <Glow className="right-0 top-24 h-72 w-72 bg-[#e7f1ec]/80" />
 
-    <div className="relative z-10 mx-auto grid max-w-7xl gap-5 px-4 py-5 md:px-8 md:py-8">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.94fr)_minmax(420px,1.06fr)]">
-        <Card className={cn('overflow-hidden rounded-[2.35rem]', vi.elevatedPanel)}>
-          <CardContent className="grid min-h-[36rem] content-center gap-7 p-5 md:p-8 lg:p-10">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge className={cn('rounded-full px-3 py-1 text-xs uppercase tracking-[0.16em]', vi.inkPill)}>Visual Stage · D · Creative Board</Badge>
-              <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', vi.coralPill)}>Warm Editorial Board</Badge>
-              <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-xs text-[#45506a]">专业不降级，兴趣不劝退</Badge>
-            </div>
-            <div>
-              <p className="mb-5 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.2em] text-[#9e574c] before:h-px before:w-8 before:bg-[#b96a5c]">Mood before settings</p>
-              <h1 className="max-w-3xl text-5xl font-extrabold leading-[0.93] tracking-[-0.075em] text-[#253048] md:text-7xl">
-                把粗糙意图铺成可判断的 <span className={vi.accentText}>创作板</span>
-              </h1>
-              <p className={cn('mt-6 max-w-2xl text-base leading-8 md:text-lg', vi.copy)}>
-                温润编辑式创作板先提供纸面秩序：墨蓝建立专业感，珊瑚色点亮行动，鼠尾草绿承接参考。彩色只做判断线索，UI is the frame, not the artwork。
-              </p>
-            </div>
-            <Card data-testid="visual-stage-composer" className={cn('rounded-[1.85rem] py-0', vi.paperPanel)}>
-              <CardContent className="grid gap-3 p-3 md:p-4">
-                <Textarea
-                  aria-label="创作意图 Creation intent"
-                  value={intent}
-                  onChange={(event) => setIntent(event.target.value)}
-                  placeholder="一句话说想做什么：做一张高级一点的头像 / 黑金冷萃海报 / 参考图改造成封面..."
-                  className="min-h-24 resize-none rounded-[1.25rem] border-[#e9d8c4] bg-[#fffaf2] text-base text-[#253048] placeholder:text-[#9ba4b3] focus-visible:ring-[#b96a5c]/28"
-                />
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap gap-2">
-                    {visualStageScaffolds.map((scaffold, index) => <Badge key={scaffold} variant="outline" className={cn('rounded-full px-3 py-1', scaffoldTone[index % scaffoldTone.length])}>{scaffold}</Badge>)}
-                  </div>
-                  <Button onClick={startCase} className={cn('px-5', vi.primaryButton)} disabled={!intent.trim()}>整理创作案 · Start Visual Stage</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </CardContent>
-        </Card>
+    <div className="relative z-10 mx-auto grid max-w-6xl gap-5 px-4 py-5 md:grid-cols-[minmax(360px,0.74fr)_minmax(0,1fr)] md:px-8 md:py-8">
+      <div className="grid content-start gap-5 md:sticky md:top-6">
+        <div className="grid gap-3 px-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={cn('rounded-full px-3 py-1 text-xs', vi.inkPill)}>创作中心原型</Badge>
+            <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', vi.coralPill)}>移动端优先</Badge>
+            <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-xs text-[#45506a]">中文优先</Badge>
+          </div>
+          <h1 className="text-4xl font-extrabold leading-[0.98] tracking-[-0.07em] text-[#253048] md:text-6xl">
+            先把一句想法变成可看的初稿
+          </h1>
+          <p className="max-w-xl text-sm leading-7 text-[#6b7488] md:text-base">
+            本切片只固定创作助手模块：用户通过对话描述、添加参考图、查看建议和初稿占位。暂不接真实 AI，不跑完整生图流程。
+          </p>
+        </div>
+        <CanvasPreview />
+      </div>
 
-        <aside className={cn('relative min-h-[42rem] overflow-hidden rounded-[2.35rem] border p-5 md:p-7', vi.elevatedPanel)} aria-label="Warm Editorial Board visual sample">
-          <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(104,85,66,0.14)_1px,transparent_0)] bg-[size:22px_22px] opacity-35" />
-          <div className="relative z-10 mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <strong className="block text-2xl tracking-[-0.04em] text-[#253048]">Creative Board</strong>
-              <span className="mt-1 block text-xs text-[#6b7488]">{vi.ratio}</span>
+      <PhoneFrame>
+        <div className="flex min-h-[780px] flex-col bg-[#fffaf2]">
+          <div className="border-b border-[#e9d8c4] bg-[#fffaf2]/92 px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-[#6b7488]">新的创作</p>
+                <h2 className="text-xl font-bold tracking-[-0.045em] text-[#253048]">创作助手</h2>
+              </div>
+              <Badge variant="outline" className={cn('rounded-full px-3 py-1', vi.sagePill)}>原型</Badge>
             </div>
-            <Badge variant="outline" className={cn('rounded-full px-3 py-1', vi.sagePill)}>Reference aligned</Badge>
           </div>
 
-          <div className="relative z-10 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="relative min-h-[20rem] overflow-hidden rounded-[1.8rem] border border-[#e9d8c4] bg-[#fffaf2]/70 p-4 shadow-[inset_0_1px_0_rgba(255,250,242,0.90)]">
-              <div aria-hidden="true" className="absolute inset-4 rounded-[1.45rem] border border-dashed border-[#d9c2a7]" />
-              {boardPins.map((pin) => <BoardPin key={pin.eyebrow} className={pin.className}>
-                <p className="font-mono text-[0.64rem] uppercase tracking-[0.18em] opacity-75">{pin.eyebrow}</p>
-                <b className="mt-1 block text-lg tracking-[-0.045em] md:text-xl">{pin.title}</b>
-              </BoardPin>)}
-              <div className="absolute left-1/2 top-1/2 grid size-24 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-[#e9d8c4] bg-[#fffaf2] text-3xl text-[#b96a5c] shadow-[0_16px_36px_rgba(37,48,72,0.12)]">✦</div>
-            </div>
+          <div data-testid="creation-assistant-thread" className="flex-1 space-y-3 overflow-hidden bg-[#fff1de]/45 px-3 py-4">
+            {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
+          </div>
 
-            <div className="grid gap-4">
-              <div className="rounded-[1.6rem] border border-[#d6e7df] bg-[#e7f1ec]/82 p-5 shadow-[0_14px_34px_rgba(37,48,72,0.07)]">
-                <Badge variant="outline" className={cn('mb-3 rounded-full px-3 py-1', vi.sagePill)}>Reference Canvas</Badge>
-                <h2 className="text-2xl font-bold tracking-[-0.055em] text-[#253048]">参考稳定，作品优先</h2>
-                <p className="mt-3 text-sm leading-6 text-[#6b7488]">参考区只使用 Sage 语义，不把每张卡染成不同颜色。</p>
-              </div>
-              <div className="rounded-[1.6rem] border border-[#253048]/20 bg-[#fffaf2] p-5 shadow-[0_14px_34px_rgba(37,48,72,0.08)]">
-                <Badge className={cn('mb-3 rounded-full px-3 py-1', vi.inkPill)}>Champion</Badge>
-                <h2 className="text-2xl font-bold tracking-[-0.055em] text-[#253048]">当前最佳更稳</h2>
-                <p className="mt-3 text-sm leading-6 text-[#6b7488]">Champion 用墨蓝建立权威，只用珊瑚色做少量行动点睛。</p>
+          <div data-testid="creation-assistant-composer" className="border-t border-[#e9d8c4] bg-[#fffaf2] p-3">
+            <div className="mb-2 flex gap-1.5 overflow-x-auto pb-1">
+              {quickPrompts.map((prompt) => <Button key={prompt} type="button" variant="outline" size="sm" className={cn('h-8 shrink-0 px-3 text-xs', vi.softButton)} onClick={() => addQuickPrompt(prompt)}>{prompt}</Button>)}
+            </div>
+            <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2] p-2 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
+              <Textarea
+                aria-label="描述你想创作的画面"
+                value={intent}
+                onChange={(event) => setIntent(event.target.value)}
+                placeholder="描述你想要的画面、用途或修改想法…"
+                className="min-h-24 resize-none border-0 bg-transparent px-2 text-base text-[#253048] shadow-none placeholder:text-[#9ba4b3] focus-visible:ring-0"
+              />
+              <div className="flex items-center justify-between gap-2 pt-2">
+                <Button type="button" variant="outline" size="sm" className={cn('px-3', vi.softButton)} onClick={() => setHasReference(true)}>＋参考图</Button>
+                <Button type="button" size="sm" className={cn('px-4', vi.primaryButton)} disabled={!intent.trim() && !hasReference} onClick={() => setShowDrafts(true)}>生成初稿</Button>
               </div>
             </div>
           </div>
-        </aside>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(340px,0.48fr)]">
-        <Card data-testid="visual-stage-creation-case" className={cn('rounded-[1.85rem]', vi.paperPanel)}>
-          <CardHeader>
-            <CardTitle className={cn('text-2xl tracking-[-0.055em]', vi.title)}>Creation Case</CardTitle>
-            <CardDescription className={vi.quietCopy}>紧凑显示系统理解、锚点状态、路由理由和下一步，不把整张表单压给用户。</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className={cn('rounded-full border px-3 py-1', routeTone[creationCase.route])}>Route · {routeDisplay[creationCase.route]}</Badge>
-              <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] text-[#45506a]">{creationCase.nextAction}</Badge>
-            </div>
-            <p className="rounded-[1.25rem] border border-[#e9d8c4] bg-[#fff1de]/70 p-4 text-sm leading-6 text-[#6b7488]">{creationCase.intentSummary}</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {creationCase.anchors.map((anchor) => <div key={anchor.key} className="rounded-[1.2rem] border border-[#e9d8c4] bg-[#fffaf2] p-3 shadow-[0_8px_20px_rgba(37,48,72,0.06)]">
-                <span className="font-mono text-xs uppercase tracking-[0.16em] text-[#6b7488]">{anchor.label}</span>
-                <p className="mt-1 text-sm font-medium text-[#253048]">{anchor.value ?? 'Missing / 待补齐'}</p>
-                <span className={cn('mt-2 inline-flex rounded-full px-2 py-0.5 text-[0.68rem] font-medium', anchor.hardBlocker ? 'bg-[#f8e3dd] text-[#9e574c]' : anchorTone[anchor.state])}>{anchor.hardBlocker ? 'Hard blocker' : anchor.state}</span>
-              </div>)}
-            </div>
-            <div className={cn('rounded-[1.25rem] border p-4 text-sm leading-6', routeTone[creationCase.route])}>{creationCase.routeReason}</div>
-            <div data-testid="visual-stage-assumptions" className="grid gap-2 rounded-[1.25rem] border border-[#e9d8c4] bg-[#fff1de]/70 p-3 text-xs text-[#6b7488]">
-              <b className="text-[#253048]">Assumptions / 假设</b>
-              {(creationCase.assumptions.length ? creationCase.assumptions : ['No assumptions yet / 暂无假设']).map((assumption) => <span key={assumption}>{assumption}</span>)}
-            </div>
-            <Button className={vi.primaryButton} disabled={generateDisabled}>开始生成 · Generate mock draft</Button>
-          </CardContent>
-        </Card>
-
-        <Card data-testid="visual-stage-router" className={cn('rounded-[1.85rem]', vi.paperPanel)}>
-          <CardHeader>
-            <CardTitle className={cn('text-xl tracking-[-0.05em]', vi.title)}>First-response router</CardTitle>
-            <CardDescription className={vi.quietCopy}>三路路由是产品状态，不是用户需要先选的模式。</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {routeLabels.map((route) => <div key={route.label} className={cn('rounded-[1.2rem] border p-3', creationCase.route === route.route ? routeTone[route.route] : 'border-[#e9d8c4] bg-[#fffaf2] text-[#6b7488]')}>
-              <b className="text-sm text-[#253048]">{route.label}</b>
-              <p className="mt-1 text-xs leading-5">{route.detail}</p>
-            </div>)}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-        <Card data-testid="reference-territories" className={cn('rounded-[1.85rem]', vi.paperPanel)}>
-          <CardHeader>
-            <Badge variant="outline" className={cn('w-fit rounded-full px-3 py-1', vi.sagePill)}>Reference Canvas</Badge>
-            <CardTitle className={cn('text-2xl tracking-[-0.055em]', vi.title)}>Reference Territory Board</CardTitle>
-            <CardDescription className={vi.quietCopy}>参考是方向簇，不是模板库；Ask-first 会显示 Unblocker Card。</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            <div data-testid="visual-stage-unblocker" className="rounded-[1.35rem] border border-[#f2d6cf] bg-[#f8e3dd]/78 p-4">
-              <b className="text-sm text-[#9e574c]">{creationCase.blocker?.title ?? 'Unblocker Card · 不让舞台死掉'}</b>
-              <p className="mt-1 text-xs leading-5 text-[#6b7488]">缺少主体、来源或权利信息时，只补齐关键锚点，不把用户退回问卷。</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {(creationCase.blocker?.actions ?? ['上传照片', '抽象头像']).map((action) => <Badge key={action} variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fffaf2]/82 text-[#253048]">{action}</Badge>)}
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              {territories.map((territory, index) => <div key={territory.id} className={cn('min-w-0 rounded-[1.35rem] border border-[#e9d8c4] p-4 shadow-[0_12px_28px_rgba(37,48,72,0.08)]', territoryTone[index % territoryTone.length])}>
-                <b className="text-sm text-[#253048]">{territory.label}</b>
-                <p className="mt-2 text-xs leading-5 text-[#6b7488]">{territory.reason}</p>
-                <p className="mt-3 text-[0.68rem] text-[#6b7488]">{territory.cues.join(' · ')}</p>
-              </div>)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card data-testid="visual-stage-champion" className={cn('rounded-[1.85rem]', vi.paperPanel)}>
-          <CardHeader>
-            <Badge variant="outline" className={cn('w-fit rounded-full px-3 py-1', vi.coralPill)}>Mood before settings</Badge>
-            <CardTitle className={cn('text-2xl tracking-[-0.055em]', vi.title)}>Champion + Comparison Set</CardTitle>
-            <CardDescription className={vi.quietCopy}>当前最佳与 2–4 个有意义备选保持可见，反馈从判断开始。</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="rounded-[1.5rem] border border-[#253048]/20 bg-[#253048] bg-[linear-gradient(135deg,#253048,#45506a)] p-5 text-[#fffaf2] shadow-[0_18px_42px_rgba(37,48,72,0.18)]">
-              <Badge className="mb-3 rounded-full bg-[#fffaf2] text-[#253048]">Champion</Badge>
-              <b>{champion.label}</b>
-              <p className="mt-2 text-sm leading-6 text-[#fff1de]/82">{champion.summary}</p>
-            </div>
-            <div data-testid="visual-stage-comparison" className="grid gap-3 md:grid-cols-2">
-              <div className="font-mono text-xs uppercase tracking-[0.16em] text-[#6b7488] md:col-span-2">Comparison Set · 对比备选</div>
-              {comparisons.map((candidate, index) => <div key={candidate.id} className={cn('rounded-[1.25rem] border border-l-4 border-[#e9d8c4] p-4', comparisonTone[index % comparisonTone.length])}>
-                <b className="text-[#253048]">{candidate.label}</b>
-                <p className="mt-2 text-sm leading-6 text-[#6b7488]">{candidate.summary}</p>
-              </div>)}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" className={vi.primaryButton} onClick={() => setCommitted(true)} disabled={!started || creationCase.route === 'ask-first'}>用这个 · Commit champion</Button>
-              {feedbackActions.map((action) => <Button key={action.label} variant={action.variant} size="sm" className={vi.secondaryButton} onClick={() => addJudgmentFeedback(action.label, action.summary)}>{action.button}</Button>)}
-            </div>
-            <p data-testid="visual-stage-feedback-status" className="min-h-5 text-sm font-medium text-[#486e64]">{feedbackMessage}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {committed ? <Card data-testid="visual-stage-delivery-package" className={cn('rounded-[1.85rem]', vi.paperPanel)}>
-        <CardHeader>
-          <Badge className={cn('w-fit rounded-full px-3 py-1', vi.inkPill)}>Delivery Package</Badge>
-          <CardTitle className={cn('text-2xl tracking-[-0.055em]', vi.title)}>Delivery Package · 交付包</CardTitle>
-          <CardDescription className={vi.quietCopy}>完成条件是 Champion 可用于具体用途；这里先生成本地 mock 交付摘要，不接真实下载或生产存储。</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm leading-6 md:grid-cols-3">
-          <div className="rounded-[1.25rem] border border-[#e9d8c4] bg-[#fffaf2] p-4">
-            <b className="text-[#253048]">Selected champion</b>
-            <p className="mt-1 text-[#6b7488]">{champion.label} — {champion.summary}</p>
-          </div>
-          <div className="rounded-[1.25rem] border border-[#e9d8c4] bg-[#fffaf2] p-4">
-            <b className="text-[#253048]">Use context / 用途</b>
-            <p className="mt-1 text-[#6b7488]">{creationCase.anchors.find((anchor) => anchor.key === 'useContext')?.value ?? '社媒海报 / use context 待补齐'}</p>
-          </div>
-          <div className="rounded-[1.25rem] border border-[#e9d8c4] bg-[#fffaf2] p-4">
-            <b className="text-[#253048]">Assumptions / 假设</b>
-            <p className="mt-1 text-[#6b7488]">{(creationCase.assumptions.length ? creationCase.assumptions : ['无额外假设']).join('；')}</p>
-          </div>
-          <p className="text-xs text-[#6b7488] md:col-span-2">来源/权利提示：本阶段仅记录创作案摘要与 mock 资产，不写入生产存储。</p>
-          <div className="flex flex-wrap gap-2 md:justify-end">
-            <Button size="sm" className={vi.primaryButton}>导出 mock 包</Button>
-            <Button variant="outline" size="sm" className={vi.secondaryButton}>继续做变体</Button>
-          </div>
-        </CardContent>
-      </Card> : null}
+        </div>
+      </PhoneFrame>
     </div>
   </section>;
 }

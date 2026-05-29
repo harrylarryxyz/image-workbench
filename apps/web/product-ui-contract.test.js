@@ -40,18 +40,15 @@ test('visual stage route encodes the creation-case router product contract', () 
   const surface = files.map((relative) => `\n/* ${relative} */\n${readPage(relative)}`).join('\n');
 
   for (const marker of [
-    'Visual Stage',
-    'D · Creative Board',
-    'Mood before settings',
-    'Reference Canvas',
-    'Creation Case',
-    'Reference-first',
-    'Generate-first',
-    'Ask-first',
-    'Champion',
-    'Comparison Set',
-    'Unblocker Card',
-    '专业不降级，兴趣不劝退',
+    '创作中心原型',
+    '移动端优先',
+    '创作助手',
+    '描述你想要的画面、用途或修改想法',
+    '参考图',
+    '生成初稿',
+    '轻量画布预告',
+    '结果会进入画布',
+    '中文优先',
   ]) {
     assert.match(surface, new RegExp(escapeRegExp(marker)), `visual stage missing ${marker}`);
   }
