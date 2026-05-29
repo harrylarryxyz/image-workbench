@@ -6,6 +6,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 ### Added
 
+- Visual Stage product-philosophy PRD, accepted ADR, PC/mobile interaction/visual spec, discovery log, and first-slice implementation plan for the unified Creation Case routing model.
 - Create Studio visual-master ADR, implementation plan, and reusable UI rules document for future Gallery and Canvas migration slices.
 - Product-level studio primitives that compose Tailwind/Shadcn surfaces for hero, composer panel, preview stage, compare frame, metrics, action toolbar, and support grid.
 
