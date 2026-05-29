@@ -68,6 +68,7 @@ type AssistantMessage = {
   references?: ReferenceToken[];
   draft?: Draft;
   onCommitDraft?: (draft: Draft) => void;
+  createdAt?: number;
 };
 
 type ConversationEntry = {
@@ -76,7 +77,7 @@ type ConversationEntry = {
   title?: string;
   body: string;
   chips?: string[];
-  references?: ReferenceToken[];
+  createdAt: number;
 };
 
 type DraftMessage = AssistantMessage & { tone: 'drafts'; draft: Draft };
@@ -157,7 +158,7 @@ function createAssistantSuggestion(intent: string, references: ReferenceToken[],
     title: generateMode ? '出图前建议' : '助手建议',
     body: `针对「${intent}」：${useCase}。${referenceHint} 建议补充：主体、画面比例、发布渠道和不能改变的元素。${generateMode ? '我会先生成草稿，确认后再加入画布。' : '如果只是讨论，我不会消耗生图额度；打开出图后再生成。'}`,
     chips: [generateMode ? '准备出图' : '普通对话', hasReference ? '已带参考图' : '建议补参考', '建议补充'],
-    references,
+    createdAt: Date.now(),
   };
 }
 
@@ -415,9 +416,10 @@ export function VisualStageClient() {
   async function submit() {
     if (!intent.trim() && !references.length) return;
     const userBody = intent.trim() || references.map((reference) => reference.label).join('、');
+    const timestamp = Date.now();
     setConversation((current) => [
       ...current,
-      { id: `user-${Date.now()}`, tone: 'user', body: userBody, references },
+      { id: `user-${timestamp}`, tone: 'user', body: userBody, createdAt: timestamp },
       createAssistantSuggestion(userBody, references, generateMode),
     ]);
     setShowDrafts(true);
@@ -434,7 +436,7 @@ export function VisualStageClient() {
       const created = await apiPost<TaskResult>(endpoint, payload);
       const initialDraft = { id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: created.images?.[0] };
       setDraft(initialDraft);
-      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft }]);
+      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft, createdAt: Date.now() }]);
       if (created.id) watchTask(created.id);
     } catch (error) {
       setDraft({ id: 'failed', status: 'FAILED', error: humanError(error) });
@@ -449,8 +451,8 @@ export function VisualStageClient() {
   }
 
   const messages = useMemo<AssistantMessage[]>(() => {
-    const next = [...initialMessages, ...conversation, ...draftMessages];
-    return next;
+    const committed = [...conversation, ...draftMessages].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+    return [...initialMessages, ...committed];
   }, [conversation, draftMessages]);
 
   useEffect(() => {
