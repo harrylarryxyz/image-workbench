@@ -45,6 +45,7 @@ test('Visual Stage routes sparse avatar taste prompt to Reference-first with one
   await expect(page.getByTestId('visual-stage-creation-case')).toContainText(/Subject|Missing|待补齐/);
   await expect(page.getByTestId('reference-territories')).toContainText(/高级|克制|商业|真实|设计/);
   await expect(page.getByTestId('visual-stage-unblocker')).toContainText(/Unblocker Card|上传照片|抽象头像/);
+  await expect(page.getByRole('button', { name: /开始生成|Generate/i })).toBeDisabled();
 });
 
 test('Visual Stage routes clear poster prompt to Generate-first with a champion draft', async ({ page }) => {

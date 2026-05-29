@@ -36,7 +36,7 @@ export function VisualStageClient() {
   const comparisonBase = creationCase.comparisons.length ? creationCase.comparisons : visualStageComparisonPlaceholders.slice(1);
   const comparisons = [...feedbackCandidates, ...comparisonBase].slice(0, 4);
   const territories = creationCase.referenceTerritories.length ? creationCase.referenceTerritories : referenceTerritoryFixtures;
-  const generateDisabled = !started || creationCase.route === 'ask-first';
+  const generateDisabled = !started || creationCase.route === 'ask-first' || creationCase.anchors.some((anchor) => anchor.hardBlocker && anchor.state === 'missing');
 
   function startCase() {
     setStarted(true);
