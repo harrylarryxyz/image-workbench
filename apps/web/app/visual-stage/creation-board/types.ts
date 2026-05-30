@@ -33,6 +33,7 @@ export type CreationObject = {
   status?: CreationObjectStatus;
   asset?: {
     assetId?: string;
+    storageKey?: string;
     thumbnailUrl?: string;
     assetUrl?: string;
   };
@@ -75,6 +76,8 @@ export type CreationRelation = {
   selectedLineage?: boolean;
 };
 
+export type SessionRelation = { from: string; to: string; label?: string };
+
 export type SessionCanvasItem = {
   id: string;
   title: string;
@@ -90,14 +93,22 @@ export type SessionCanvasItem = {
   references?: Array<{
     id: string;
     label: string;
-    source: 'local' | 'asset' | 'history';
+    source: 'local' | 'asset' | 'history' | 'canvas';
     title: string;
     hint: string;
     role?: string;
     storageKey?: string;
     assetUrl?: string;
+    sourceObjectId?: string;
+    parentObjectIds?: string[];
   }>;
   branchCount?: number;
+  candidateIndex?: number;
+  taskId?: string;
+  sourceObjectId?: string;
+  parentObjectIds?: string[];
+  generationParams?: { count: number; size: string; quality: string; format: string; apiMode: string; background: string };
+  createdAt?: number;
 };
 
 export type CreationBoardState = {

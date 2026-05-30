@@ -1,8 +1,14 @@
+function localApiBase(): string {
+  const host = process.env.API_INTERNAL_HOST ?? '127.0.0.1';
+  const port = process.env.API_INTERNAL_PORT ?? '3100';
+  return `http://${host}:${port}`;
+}
+
 function apiBase(): string {
   if (typeof window === 'undefined') {
-    return process.env.API_INTERNAL_BASE ?? process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3100';
+    return process.env.API_INTERNAL_BASE ?? process.env.NEXT_PUBLIC_API_BASE ?? localApiBase();
   }
-  return process.env.NEXT_PUBLIC_API_BASE ?? '/api';
+  return '/api';
 }
 
 function readBrowserCookie(name: string): string | null {

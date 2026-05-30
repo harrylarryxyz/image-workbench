@@ -301,6 +301,37 @@ test('visual stage creation board supports draggable relayout, click details, an
   assert.doesNotMatch(surface, /双击或长按用于打开详情卡|双击或长按看详情|单击对象已选中/, 'Creation Board copy must not preserve the old click/long-press contract');
 });
 
+test('visual stage supports isolated creation cases, real generation parameters, preview references, and board lineage', () => {
+  const surface = [
+    'visual-stage/VisualStageClient.tsx',
+    'visual-stage/creation-board/types.ts',
+    'visual-stage/creation-board/CreationBoard.tsx',
+    'visual-stage/creation-board/CreationBoardCanvas.tsx',
+    'visual-stage/creation-board/RelationshipPeek.tsx',
+  ].map((relative) => `\n/* ${relative} */\n${readPage(relative)}`).join('\n');
+
+  for (const marker of [
+    '新建创作案',
+    'creationProjectsStorageKey',
+    'activeProjectIdStorageKey',
+    'generationParams',
+    'count: 1',
+    'data-testid="generation-count-select"',
+    'data-testid="composer-board-reference-token"',
+    'sourceObjectId',
+    'parentObjectIds',
+    'autoCommitTaskImagesToBoard',
+    'sessionRelations',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `Visual Stage missing project/parameter/lineage contract marker: ${marker}`);
+  }
+
+  assert.match(surface, /<CreationBoard[\s\S]*sessionRelations=\{sessionRelations\}/, 'Creation Board must receive live session lineage relations');
+  assert.match(surface, /function continueEdit[\s\S]*referenceFromDraft[\s\S]*pushReference\([\s\S]*appendText:\s*false[\s\S]*setGenerateMode\(true\)/, 'Continue edit should add a generated-image preview reference instead of a text-only prompt');
+  assert.doesNotMatch(surface, /数量 4张|count:\s*2,\s*timeoutSec/, 'Visual Stage must not hard-code two/four generated candidates by default');
+  assert.doesNotMatch(surface, /setIntent\(\(current\) => current\.trim\(\) \? `\$\{nextIntent\}/, 'Board long-press should not inject object titles into the text input');
+});
+
 test('visual stage creation board is a real pannable infinite canvas and renders generated images as visual objects', () => {
   const surface = [
     'visual-stage/creation-board/types.ts',

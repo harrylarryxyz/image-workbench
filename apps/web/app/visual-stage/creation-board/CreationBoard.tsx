@@ -12,14 +12,15 @@ import { CreationBoardCanvas } from './CreationBoardCanvas';
 import { MobileObjectStack } from './MobileObjectStack';
 import { ObjectInspector } from './ObjectInspector';
 import { RelationshipPeek } from './RelationshipPeek';
-import type { CreationObject, SessionCanvasItem } from './types';
+import type { CreationObject, CreationRelation, CreationRelationType, SessionCanvasItem, SessionRelation } from './types';
 
 function objectsFromSession(items: SessionCanvasItem[]): CreationObject[] {
-  return items.slice(0, 2).map((item, index) => {
+  return items.map((item, index) => {
     const referenceSummary = item.references?.length ? `参考：${item.references.map((reference) => `${reference.label} · ${reference.role ?? '参考'}`).join('、')}` : '无显式参考';
     const branchSummary = `分支 ${item.branchCount ?? index + 1}`;
+    const sourceNodeIds = item.parentObjectIds ?? item.references?.flatMap((reference) => reference.parentObjectIds ?? []) ?? [];
     return {
-      id: `session-${item.id}`,
+      id: item.sourceObjectId ?? `session-${item.id}`,
       kind: 'generated.image',
       title: `会话主图 · ${item.title}`,
       summary: item.intent ? `已加入画布。来自当前创作助手会话：${item.intent}。${referenceSummary}。${branchSummary}。` : `已加入画布。来自当前会话的已确认主图。${branchSummary}。`,
@@ -28,8 +29,25 @@ function objectsFromSession(items: SessionCanvasItem[]): CreationObject[] {
       status: index === 0 ? 'champion' : 'active',
       asset: { assetUrl: imageUrl(item.image) ?? undefined, thumbnailUrl: imageUrl(item.image) ?? undefined },
       semantic: { slot: 'resultAnchor', priority: 78 - index * 8, borrow: ['当前会话感觉', '可继续作为参考'] },
+      lineage: { sourceNodeIds, taskId: item.taskId },
     };
   });
+}
+
+function relationType(label?: string): CreationRelationType {
+  if (label === 'edit' || label === 'variant' || label === 'reference' || label === 'adoption') return label;
+  return 'generation';
+}
+
+function relationsFromSession(relations: SessionRelation[]): CreationRelation[] {
+  return relations.map((relation, index) => ({
+    id: `session-edge-${index}-${relation.from}-${relation.to}`,
+    sourceId: relation.from,
+    targetId: relation.to,
+    type: relationType(relation.label),
+    strength: 'primary',
+    selectedLineage: true,
+  }));
 }
 
 function selectedContextCopy(object?: CreationObject) {
@@ -42,8 +60,9 @@ function selectedContextCopy(object?: CreationObject) {
   return `正在基于 ${object.title}`;
 }
 
-export function CreationBoard({ canvasItems, onReuseCanvasItem, onUseObjectInAssistant }: {
+export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem, onUseObjectInAssistant }: {
   canvasItems?: SessionCanvasItem[];
+  sessionRelations?: SessionRelation[];
   onReuseCanvasItem?: (item: SessionCanvasItem) => void;
   onUseObjectInAssistant?: (object: CreationObject) => void;
 }) {
@@ -51,7 +70,9 @@ export function CreationBoard({ canvasItems, onReuseCanvasItem, onUseObjectInAss
   const [inspectorOpenObjectId, setInspectorOpenObjectId] = useState<string | null>(null);
   const [assistantContextObjectId, setAssistantContextObjectId] = useState<string | null>(null);
   const sessionObjects = useMemo(() => objectsFromSession(canvasItems ?? []), [canvasItems]);
+  const sessionLineageRelations = useMemo(() => relationsFromSession(sessionRelations ?? []), [sessionRelations]);
   const objects = useMemo(() => [...creationBoardObjects, ...sessionObjects], [sessionObjects]);
+  const relations = useMemo(() => [...creationBoardRelations, ...sessionLineageRelations], [sessionLineageRelations]);
   const selectedObject = objects.find((object) => object.id === selectedObjectId) ?? objects[0];
   const inspectorObject = objects.find((object) => object.id === inspectorOpenObjectId) ?? undefined;
   const assistantContextObject = objects.find((object) => object.id === assistantContextObjectId) ?? undefined;
@@ -91,7 +112,7 @@ export function CreationBoard({ canvasItems, onReuseCanvasItem, onUseObjectInAss
           <div className="min-w-0 overflow-x-auto overflow-y-hidden rounded-[1.6rem] border border-[#e9d8c4] bg-[#fff1de]/48 p-2" aria-label="创作案板横向画布区域">
             <CreationBoardCanvas
               objects={objects}
-              relations={creationBoardRelations}
+              relations={relations}
               selectedObjectId={selectedObject?.id ?? selectedObjectId}
               onShowDetails={openDetails}
               onUseInAssistant={useObjectInAssistant}
@@ -116,8 +137,8 @@ export function CreationBoard({ canvasItems, onReuseCanvasItem, onUseObjectInAss
               </div>
             </div>
 
-            <ObjectInspector object={inspectorObject} relations={creationBoardRelations} />
-            <RelationshipPeek objects={objects} relations={creationBoardRelations} selectedObjectId={selectedObject?.id ?? selectedObjectId} />
+            <ObjectInspector object={inspectorObject} relations={relations} />
+            <RelationshipPeek objects={objects} relations={relations} selectedObjectId={selectedObject?.id ?? selectedObjectId} />
             {latestCanvasItem ? <Button type="button" variant="outline" className={cn('h-auto rounded-[1rem] border-[#d6e7df] bg-[#e7f1ec] px-3 py-2 text-left text-[#486e64] hover:bg-[#fffaf2]')} onClick={() => onReuseCanvasItem?.(latestCanvasItem)}>
               把当前主图作为 @图片 继续参考
             </Button> : null}
@@ -132,8 +153,8 @@ export function CreationBoard({ canvasItems, onReuseCanvasItem, onUseObjectInAss
         <p className="text-xs leading-5 text-[#6b7488]">移动端聚焦当前对象，不减少编辑能力；Bottom Inspector 承接详情，Relationship Peek 承接关系。</p>
       </div>
       <MobileObjectStack objects={objects} selectedObjectId={selectedObject?.id ?? selectedObjectId} onSelect={openDetails} />
-      <ObjectInspector object={inspectorObject} relations={creationBoardRelations} />
-      <RelationshipPeek objects={objects} relations={creationBoardRelations} selectedObjectId={selectedObject?.id ?? selectedObjectId} />
+      <ObjectInspector object={inspectorObject} relations={relations} />
+      <RelationshipPeek objects={objects} relations={relations} selectedObjectId={selectedObject?.id ?? selectedObjectId} />
       {latestCanvasItem ? <Button type="button" variant="outline" className={cn('h-auto rounded-[1rem] border-[#d6e7df] bg-[#e7f1ec] px-3 py-2 text-left text-[#486e64] hover:bg-[#fffaf2]')} onClick={() => onReuseCanvasItem?.(latestCanvasItem)}>
         把当前主图作为 @图片 继续参考
       </Button> : null}

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
 import { apiFormPost, apiPost } from '@/lib/api';
 import { subscribeTaskEvents, pollTaskUntilTerminal } from '@/lib/task-events';
@@ -34,7 +36,7 @@ const vi = {
   inkPill: 'bg-[#253048] text-[#fffaf2]',
 };
 
-type ReferenceSource = 'local' | 'asset' | 'history';
+type ReferenceSource = 'local' | 'asset' | 'history' | 'canvas';
 type MessageTone = 'user' | 'assistant' | 'suggestion' | 'reference' | 'drafts' | 'notice';
 
 type ReferenceToken = {
@@ -46,6 +48,8 @@ type ReferenceToken = {
   role?: string;
   storageKey?: string;
   assetUrl?: string;
+  sourceObjectId?: string;
+  parentObjectIds?: string[];
 };
 
 type Draft = {
@@ -65,6 +69,31 @@ type CanvasItem = {
   intent?: string;
   references?: ReferenceToken[];
   branchCount?: number;
+  candidateIndex?: number;
+  taskId?: string;
+  sourceObjectId?: string;
+  parentObjectIds?: string[];
+  generationParams?: GenerationParams;
+  createdAt?: number;
+};
+
+type SessionRelation = { from: string; to: string; label?: string };
+
+type GenerationParams = {
+  count: number;
+  size: string;
+  quality: string;
+  format: string;
+  apiMode: string;
+  background: string;
+};
+
+type CreationProject = {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  session: PersistedVisualStageSession;
 };
 
 type AssistantMessage = {
@@ -100,21 +129,37 @@ type PersistedVisualStageSession = {
   draft: Draft | null;
   draftMessages: DraftMessage[];
   canvasItems: CanvasItem[];
+  sessionRelations: SessionRelation[];
   conversation: ConversationEntry[];
+  generationParams: GenerationParams;
+  autoCommitTaskImagesToBoard: boolean;
+};
+
+const defaultGenerationParams: GenerationParams = {
+  count: 1,
+  size: '1024x1024',
+  quality: 'low',
+  format: 'png',
+  apiMode: 'auto',
+  background: 'auto',
 };
 
 const sessionStorageKey = 'image-workbench.visual-stage.session.v1';
+const creationProjectsStorageKey = 'image-workbench.visual-stage.creationProjects.v1';
+const activeProjectIdStorageKey = 'image-workbench.visual-stage.activeProjectId.v1';
 
 const sourceLabel: Record<ReferenceSource, string> = {
   local: '本地新图片',
   asset: '素材图片',
   history: '历史图片',
+  canvas: '画布对象',
 };
 
 const sourceClass: Record<ReferenceSource, string> = {
   local: 'border-[#f2d6cf] bg-[#f8e3dd] text-[#9e574c]',
   asset: 'border-[#d6e7df] bg-[#e7f1ec] text-[#486e64]',
   history: 'border-[#e9d8c4] bg-[#fff1de] text-[#45506a]',
+  canvas: 'border-[#eaaea4] bg-[#f4cfc7] text-[#8d4c43]',
 };
 
 const referenceRoles = ['构图', '人物', '色调', '风格', '产品', '背景'];
@@ -153,6 +198,12 @@ function fileNameFromDraft(draft: Draft) {
   return name.length > 34 ? `${name.slice(0, 18)}…${name.slice(-12)}` : name;
 }
 
+function fileNameFromImage(image: TaskImage, fallback = '生成草稿') {
+  const key = image.storageKey ?? image.assetUrl ?? fallback;
+  const name = decodeURIComponent(key.split('?')[0]).split('/').pop() ?? fallback;
+  return name.length > 34 ? `${name.slice(0, 18)}…${name.slice(-12)}` : name;
+}
+
 function buildReferenceGuidance(references: ReferenceToken[]) {
   const roleCopy: Record<string, string> = {
     构图: '作为构图参考，优先学习画面结构、景别和留白关系',
@@ -175,6 +226,72 @@ function assetSrc(assetUrl?: string) {
 
 function referencePreviewSrc(reference: ReferenceToken) {
   return assetSrc(reference.assetUrl) ?? (reference.storageKey ? `/api/assets/file?key=${encodeURIComponent(reference.storageKey)}` : undefined);
+}
+
+function uniqueNonEmpty(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.filter(Boolean) as string[]));
+}
+
+function canvasObjectIdFromItem(item: Pick<CanvasItem, 'id' | 'sourceObjectId'>) {
+  return item.sourceObjectId ?? `session-${item.id}`;
+}
+
+function referenceFromCanvasItem(item: CanvasItem, nextNumber: number): ReferenceToken | null {
+  if (!item.image) return null;
+  const sourceObjectId = canvasObjectIdFromItem(item);
+  return {
+    id: `canvas-${sourceObjectId}-${nextNumber}`,
+    label: `@图片${nextNumber}`,
+    source: 'canvas',
+    title: item.title,
+    hint: '来自创作案板的预览图引用；不会把图片名塞进输入框。',
+    role: '风格',
+    storageKey: item.image.storageKey,
+    assetUrl: item.image.assetUrl,
+    sourceObjectId,
+    parentObjectIds: uniqueNonEmpty([sourceObjectId, ...(item.parentObjectIds ?? [])]),
+  };
+}
+
+function referenceFromCreationObject(object: CreationObject, nextNumber: number): ReferenceToken {
+  const sourceObjectId = object.id;
+  return {
+    id: `canvas-${sourceObjectId}-${nextNumber}`,
+    label: `@图片${nextNumber}`,
+    source: 'canvas',
+    title: object.title,
+    hint: '来自画布对象的预览图引用；作为上下文卡片带入创作助手。',
+    role: object.kind === 'brand.palette' ? '品牌' : object.kind === 'text' ? '文字/版式' : '风格',
+    storageKey: object.asset?.storageKey,
+    assetUrl: object.asset?.assetUrl ?? object.asset?.thumbnailUrl,
+    sourceObjectId,
+    parentObjectIds: uniqueNonEmpty([sourceObjectId, ...(object.lineage?.sourceNodeIds ?? [])]),
+  };
+}
+
+function referenceFromDraft(draft: Draft, nextNumber: number): ReferenceToken | null {
+  const championIndex = draft.championIndex ?? 0;
+  const image = draft.images?.[championIndex] ?? draft.image;
+  if (!image) return null;
+  const id = canvasItemIdFromImage(draft, image, championIndex);
+  const sourceObjectId = `session-${id}`;
+  return {
+    id: `canvas-${sourceObjectId}-${nextNumber}`,
+    label: `@图片${nextNumber}`,
+    source: 'canvas',
+    title: fileNameFromImage(image, `生成图 ${championIndex + 1}`),
+    hint: '来自对话生成图的预览引用；用于继续生成并在案板保留父子关系。',
+    role: '风格',
+    storageKey: image.storageKey,
+    assetUrl: image.assetUrl ?? image.thumbnailUrl,
+    sourceObjectId,
+    parentObjectIds: [sourceObjectId],
+  };
+}
+
+function canvasItemIdFromImage(draft: Draft, image: TaskImage, index: number) {
+  const raw = image.storageKey ?? image.assetUrl ?? `${draft.taskId ?? draft.id}-${index}`;
+  return `${draft.taskId ?? draft.id}-${index}-${encodeURIComponent(raw).slice(0, 96)}`;
 }
 
 function draftStatusSummary(draft: Draft) {
@@ -202,6 +319,22 @@ function createAssistantSuggestion(intent: string, references: ReferenceToken[],
   };
 }
 
+function createEmptySession(overrides: Partial<PersistedVisualStageSession> = {}): PersistedVisualStageSession {
+  return {
+    intent: overrides.intent ?? '',
+    references: overrides.references ?? [],
+    generateMode: overrides.generateMode ?? false,
+    showDrafts: overrides.showDrafts ?? false,
+    draft: overrides.draft ?? null,
+    draftMessages: overrides.draftMessages ?? [],
+    canvasItems: overrides.canvasItems ?? [],
+    sessionRelations: overrides.sessionRelations ?? [],
+    conversation: overrides.conversation ?? [],
+    generationParams: { ...defaultGenerationParams, ...(overrides.generationParams ?? {}) },
+    autoCommitTaskImagesToBoard: overrides.autoCommitTaskImagesToBoard ?? true,
+  };
+}
+
 function loadPersistedSession(): Partial<PersistedVisualStageSession> | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -221,6 +354,39 @@ function savePersistedSession(session: PersistedVisualStageSession) {
   }
 }
 
+function loadPersistedProjects() {
+  if (typeof window === 'undefined') return { projects: [] as CreationProject[], activeProjectId: '' };
+  try {
+    const raw = window.localStorage.getItem(creationProjectsStorageKey);
+    const parsed = raw ? JSON.parse(raw) as CreationProject[] : [];
+    const projects = parsed.map((project) => ({ ...project, session: createEmptySession(project.session) }));
+    return { projects, activeProjectId: window.localStorage.getItem(activeProjectIdStorageKey) ?? projects[0]?.id ?? '' };
+  } catch {
+    return { projects: [] as CreationProject[], activeProjectId: '' };
+  }
+}
+
+function persistCreationProjects(projects: CreationProject[], activeProjectId: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(creationProjectsStorageKey, JSON.stringify(projects));
+    window.localStorage.setItem(activeProjectIdStorageKey, activeProjectId);
+  } catch {
+    // Keep the live workspace usable when storage quota/private mode blocks persistence.
+  }
+}
+
+function createProject(title: string, session: PersistedVisualStageSession = createEmptySession()): CreationProject {
+  const now = Date.now();
+  return { id: `creation-case-${now}-${Math.random().toString(36).slice(2, 7)}`, title, createdAt: now, updatedAt: now, session };
+}
+
+function projectTitleFromSession(project: CreationProject, session: PersistedVisualStageSession) {
+  if (!project.title.startsWith('创作案 ')) return project.title;
+  const source = session.intent.trim() || session.conversation.find((entry) => entry.tone === 'user')?.body?.trim() || project.title;
+  return source.length > 16 ? `${source.slice(0, 16)}…` : source;
+}
+
 function Glow({ className }: { className?: string }) {
   return <div aria-hidden="true" className={cn('pointer-events-none absolute rounded-full blur-3xl', className)} />;
 }
@@ -233,13 +399,17 @@ function PhoneFrame({ children }: { children: ReactNode }) {
 
 function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void }) {
   const src = referencePreviewSrc(reference);
+  const trayChildren = <>
+    {src ? <img src={src} alt={`${reference.label} 缩略图`} className="h-7 w-7 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-current/15 bg-[#fffaf2]/60" />}
+    <span className="min-w-0 flex-1 truncate font-semibold">{reference.label}</span>
+    {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
+    <Button type="button" variant="ghost" size="sm" aria-label={`${reference.label} 用途`} className="h-6 shrink-0 rounded-full px-1.5 text-[0.62rem] opacity-80" onClick={() => onRemove?.(`${reference.id}:role`)}>{reference.role ?? '用途'}</Button>
+  </>;
+  if (tray && reference.source === 'canvas') {
+    return <div data-testid="composer-board-reference-token" className={cn('inline-flex h-9 w-[9rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>{trayChildren}</div>;
+  }
   if (tray) {
-    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[9rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
-      {src ? <img src={src} alt={`${reference.label} 缩略图`} className="h-7 w-7 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-current/15 bg-[#fffaf2]/60" />}
-      <span className="min-w-0 flex-1 truncate font-semibold">{reference.label}</span>
-      {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
-      <Button type="button" variant="ghost" size="sm" aria-label={`${reference.label} 用途`} className="h-6 shrink-0 rounded-full px-1.5 text-[0.62rem] opacity-80" onClick={() => onRemove?.(`${reference.id}:role`)}>{reference.role ?? '用途'}</Button>
-    </div>;
+    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[9rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>{trayChildren}</div>;
   }
   return <div className={cn('rounded-[1rem] border p-2', sourceClass[reference.source], 'min-w-0')}>
     <div className="flex min-w-0 items-center gap-2">
@@ -386,32 +556,95 @@ export function VisualStageClient() {
   const [draftMessages, setDraftMessages] = useState<DraftMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
+  const [sessionRelations, setSessionRelations] = useState<SessionRelation[]>([]);
   const [conversation, setConversation] = useState<ConversationEntry[]>([]);
+  const [generationParams, setGenerationParams] = useState<GenerationParams>(defaultGenerationParams);
+  const [creationProjects, setCreationProjects] = useState<CreationProject[]>([]);
+  const [activeProjectId, setActiveProjectId] = useState('');
+  const [projectsHydrated, setProjectsHydrated] = useState(false);
   const lastIntentRef = useRef('');
   const lastReferencesRef = useRef<ReferenceToken[]>([]);
+  const taskContextRef = useRef<Record<string, { intent: string; references: ReferenceToken[]; generationParams: GenerationParams }>>({});
   const threadRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const currentSession = useMemo(() => createEmptySession({
+    intent,
+    references,
+    generateMode,
+    showDrafts,
+    draft,
+    draftMessages,
+    canvasItems,
+    sessionRelations,
+    conversation,
+    generationParams,
+    autoCommitTaskImagesToBoard: true,
+  }), [canvasItems, conversation, draft, draftMessages, generateMode, generationParams, intent, references, sessionRelations, showDrafts]);
+
+  function applySession(session: Partial<PersistedVisualStageSession> | null | undefined) {
+    const normalized = createEmptySession(session ?? {});
+    setIntent(normalized.intent);
+    setReferences(normalized.references);
+    setGenerateMode(normalized.generateMode);
+    setShowDrafts(normalized.showDrafts);
+    setDraft(normalized.draft);
+    setDraftMessages(normalized.draftMessages);
+    setCanvasItems(normalized.canvasItems);
+    setSessionRelations(normalized.sessionRelations);
+    setConversation(normalized.conversation);
+    setGenerationParams(normalized.generationParams);
+    lastIntentRef.current = normalized.intent;
+    lastReferencesRef.current = normalized.references;
+    if (normalized.draft?.taskId && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(normalized.draft.status)) watchTask(normalized.draft.taskId);
+  }
+
   useEffect(() => {
-    const persisted = loadPersistedSession();
-    if (!persisted) return;
-    setIntent(persisted.intent ?? '');
-    setReferences(persisted.references ?? []);
-    setGenerateMode(Boolean(persisted.generateMode));
-    setShowDrafts(Boolean(persisted.showDrafts));
-    setDraft(persisted.draft ?? null);
-    setDraftMessages(persisted.draftMessages ?? []);
-    setCanvasItems(persisted.canvasItems ?? []);
-    setConversation(persisted.conversation ?? []);
-    if (persisted.draft?.taskId && !['SUCCEEDED', 'FAILED', 'CANCELLED'].includes(persisted.draft.status)) watchTask(persisted.draft.taskId);
-    // Hydrate client-only persisted session once after SSR.
+    const legacySession = loadPersistedSession();
+    const { projects, activeProjectId: storedActiveProjectId } = loadPersistedProjects();
+    const initialProjects = projects.length ? projects : [createProject('创作案 1', createEmptySession(legacySession ?? {}))];
+    const initialActiveProjectId = initialProjects.some((project) => project.id === storedActiveProjectId) ? storedActiveProjectId : initialProjects[0]?.id ?? '';
+    const activeProject = initialProjects.find((project) => project.id === initialActiveProjectId) ?? initialProjects[0];
+    setCreationProjects(initialProjects);
+    setActiveProjectId(initialActiveProjectId);
+    applySession(activeProject?.session);
+    persistCreationProjects(initialProjects, initialActiveProjectId);
+    setProjectsHydrated(true);
+    // Hydrate client-only persisted project once after SSR.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    savePersistedSession({ intent, references, generateMode, showDrafts, draft, draftMessages, canvasItems, conversation });
-  }, [canvasItems, conversation, draft, draftMessages, generateMode, intent, references, showDrafts]);
+    if (!projectsHydrated || !activeProjectId) return;
+    savePersistedSession(currentSession);
+    setCreationProjects((current) => {
+      const next = current.map((project) => project.id === activeProjectId ? { ...project, title: projectTitleFromSession(project, currentSession), updatedAt: Date.now(), session: currentSession } : project);
+      persistCreationProjects(next, activeProjectId);
+      return next;
+    });
+  }, [activeProjectId, currentSession, projectsHydrated]);
+
+  function newCreationProject() {
+    const savedActiveProjects = creationProjects.map((project) => project.id === activeProjectId ? { ...project, updatedAt: Date.now(), session: currentSession } : project);
+    const nextProject = createProject(`创作案 ${savedActiveProjects.length + 1}`);
+    const nextProjects = [nextProject, ...savedActiveProjects];
+    setCreationProjects(nextProjects);
+    setActiveProjectId(nextProject.id);
+    applySession(nextProject.session);
+    persistCreationProjects(nextProjects, nextProject.id);
+  }
+
+  function switchCreationProject(projectId: string) {
+    if (!projectId || projectId === activeProjectId) return;
+    const savedProjects = creationProjects.map((project) => project.id === activeProjectId ? { ...project, updatedAt: Date.now(), session: currentSession } : project);
+    const target = savedProjects.find((project) => project.id === projectId);
+    if (!target) return;
+    setCreationProjects(savedProjects);
+    setActiveProjectId(projectId);
+    applySession(target.session);
+    persistCreationProjects(savedProjects, projectId);
+  }
 
   function appendToken(reference: ReferenceToken) {
     setIntent((current) => {
@@ -420,9 +653,9 @@ export function VisualStageClient() {
     });
   }
 
-  function pushReference(reference: ReferenceToken) {
+  function pushReference(reference: ReferenceToken, options: { appendText?: boolean } = {}) {
     setReferences((current) => [...current, reference]);
-    appendToken(reference);
+    if (options.appendText ?? reference.source !== 'canvas') appendToken(reference);
     setShowMentionPicker(false);
   }
 
@@ -479,14 +712,60 @@ export function VisualStageClient() {
     }
   }
 
+  function updateGenerationParam<K extends keyof GenerationParams>(key: K, value: GenerationParams[K]) {
+    setGenerationParams((current) => ({ ...current, [key]: value }));
+  }
+
+  function autoCommitTaskImagesToBoard(nextDraft: Draft, refs = lastReferencesRef.current, prompt = lastIntentRef.current, params = generationParams) {
+    if (nextDraft.status !== 'SUCCEEDED') return;
+    const images = nextDraft.images?.length ? nextDraft.images : nextDraft.image ? [nextDraft.image] : [];
+    if (!images.length) return;
+    const directParentObjectIds = uniqueNonEmpty(refs.map((reference) => reference.sourceObjectId));
+    const parentObjectIds = uniqueNonEmpty(refs.flatMap((reference) => [reference.sourceObjectId, ...(reference.parentObjectIds ?? [])]));
+    const additions = images.map((image, index) => {
+      const id = canvasItemIdFromImage(nextDraft, image, index);
+      const sourceObjectId = `session-${id}`;
+      return {
+        id,
+        sourceObjectId,
+        title: fileNameFromImage(image, `生成图 ${index + 1}`),
+        image,
+        intent: prompt,
+        references: refs,
+        parentObjectIds,
+        candidateIndex: index,
+        taskId: nextDraft.taskId ?? nextDraft.id,
+        generationParams: params,
+        createdAt: Date.now() + index,
+      } satisfies CanvasItem;
+    });
+    setCanvasItems((current) => {
+      const seen = new Set(current.map((item) => item.id));
+      const fresh = additions.filter((item) => !seen.has(item.id)).map((item, index) => ({ ...item, branchCount: current.length + index + 1 }));
+      return fresh.length ? [...fresh, ...current] : current;
+    });
+    setSessionRelations((current) => {
+      const seen = new Set(current.map((relation) => `${relation.from}->${relation.to}`));
+      const fresh = additions.flatMap((item) => directParentObjectIds.map((parentId) => ({ from: parentId, to: item.sourceObjectId ?? `session-${item.id}`, label: 'generation' }))).filter((relation) => {
+        const key = `${relation.from}->${relation.to}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return fresh.length ? [...current, ...fresh] : current;
+    });
+  }
+
   function watchTask(id: string) {
     let fallbackStarted = false;
     const onTask = (task: TaskResult) => {
       const images = task.images ?? [];
       const image = images[0];
       const nextDraft = { id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, images, championIndex: 0, error: task.errorMessage ?? task.error ?? null };
+      const taskContext = taskContextRef.current[id] ?? { intent: lastIntentRef.current, references: lastReferencesRef.current, generationParams };
       setDraft(nextDraft);
-      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? `${draftStatusSummary(nextDraft)}。先选冠军图，确认后再加入画布。` : '已进入真实生成流程，等待任务返回。', draft: { ...message.draft, ...nextDraft, championIndex: message.draft.championIndex ?? 0 }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
+      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? `${draftStatusSummary(nextDraft)}。已自动加入创作案板，可继续选冠军图或基于它再生成。` : '已进入真实生成流程，等待任务返回。', draft: { ...message.draft, ...nextDraft, championIndex: message.draft.championIndex ?? 0 }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
+      autoCommitTaskImagesToBoard(nextDraft, taskContext.references, taskContext.intent, taskContext.generationParams);
     };
     const fallback = async () => {
       if (fallbackStarted) return;
@@ -530,16 +809,18 @@ export function VisualStageClient() {
       const refKeys = references.map((reference) => reference.storageKey).filter(Boolean) as string[];
       const endpoint = refKeys.length ? '/tasks/edit' : '/tasks/generate';
       const prompt = `${intent.trim()}\n${buildReferenceGuidance(references)}`.trim();
+      const params = generationParams;
       lastIntentRef.current = intent.trim();
       lastReferencesRef.current = references;
-      const payload = refKeys.length
-        ? { prompt, model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', refKeys, count: 2, timeoutSec: 600 }
-        : { prompt, model: 'gpt-image-2', size: '1024x1024', quality: 'low', format: 'png', background: 'auto', apiMode: 'auto', count: 1, timeoutSec: 600 };
+      const basePayload = { prompt, model: 'gpt-image-2', size: params.size, quality: params.quality, format: params.format, background: params.background, apiMode: params.apiMode, count: params.count, timeoutSec: 600 };
+      const payload = refKeys.length ? { ...basePayload, refKeys } : basePayload;
       const created = await apiPost<TaskResult>(endpoint, payload);
       const initialImages = created.images ?? [];
       const initialDraft = { id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: initialImages[0], images: initialImages, championIndex: 0 };
+      if (created.id) taskContextRef.current[created.id] = { intent: intent.trim(), references, generationParams: params };
       setDraft(initialDraft);
-      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit, createdAt: Date.now() }]);
+      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: initialDraft.status === 'SUCCEEDED' ? '生成已完成，并已自动加入创作案板。' : '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit, createdAt: Date.now() }]);
+      autoCommitTaskImagesToBoard(initialDraft, references, intent.trim(), params);
       if (created.id) watchTask(created.id);
     } catch (error) {
       setDraft({ id: 'failed', status: 'FAILED', error: humanError(error) });
@@ -549,19 +830,19 @@ export function VisualStageClient() {
   }
 
   function commitDraft(nextDraft: Draft) {
-    if (!nextDraft.image) return;
-    setCanvasItems((current) => [{ id: nextDraft.image?.storageKey ?? nextDraft.id, title: fileNameFromDraft(nextDraft), image: nextDraft.image, intent: lastIntentRef.current, references: lastReferencesRef.current, branchCount: current.length + 1 }, ...current]);
+    autoCommitTaskImagesToBoard(nextDraft);
   }
 
   function reuseCanvasImage(item: CanvasItem) {
-    if (!item.image) return;
-    const nextNumber = references.length + 1;
-    pushReference({ id: `canvas-${nextNumber}`, label: `@图片${nextNumber}`, source: 'history', title: item.title, hint: '来自 Creation Board 主图，可继续作为风格或成片参考。', role: '风格', storageKey: item.image.storageKey, assetUrl: item.image.assetUrl });
+    const reference = referenceFromCanvasItem(item, references.length + 1);
+    if (!reference) return;
+    pushReference(reference, { appendText: false });
+    requestAnimationFrame(() => composerInputRef.current?.focus());
   }
 
   function useCanvasObjectInAssistant(object: CreationObject) {
-    const nextIntent = `基于「${object.title}」继续：`;
-    setIntent((current) => current.trim() ? `${nextIntent} ${current.trim()}` : nextIntent);
+    const reference = referenceFromCreationObject(object, references.length + 1);
+    pushReference(reference, { appendText: false });
     requestAnimationFrame(() => composerInputRef.current?.focus());
   }
 
@@ -571,9 +852,10 @@ export function VisualStageClient() {
   }
 
   function continueEdit(nextDraft: Draft) {
-    const championIndex = nextDraft.championIndex ?? 0;
-    setIntent(`继续优化冠军图 ${championIndex + 1}：保留当前主体和构图，调整为更温润、更适合发布的版本`);
+    const reference = referenceFromDraft(nextDraft, references.length + 1);
+    if (reference) pushReference(reference, { appendText: false });
     setGenerateMode(true);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
   }
 
   function applyChipSuggestion(chip: string) {
@@ -584,6 +866,7 @@ export function VisualStageClient() {
     const committed = [...conversation, ...draftMessages].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
     return [...initialMessages, ...committed];
   }, [conversation, draftMessages]);
+  const activeProject = creationProjects.find((project) => project.id === activeProjectId) ?? creationProjects[0];
 
   useEffect(() => {
     const thread = threadRef.current;
@@ -601,10 +884,20 @@ export function VisualStageClient() {
 
     <div className="relative z-10 mx-auto grid max-w-[1680px] gap-5 px-4 py-5 md:px-8 md:py-8">
       <div className="grid gap-3 px-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge className={cn('rounded-full px-3 py-1 text-xs', vi.inkPill)}>创作中心原型</Badge>
-          <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', vi.coralPill)}>移动端优先</Badge>
-          <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-xs text-[#45506a]">中文优先</Badge>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={cn('rounded-full px-3 py-1 text-xs', vi.inkPill)}>创作中心原型</Badge>
+            <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', vi.coralPill)}>移动端优先</Badge>
+            <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-xs text-[#45506a]">中文优先</Badge>
+          </div>
+          <div data-testid="creation-project-switcher" className="flex min-w-[min(100%,24rem)] items-center gap-2 rounded-full border border-[#e9d8c4] bg-[#fffaf2]/82 p-1 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
+            <Label htmlFor="creation-project-select" className="sr-only">切换创作案</Label>
+            <NativeSelect id="creation-project-select" aria-label="切换创作案" value={activeProjectId} onChange={(event) => switchCreationProject(event.target.value)} className="h-9 rounded-full border-0 bg-transparent text-xs text-[#253048] shadow-none focus-visible:ring-[#b96a5c]/20">
+              {creationProjects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
+              {!creationProjects.length ? <option value="">{activeProject?.title ?? '创作案 1'}</option> : null}
+            </NativeSelect>
+            <Button type="button" size="sm" className={cn('h-9 shrink-0 px-3 text-xs', vi.primaryButton)} onClick={newCreationProject}>新建创作案</Button>
+          </div>
         </div>
         <div className="grid gap-3 xl:grid-cols-[minmax(0,0.72fr)_minmax(340px,0.28fr)] xl:items-end">
           <div className="grid gap-3">
@@ -625,7 +918,7 @@ export function VisualStageClient() {
       </div>
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
-        <CreationBoard canvasItems={canvasItems} onReuseCanvasItem={reuseCanvasImage} onUseObjectInAssistant={useCanvasObjectInAssistant} />
+        <CreationBoard canvasItems={canvasItems} sessionRelations={sessionRelations} onReuseCanvasItem={reuseCanvasImage} onUseObjectInAssistant={useCanvasObjectInAssistant} />
 
         <PhoneFrame>
           <div data-testid="visual-stage-phone" className="flex h-[780px] max-h-[calc(100vh-2rem)] min-h-[720px] flex-col bg-[#fffaf2]">
@@ -661,11 +954,49 @@ export function VisualStageClient() {
 
               {showParams ? <div data-testid="generation-params-drawer" className={cn('absolute bottom-0 left-0 right-0 z-30 rounded-t-[1.6rem] border border-[#e9d8c4] bg-[#fffaf2] p-4 shadow-[0_-18px_50px_rgba(37,48,72,0.16)]')}>
                 <div className="mb-3 flex items-center justify-between">
-                  <b className="text-[#253048]">出图参数</b>
+                  <div>
+                    <b className="block text-[#253048]">出图参数</b>
+                    <span className="text-xs text-[#6b7488]">默认 1 张；多候选需要主动选择。</span>
+                  </div>
                   <Button type="button" variant="ghost" size="sm" className="rounded-full text-[#6b7488]" onClick={() => setShowParams(false)}>收起</Button>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs text-[#45506a]">
-                  {['尺寸 3:4', '数量 4张', '模型 自动', '风格强度 中', '参考权重 70%', '草稿先进对话'].map((item) => <div key={item} className="rounded-[1rem] border border-[#e9d8c4] bg-[#fff1de]/60 px-3 py-2">{item}</div>)}
+                <div className="grid grid-cols-2 gap-3 text-xs text-[#45506a]">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="generation-count-select">数量</Label>
+                    <NativeSelect id="generation-count-select" data-testid="generation-count-select" value={String(generationParams.count)} onChange={(event) => updateGenerationParam('count', Number(event.target.value))} className="border-[#e9d8c4] bg-[#fffaf2] text-xs">
+                      {[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count} 张</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="generation-size-select">尺寸</Label>
+                    <NativeSelect id="generation-size-select" data-testid="generation-size-select" value={generationParams.size} onChange={(event) => updateGenerationParam('size', event.target.value)} className="border-[#e9d8c4] bg-[#fffaf2] text-xs">
+                      {['1024x1024', '1024x1536', '1536x1024', 'auto'].map((size) => <option key={size} value={size}>{size}</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="generation-quality-select">质量</Label>
+                    <NativeSelect id="generation-quality-select" data-testid="generation-quality-select" value={generationParams.quality} onChange={(event) => updateGenerationParam('quality', event.target.value)} className="border-[#e9d8c4] bg-[#fffaf2] text-xs">
+                      {['low', 'medium', 'high', 'auto'].map((quality) => <option key={quality} value={quality}>{quality}</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="generation-format-select">格式</Label>
+                    <NativeSelect id="generation-format-select" data-testid="generation-format-select" value={generationParams.format} onChange={(event) => updateGenerationParam('format', event.target.value)} className="border-[#e9d8c4] bg-[#fffaf2] text-xs">
+                      {['png', 'jpeg', 'webp'].map((format) => <option key={format} value={format}>{format}</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="generation-api-mode-select">API 模式</Label>
+                    <NativeSelect id="generation-api-mode-select" data-testid="generation-api-mode-select" value={generationParams.apiMode} onChange={(event) => updateGenerationParam('apiMode', event.target.value)} className="border-[#e9d8c4] bg-[#fffaf2] text-xs">
+                      {['auto', 'images', 'responses'].map((apiMode) => <option key={apiMode} value={apiMode}>{apiMode}</option>)}
+                    </NativeSelect>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="generation-background-select">背景</Label>
+                    <NativeSelect id="generation-background-select" data-testid="generation-background-select" value={generationParams.background} onChange={(event) => updateGenerationParam('background', event.target.value)} className="border-[#e9d8c4] bg-[#fffaf2] text-xs">
+                      {['auto', 'opaque', 'transparent'].map((background) => <option key={background} value={background}>{background}</option>)}
+                    </NativeSelect>
+                  </div>
                 </div>
               </div> : null}
 
