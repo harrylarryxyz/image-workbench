@@ -59,7 +59,8 @@ test('Creation Board objects can be dragged, clicked for details, and long-press
   await page.mouse.up();
 
   await expect(page.getByTestId('creation-assistant-context')).toContainText('小红书 3:4 交付画板');
-  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/小红书 3:4 交付画板/);
+  await expect(page.getByTestId('composer-board-reference-token')).toContainText('@图片1');
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
 });
 
 test('Visual Stage supports + local image and @ advanced reference tokens on mobile', async ({ page }) => {
@@ -94,7 +95,9 @@ test('Visual Stage supports + local image and @ advanced reference tokens on mob
   await expect(page.getByTestId('creation-assistant-thread')).not.toContainText('做一张温柔高级的护肤品宣传图');
 
   await page.getByRole('button', { name: '参数' }).click();
-  await expect(page.getByTestId('generation-params-drawer')).toContainText('参考权重 70%');
+  await expect(page.getByTestId('generation-params-drawer')).toContainText('默认 1 张');
+  await expect(page.getByTestId('generation-params-drawer')).toContainText('API 模式');
+  await expect(page.getByTestId('generation-count-select')).toHaveValue('1');
   await page.getByRole('button', { name: '收起' }).click();
 
   await page.route('**/api/tasks/edit', async (route) => {
@@ -338,7 +341,7 @@ test('Visual Stage supports comparison drafts, champion selection, continue-edit
   });
   await page.route('**/api/tasks/edit', async (route) => {
     const body = route.request().postDataJSON();
-    expect(body.count).toBeGreaterThanOrEqual(2);
+    expect(body.count).toBe(2);
     await route.fulfill({ json: { id: 'task_comparison_set', type: 'image.edit', status: 'QUEUED' } });
   });
   await page.route('**/api/tasks/task_comparison_set/events', async (route) => route.fulfill({ status: 500, body: 'stream unavailable' }));
@@ -354,6 +357,9 @@ test('Visual Stage supports comparison drafts, champion selection, continue-edit
   await page.getByRole('button', { name: /用途/ }).click();
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('构图');
   await page.getByLabel('描述你想创作的画面').fill('@图片1 做一张温润海报');
+  await page.getByRole('button', { name: '参数' }).click();
+  await page.getByTestId('generation-count-select').selectOption('2');
+  await page.getByRole('button', { name: '收起' }).click();
   await page.getByRole('button', { name: '出图关' }).click();
   await page.getByRole('button', { name: '发送出图' }).click();
 
@@ -361,7 +367,8 @@ test('Visual Stage supports comparison drafts, champion selection, continue-edit
   await page.getByRole('button', { name: '选择第 2 张为冠军图' }).click();
   await expect(page.getByTestId('draft-card')).toContainText('冠军图 2');
   await page.getByRole('button', { name: '继续改' }).click();
-  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/继续优化冠军图 2/);
+  await expect(page.getByTestId('composer-board-reference-token')).toContainText('@图片2');
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
   await page.getByRole('button', { name: '加入画布' }).click();
   await expect(page.getByTestId('creation-board-shell')).toContainText('draft-b.png');
 });
@@ -394,10 +401,15 @@ test('Visual Stage Creation Board tracks intent, references, champion, branches,
   }
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('产品');
   await page.getByLabel('描述你想创作的画面').fill('@图片1 做一张温润纸面感产品海报');
+  await page.getByRole('button', { name: '参数' }).click();
+  await page.getByTestId('generation-count-select').selectOption('2');
+  await page.getByRole('button', { name: '收起' }).click();
   await page.getByRole('button', { name: '出图关' }).click();
   await page.getByRole('button', { name: '发送出图' }).click();
   await page.getByRole('button', { name: '选择第 2 张为冠军图' }).click();
   await page.getByRole('button', { name: '继续改' }).click();
+  await expect(page.getByTestId('composer-board-reference-token')).toContainText('@图片2');
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
   await page.getByRole('button', { name: '加入画布' }).click();
 
   await expect(page.getByTestId('creation-board-shell')).toContainText('Creation Board');
@@ -409,7 +421,8 @@ test('Visual Stage Creation Board tracks intent, references, champion, branches,
   await page.getByRole('button', { name: '把当前主图作为 @图片 继续参考' }).click();
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片2');
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('风格');
-  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/@图片2/);
+  await expect(page.getByTestId('composer-board-reference-token').first()).toContainText('@图片2');
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
 });
 
 
