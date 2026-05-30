@@ -12,6 +12,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 - Tightened Visual Stage chat/reference UX: typing no longer appears in the thread before send, send clears the composer, refresh preserves and auto-scrolls to the latest exchange, generated drafts remain visible when 出图 is toggled off, polling can reconcile already-finished tasks immediately when SSE is unavailable, long draft filenames truncate safely, reference images no longer create automatic chat descriptions, and the reference tray uses visible `@图片N` chips with token-only horizontal scrolling plus deletion.
 - Upgraded `/visual-stage` into a Creation Board MVP: confirmed champion images now carry the source intent, reference-role summary, branch count, main-image framing, “把主图作为参考” reuse, and reference-role guidance is injected into assistant/generation prompts without exposing storage keys or provider details.
 - Fixed Visual Stage comparison-draft generation for reference-image edits: task capabilities now distinguish generate/edit limits, provider edit calls carry the intended output count, `gpt-image-2` edit requests are split into single-output provider calls when needed, and every returned image payload is persisted instead of only the first draft.
+- Tightened Visual Stage review-loop usability: uploaded reference chips now show thumbnails, assistant suggestion chips can be clicked back into the composer, generated drafts show human status instead of file names, and 出图模式 bypasses assistant chatter while going straight to task creation.
 
 ### Added
 

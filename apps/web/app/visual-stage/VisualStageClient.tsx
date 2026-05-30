@@ -171,6 +171,21 @@ function assetSrc(assetUrl?: string) {
   return assetUrl;
 }
 
+function referencePreviewSrc(reference: ReferenceToken) {
+  return assetSrc(reference.assetUrl) ?? (reference.storageKey ? `/api/assets/file?key=${encodeURIComponent(reference.storageKey)}` : undefined);
+}
+
+function draftStatusSummary(draft: Draft) {
+  if (draft.status === 'SUCCEEDED') {
+    const count = draft.images?.length ?? (draft.image ? 1 : 1);
+    return `生成完成 · ${Math.max(count, 1)} 张候选`;
+  }
+  if (draft.status === 'FAILED') return '生成失败';
+  if (draft.status === 'CANCELLED') return '已取消';
+  if (draft.status === 'QUEUED') return '已提交生成';
+  return '生成中';
+}
+
 function createAssistantSuggestion(intent: string, references: ReferenceToken[], generateMode: boolean, createdAt = Date.now()): ConversationEntry {
   const hasReference = references.length > 0;
   const useCase = /小红书|封面|海报|宣传|首图/.test(intent) ? '使用场景已经比较明确' : '使用场景还可以再补一句';
@@ -215,9 +230,10 @@ function PhoneFrame({ children }: { children: ReactNode }) {
 }
 
 function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void }) {
-  const src = assetSrc(reference.assetUrl);
+  const src = referencePreviewSrc(reference);
   if (tray) {
-    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[8.25rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
+    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[9rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>
+      {src ? <img src={src} alt={`${reference.label} 缩略图`} className="h-7 w-7 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-current/15 bg-[#fffaf2]/60" />}
       <span className="min-w-0 flex-1 truncate font-semibold">{reference.label}</span>
       {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
       <Button type="button" variant="ghost" size="sm" aria-label={`${reference.label} 用途`} className="h-6 shrink-0 rounded-full px-1.5 text-[0.62rem] opacity-80" onClick={() => onRemove?.(`${reference.id}:role`)}>{reference.role ?? '用途'}</Button>
@@ -243,14 +259,15 @@ function DraftCard({ draft, onCommitDraft, onSelectChampion, onContinueEdit }: {
   const url = imageUrl(champion);
   const done = draft.status === 'SUCCEEDED' && champion;
   const displayDraft = { ...draft, image: champion };
+  const summary = draftStatusSummary(displayDraft);
   return <div data-testid="draft-card" className="mt-3 min-w-0 overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
     <div className="grid aspect-square place-items-center bg-[linear-gradient(145deg,#fff1de,#f8e3dd)] text-xs text-[#9e574c]">
       {url ? <img src={url} alt="真实生成草稿" className="h-full w-full object-cover" /> : draft.status === 'FAILED' ? '生成失败' : '生成中'}
     </div>
     <div className="grid gap-2 px-2 py-2 text-xs">
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[#253048]" title={fileNameFromDraft(displayDraft)}>{done ? fileNameFromDraft(displayDraft) : '等待生成结果'}</span>
-        <span className="text-[#b96a5c]">{draft.status === 'SUCCEEDED' ? '生成完成' : draft.status}</span>
+        <span className="min-w-0 truncate text-[#253048]">{summary}</span>
+        <span className="shrink-0 text-[#b96a5c]">{done ? '可确认' : '等待结果'}</span>
       </div>
       {images.length > 1 ? <div className="grid gap-2">
         <div className="flex items-center justify-between text-[#6b7488]"><span>比较草稿</span><b className="text-[#9e574c]">冠军图 {championIndex + 1}</b></div>
@@ -267,7 +284,7 @@ function DraftCard({ draft, onCommitDraft, onSelectChampion, onContinueEdit }: {
   </div>;
 }
 
-function MessageBubble({ message }: { message: AssistantMessage }) {
+function MessageBubble({ message, onChipClick }: { message: AssistantMessage; onChipClick?: (chip: string) => void }) {
   const isUser = message.tone === 'user';
   const isReference = message.tone === 'reference';
   const isDrafts = message.tone === 'drafts';
@@ -290,7 +307,7 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
       {isReference ? <div className="mt-3 grid gap-2">
         {message.references?.map((reference) => <div key={reference.id} className="grid grid-cols-[4.5rem_1fr] gap-3">
           <div className="aspect-[4/5] overflow-hidden rounded-[1rem] border border-[#d6e7df] bg-[linear-gradient(145deg,#e7f1ec,#fffaf2_55%,#f8e3dd)]">
-            {assetSrc(reference.assetUrl) ? <img src={assetSrc(reference.assetUrl)} alt="" className="h-full w-full object-cover" /> : null}
+            {referencePreviewSrc(reference) ? <img src={referencePreviewSrc(reference)} alt="" className="h-full w-full object-cover" /> : null}
           </div>
           <div className="grid content-center gap-1 text-xs text-[#6b7488]">
             <span>{reference.title}</span>
@@ -310,7 +327,7 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
         </div>}
       </> : null}
       {message.chips?.length ? <div className="mt-3 flex flex-wrap gap-1.5">
-        {message.chips.map((chip) => <Badge key={chip} variant="outline" className={cn('rounded-full px-2 py-0.5 text-[0.68rem]', isUser ? 'border-[#fffaf2]/30 bg-[#fffaf2]/10 text-[#fffaf2]' : 'border-[#e9d8c4] bg-[#fff1de]/70 text-[#45506a]')}>{chip}</Badge>)}
+        {message.chips.map((chip) => onChipClick && !isUser ? <Button key={chip} type="button" variant="outline" size="sm" className={cn('h-auto rounded-full px-2 py-0.5 text-[0.68rem]', 'border-[#e9d8c4] bg-[#fff1de]/70 text-[#45506a] hover:bg-[#fffaf2]')} onClick={() => onChipClick(chip)}>{chip}</Button> : <Badge key={chip} variant="outline" className={cn('rounded-full px-2 py-0.5 text-[0.68rem]', isUser ? 'border-[#fffaf2]/30 bg-[#fffaf2]/10 text-[#fffaf2]' : 'border-[#e9d8c4] bg-[#fff1de]/70 text-[#45506a]')}>{chip}</Badge>)}
       </div> : null}
     </div>
   </div>;
@@ -466,7 +483,7 @@ export function VisualStageClient() {
       const image = images[0];
       const nextDraft = { id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, images, championIndex: 0, error: task.errorMessage ?? task.error ?? null };
       setDraft(nextDraft);
-      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? '生成完成。先选冠军图，确认后再加入画布。' : '已进入真实生成流程，等待任务返回。', draft: { ...message.draft, ...nextDraft, championIndex: message.draft.championIndex ?? 0 }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
+      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? `${draftStatusSummary(nextDraft)}。先选冠军图，确认后再加入画布。` : '已进入真实生成流程，等待任务返回。', draft: { ...message.draft, ...nextDraft, championIndex: message.draft.championIndex ?? 0 }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
     };
     const fallback = async () => {
       if (fallbackStarted) return;
@@ -500,7 +517,7 @@ export function VisualStageClient() {
       ...current,
       { id: `user-${timestamp}`, tone: 'user', body: userBody, createdAt: timestamp },
     ]);
-    void requestAssistantSuggestion(userBody, references, generateMode, timestamp);
+    if (!generateMode) void requestAssistantSuggestion(userBody, references, generateMode, timestamp);
     setShowDrafts(true);
     setIntent('');
     if (!generateMode) return;
@@ -548,6 +565,10 @@ export function VisualStageClient() {
     const championIndex = nextDraft.championIndex ?? 0;
     setIntent(`继续优化冠军图 ${championIndex + 1}：保留当前主体和构图，调整为更温润、更适合发布的版本`);
     setGenerateMode(true);
+  }
+
+  function applyChipSuggestion(chip: string) {
+    setIntent((current) => current.trim() ? `${current.trim()} ${chip}` : chip);
   }
 
   const messages = useMemo<AssistantMessage[]>(() => {
@@ -600,7 +621,7 @@ export function VisualStageClient() {
           </div>
 
           <div ref={threadRef} data-testid="creation-assistant-thread" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#fff1de]/45 px-3 py-4">
-            {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
+            {messages.map((message) => <MessageBubble key={message.id} message={message} onChipClick={applyChipSuggestion} />)}
           </div>
 
           <div data-testid="creation-assistant-composer" className="relative shrink-0 border-t border-[#e9d8c4] bg-[#fffaf2] p-3">

@@ -101,9 +101,9 @@ test('Visual Stage keeps draft typing out of the thread, clears composer after s
   await expect(thread.locator('> div').last()).toBeInViewport();
 });
 
-test('Visual Stage keeps generated draft visible when generation toggle is turned off and truncates long generated filenames', async ({ page }) => {
+test('Visual Stage keeps generated draft visible when generation toggle is turned off and hides generated filenames', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const longName = 'this-is-a-very-long-generated-filename-that-should-never-push-the-draft-card-outside-of-the-phone-frame-because-it-is-truncated.png';
+  const longName = 'this-is-a-very-long-generated-filename-that-should-never-be-visible-to-users.png';
   let statusPolls = 0;
 
   await page.route('**/api/tasks/generate', async (route) => {
@@ -128,11 +128,12 @@ test('Visual Stage keeps generated draft visible when generation toggle is turne
   await page.getByLabel('描述你想创作的画面').fill('生成一张温润香水海报');
   await page.getByRole('button', { name: '出图关' }).click();
   await page.getByRole('button', { name: '发送出图' }).click();
-  await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成完成');
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成完成 · 1 张候选');
+  await expect(page.getByTestId('creation-assistant-thread')).not.toContainText(longName);
   expect(statusPolls).toBeGreaterThan(0);
 
   await page.getByRole('button', { name: '出图开' }).click();
-  await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成完成');
+  await expect(page.getByTestId('creation-assistant-thread')).toContainText('生成完成 · 1 张候选');
 
   const cardBox = await page.getByTestId('draft-card').boundingBox();
   const phoneBox = await page.getByTestId('visual-stage-phone').boundingBox();
@@ -206,6 +207,51 @@ test('Visual Stage ordinary chat persists assistant conversation after refresh',
   await page.reload();
   await expect(page.getByTestId('creation-assistant-thread')).toContainText('我想做一张温润杂志感护肤品海报');
   await expect(page.getByTestId('creation-assistant-thread')).toContainText('助手建议');
+});
+
+test('Visual Stage makes references previewable, chips actionable, and generation mode bypasses assistant chatter', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  let assistantCalls = 0;
+  const visibleFileName = 'customer-visible-output.png';
+
+  await page.route('**/api/agent/visual-stage/reply', async (route) => {
+    assistantCalls += 1;
+    await route.fulfill({ json: { provider: 'llm', title: '助手建议', body: '可以先补一个画幅比例。', chips: ['补充 3:4 比例', '保持主体'] } });
+  });
+  await page.route('**/api/assets/upload', async (route) => {
+    await route.fulfill({ json: { storageKey: 'local://uploads/default/reference-preview.png', assetUrl: '/assets/file?key=local%3A%2F%2Fuploads%2Fdefault%2Freference-preview.png', originalName: 'reference-preview.png', format: 'png', sizeBytes: tinyPng.length } });
+  });
+  await page.route('**/api/assets/file?**', async (route) => route.fulfill({ body: tinyPng, contentType: 'image/png' }));
+  await page.route('**/api/tasks/generate', async (route) => {
+    await route.fulfill({ json: { id: 'task_human_summary', type: 'image.generate', status: 'QUEUED' } });
+  });
+  await page.route('**/api/tasks/task_human_summary/events', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: `event: task.snapshot\ndata: {"id":"task_human_summary","type":"image.generate","status":"SUCCEEDED","images":[{"storageKey":"local://outputs/default/${visibleFileName}","assetUrl":"/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2F${visibleFileName}","format":"png","sizeBytes":1234}]}\n\n`,
+    });
+  });
+
+  await page.goto('/visual-stage');
+  await page.getByLabel('描述你想创作的画面').fill('先聊一张温润海报');
+  await page.getByRole('button', { name: '发送' }).click();
+  await page.getByRole('button', { name: '补充 3:4 比例' }).click();
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('补充 3:4 比例');
+
+  await page.locator('input[type="file"][aria-label="选择本地新图片"]').setInputFiles({ name: 'reference-preview.png', mimeType: 'image/png', buffer: tinyPng });
+  const firstToken = page.getByTestId('reference-token').first();
+  await expect(firstToken.getByRole('img', { name: '@图片1 缩略图' })).toBeVisible();
+  await expect(firstToken).not.toContainText('reference-preview.png');
+  await firstToken.getByRole('button', { name: '删除 @图片1' }).click();
+
+  await page.getByLabel('描述你想创作的画面').fill('生成一张温润香水海报');
+  await page.getByRole('button', { name: '出图关' }).click();
+  await page.getByRole('button', { name: '发送出图' }).click();
+
+  await expect(page.getByTestId('draft-card')).toContainText('生成完成 · 1 张候选');
+  await expect(page.getByTestId('draft-card')).not.toContainText(visibleFileName);
+  expect(assistantCalls).toBe(1);
 });
 
 test('Visual Stage restores a pending generation after refresh and shows completed draft from polling', async ({ page }) => {
