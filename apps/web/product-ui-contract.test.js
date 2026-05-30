@@ -353,6 +353,23 @@ test('visual stage creation board is a real pannable infinite canvas and renders
   assert.doesNotMatch(surface, /phase-1-static-wysiwyg|静态真实画布壳|当前不调用 AI/, 'reviewable Visual Stage must not present the deployed surface as a static shell');
 });
 
+test('visual stage main board starts empty, persists layout, supports arrange, and avoids duplicate draft actions', () => {
+  const board = readPage('visual-stage/creation-board/CreationBoard.tsx');
+  const canvas = readPage('visual-stage/creation-board/CreationBoardCanvas.tsx');
+  const client = readPage('visual-stage/VisualStageClient.tsx');
+  const surface = `${board}\n${canvas}\n${client}`;
+
+  assert.doesNotMatch(board, /\.\.\.creationBoardObjects/, 'Main /visual-stage board must not preload demo fixture objects');
+  assert.match(board, /emptyCreationBoardCopy/, 'Empty board should explain that the canvas is intentionally blank until work exists');
+  assert.match(canvas, /creationBoardPositionStorageKey/, 'Canvas positions must persist beyond a drag and refresh');
+  assert.match(canvas, /savePersistedNodePositions/, 'Canvas should save drag-stop positions to localStorage');
+  assert.match(canvas, /arrangeNodesIntoReadableGrid/, 'Creation Board needs a one-click readable layout arranger');
+  assert.match(board, /整理画布/, 'Creation Board toolbar should expose one-click layout arrange');
+  assert.match(client, /appendText:\s*true[\s\S]*referenceFromCreationObject|referenceFromCreationObject[\s\S]*appendText:\s*true/, 'Long-pressing a board image should inject its @图片 token into the composer');
+  assert.doesNotMatch(client, /const\s+referenceRoles\s*=|构图'\s*,\s*'人物'|人物'\s*,\s*'色调'|产品'\s*,\s*'背景'/, 'Reference tray must not rely on hard-coded role chips; users should describe usage naturally');
+  assert.doesNotMatch(surface, />继续改<|aria-label="继续改"/, 'Draft cards should not duplicate continue-edit and add-to-board actions');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',

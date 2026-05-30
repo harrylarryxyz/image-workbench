@@ -22,45 +22,49 @@ test('Visual Stage mobile-first creation assistant prototype renders without deb
   await expect(page.getByTestId('visual-stage-shell')).not.toContainText(forbiddenMainFlow);
 });
 
-test('Creation Board objects can be dragged, clicked for details, and long-pressed into the assistant', async ({ page }) => {
+test('Creation Board starts empty, then generated objects can be arranged, inspected, and long-pressed into the assistant', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 920 });
+  await page.route('**/api/tasks/generate', async (route) => {
+    await route.fulfill({ json: { id: 'task_board_drag', type: 'image.generate', status: 'QUEUED' } });
+  });
+  await page.route('**/api/tasks/task_board_drag/events', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: 'event: task.snapshot\ndata: {"id":"task_board_drag","type":"image.generate","status":"SUCCEEDED","images":[{"storageKey":"local://outputs/default/drag-node.png","assetUrl":"/assets/file?key=local%3A%2F%2Foutputs%2Fdefault%2Fdrag-node.png","format":"png","sizeBytes":1234}]}\n\n',
+    });
+  });
+  await page.route('**/api/assets/file?**', async (route) => route.fulfill({ body: tinyPng, contentType: 'image/png' }));
+
   await page.goto('/visual-stage');
+  await expect(page.getByTestId('creation-board-empty-state')).toContainText('空白创作案板');
+  await expect(page.locator('[data-creation-object-id]')).toHaveCount(0);
 
-  const textNode = page.locator('[data-creation-object-id="text-title-1"]');
-  await expect(textNode).toBeVisible();
-  await textNode.scrollIntoViewIfNeeded();
-  const before = await textNode.boundingBox();
-  expect(before).not.toBeNull();
+  await page.getByLabel('描述你想创作的画面').fill('生成一张可拖动的温润纸面感海报');
+  await page.getByRole('button', { name: '出图关' }).click();
+  await page.getByRole('button', { name: '发送出图' }).click();
 
-  await page.mouse.move((before?.x ?? 0) + 40, (before?.y ?? 0) + 28);
-  await page.mouse.down();
-  await page.mouse.move((before?.x ?? 0) + 170, (before?.y ?? 0) + 98, { steps: 8 });
-  await page.mouse.up();
+  const imageNode = page.locator('[data-creation-object-id^="session-task_board_drag-0-"]').first();
+  await expect(imageNode).toBeVisible();
+  await expect(page.getByTestId('creation-board-empty-state')).toHaveCount(0);
+  await page.getByRole('button', { name: '整理画布' }).click();
+  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem('visual-stage.creation-board.node-positions.v1') ?? '')).toContain('task_board_drag');
 
-  await expect.poll(async () => {
-    const after = await textNode.boundingBox();
-    if (!after || !before) return 0;
-    return Math.abs(after.x - before.x) + Math.abs(after.y - before.y);
-  }).toBeGreaterThan(40);
-
-  const refNode = page.locator('[data-creation-object-id="ref-product-1"]');
-  await refNode.click();
+  await imageNode.click();
   const inspector = page.getByRole('complementary').getByTestId('creation-object-inspector');
-  await expect(inspector).toContainText('产品参考图');
-  await expect(inspector).toContainText('单击打开详情');
+  await expect(inspector).toContainText('会话主图');
+  await expect(inspector).toContainText('已加入画布');
 
-  const artboardNode = page.locator('[data-creation-object-id="artboard-xhs-1"]');
-  await artboardNode.scrollIntoViewIfNeeded();
-  const artboardBox = await artboardNode.boundingBox();
-  expect(artboardBox).not.toBeNull();
-  await page.mouse.move((artboardBox?.x ?? 0) + 32, (artboardBox?.y ?? 0) + 32);
+  const nodeBox = await imageNode.boundingBox();
+  expect(nodeBox).not.toBeNull();
+  await page.mouse.move((nodeBox?.x ?? 0) + 32, (nodeBox?.y ?? 0) + 32);
   await page.mouse.down();
   await page.waitForTimeout(720);
   await page.mouse.up();
 
-  await expect(page.getByTestId('creation-assistant-context')).toContainText('小红书 3:4 交付画板');
+  await expect(page.getByTestId('creation-assistant-context')).toContainText('会话主图');
   await expect(page.getByTestId('composer-board-reference-token')).toContainText('@图片1');
-  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/@图片1/);
 });
 
 test('Visual Stage supports + local image and @ advanced reference tokens on mobile', async ({ page }) => {
@@ -329,19 +333,18 @@ test('Visual Stage restores a pending generation after refresh and shows complet
   await expect(page.getByRole('button', { name: '加入画布' })).toBeVisible();
 });
 
-test('Visual Stage supports comparison drafts, champion selection, continue-edit, and reference roles', async ({ page }) => {
+test('Visual Stage supports comparison drafts, champion selection, natural-language references, and no duplicate continue-edit action', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/api/assets/upload', async (route) => {
     await route.fulfill({ json: { storageKey: 'local://uploads/default/role-ref.png', assetUrl: '/assets/file?key=local%3A%2F%2Fuploads%2Fdefault%2Frole-ref.png', originalName: 'role-ref.png', format: 'png', sizeBytes: tinyPng.length } });
   });
-  await page.route('**/api/agent/visual-stage/reply', async (route) => {
-    const body = route.request().postDataJSON();
-    expect(body.references[0].role).toBe('构图');
-    await route.fulfill({ json: { provider: 'llm', title: '创作判断', body: '参考图作为构图锚点，生成后先选冠军图。', chips: ['真实助手', '构图锚点'] } });
-  });
   await page.route('**/api/tasks/edit', async (route) => {
     const body = route.request().postDataJSON();
     expect(body.count).toBe(2);
+    expect(body.refKeys).toEqual(['local://uploads/default/role-ref.png']);
+    expect(body.prompt).toContain('@图片1 做一张温润海报');
+    expect(body.prompt).not.toContain('作为构图参考');
+    expect(body.prompt).not.toContain('作为产品参考');
     await route.fulfill({ json: { id: 'task_comparison_set', type: 'image.edit', status: 'QUEUED' } });
   });
   await page.route('**/api/tasks/task_comparison_set/events', async (route) => route.fulfill({ status: 500, body: 'stream unavailable' }));
@@ -354,8 +357,8 @@ test('Visual Stage supports comparison drafts, champion selection, continue-edit
 
   await page.goto('/visual-stage');
   await page.locator('input[type="file"][aria-label="选择本地新图片"]').setInputFiles({ name: 'role-ref.png', mimeType: 'image/png', buffer: tinyPng });
-  await page.getByRole('button', { name: /用途/ }).click();
-  await expect(page.getByTestId('composer-reference-tokens')).toContainText('构图');
+  await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片1');
+  await expect(page.getByTestId('composer-reference-tokens')).not.toContainText('构图');
   await page.getByLabel('描述你想创作的画面').fill('@图片1 做一张温润海报');
   await page.getByRole('button', { name: '参数' }).click();
   await page.getByTestId('generation-count-select').selectOption('2');
@@ -366,24 +369,24 @@ test('Visual Stage supports comparison drafts, champion selection, continue-edit
   await expect(page.getByTestId('draft-card')).toContainText('比较草稿');
   await page.getByRole('button', { name: '选择第 2 张为冠军图' }).click();
   await expect(page.getByTestId('draft-card')).toContainText('冠军图 2');
-  await page.getByRole('button', { name: '继续改' }).click();
-  await expect(page.getByTestId('composer-board-reference-token')).toContainText('@图片2');
-  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
+  await expect(page.getByRole('button', { name: '继续改' })).toHaveCount(0);
   await page.getByRole('button', { name: '加入画布' }).click();
   await expect(page.getByTestId('creation-board-shell')).toContainText('draft-b.png');
 });
 
-test('Visual Stage Creation Board tracks intent, references, champion, branches, and reuses board image as reference', async ({ page }) => {
+test('Visual Stage Creation Board tracks intent, natural-language references, branches, and reuses board image as reference', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/api/assets/upload', async (route) => {
     await route.fulfill({ json: { storageKey: 'local://uploads/default/board-product.png', assetUrl: '/assets/file?key=local%3A%2F%2Fuploads%2Fdefault%2Fboard-product.png', originalName: 'board-product.png', format: 'png', sizeBytes: tinyPng.length } });
   });
   await page.route('**/api/agent/visual-stage/reply', async (route) => {
-    await route.fulfill({ json: { provider: 'llm', title: '创作判断', body: '我会参考 @图片1 的产品，保持主体。', chips: ['产品保真'] } });
+    await route.fulfill({ json: { provider: 'llm', title: '创作判断', body: '我会按自然语言理解 @图片1，保持主体。', chips: ['主体保真'] } });
   });
   await page.route('**/api/tasks/edit', async (route) => {
     const body = route.request().postDataJSON();
-    expect(body.prompt).toContain('参考使用规则：@图片1 作为产品参考，优先保持主体和关键细节');
+    expect(body.prompt).toContain('@图片1 做一张温润纸面感产品海报');
+    expect(body.prompt).not.toContain('作为产品参考');
+    expect(body.prompt).not.toContain('作为构图参考');
     await route.fulfill({ json: { id: 'task_board_case', type: 'image.edit', status: 'QUEUED' } });
   });
   await page.route('**/api/tasks/task_board_case/events', async (route) => route.fulfill({ status: 500, body: 'stream unavailable' }));
@@ -396,10 +399,8 @@ test('Visual Stage Creation Board tracks intent, references, champion, branches,
 
   await page.goto('/visual-stage');
   await page.locator('input[type="file"][aria-label="选择本地新图片"]').setInputFiles({ name: 'board-product.png', mimeType: 'image/png', buffer: tinyPng });
-  for (let i = 0; i < 5; i += 1) {
-    await page.getByRole('button', { name: /用途/ }).click();
-  }
-  await expect(page.getByTestId('composer-reference-tokens')).toContainText('产品');
+  await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片1');
+  await expect(page.getByTestId('composer-reference-tokens')).not.toContainText('产品');
   await page.getByLabel('描述你想创作的画面').fill('@图片1 做一张温润纸面感产品海报');
   await page.getByRole('button', { name: '参数' }).click();
   await page.getByTestId('generation-count-select').selectOption('2');
@@ -407,20 +408,18 @@ test('Visual Stage Creation Board tracks intent, references, champion, branches,
   await page.getByRole('button', { name: '出图关' }).click();
   await page.getByRole('button', { name: '发送出图' }).click();
   await page.getByRole('button', { name: '选择第 2 张为冠军图' }).click();
-  await page.getByRole('button', { name: '继续改' }).click();
-  await expect(page.getByTestId('composer-board-reference-token')).toContainText('@图片2');
-  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
+  await expect(page.getByRole('button', { name: '继续改' })).toHaveCount(0);
   await page.getByRole('button', { name: '加入画布' }).click();
 
   await expect(page.getByTestId('creation-board-shell')).toContainText('Creation Board');
   await expect(page.getByTestId('creation-board-shell')).toContainText('做一张温润纸面感产品海报');
-  await expect(page.getByTestId('creation-board-shell')).toContainText('@图片1 · 产品');
-  await expect(page.getByTestId('creation-board-shell')).toContainText('主图 · board-b.png');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('@图片1 · 参考');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('会话主图 · board-b.png');
   await expect(page.getByTestId('creation-board-shell')).toContainText('分支 1');
 
   await page.getByRole('button', { name: '把当前主图作为 @图片 继续参考' }).click();
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片2');
-  await expect(page.getByTestId('composer-reference-tokens')).toContainText('风格');
+  await expect(page.getByTestId('composer-reference-tokens')).not.toContainText('风格');
   await expect(page.getByTestId('composer-board-reference-token').first()).toContainText('@图片2');
   await expect(page.getByLabel('描述你想创作的画面')).toHaveValue('');
 });

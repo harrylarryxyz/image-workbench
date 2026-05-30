@@ -7,7 +7,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { imageUrl } from '../../create-utils';
-import { creationBoardObjects, creationBoardRelations } from './creation-board-fixtures';
 import { CreationBoardCanvas } from './CreationBoardCanvas';
 import { MobileObjectStack } from './MobileObjectStack';
 import { ObjectInspector } from './ObjectInspector';
@@ -66,17 +65,19 @@ export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem
   onReuseCanvasItem?: (item: SessionCanvasItem) => void;
   onUseObjectInAssistant?: (object: CreationObject) => void;
 }) {
-  const [selectedObjectId, setSelectedObjectId] = useState('text-title-1');
+  const [selectedObjectId, setSelectedObjectId] = useState('');
   const [inspectorOpenObjectId, setInspectorOpenObjectId] = useState<string | null>(null);
   const [assistantContextObjectId, setAssistantContextObjectId] = useState<string | null>(null);
+  const [arrangeVersion, setArrangeVersion] = useState(0);
   const sessionObjects = useMemo(() => objectsFromSession(canvasItems ?? []), [canvasItems]);
   const sessionLineageRelations = useMemo(() => relationsFromSession(sessionRelations ?? []), [sessionRelations]);
-  const objects = useMemo(() => [...creationBoardObjects, ...sessionObjects], [sessionObjects]);
-  const relations = useMemo(() => [...creationBoardRelations, ...sessionLineageRelations], [sessionLineageRelations]);
+  const objects = useMemo(() => sessionObjects, [sessionObjects]);
+  const relations = useMemo(() => sessionLineageRelations, [sessionLineageRelations]);
   const selectedObject = objects.find((object) => object.id === selectedObjectId) ?? objects[0];
   const inspectorObject = objects.find((object) => object.id === inspectorOpenObjectId) ?? undefined;
   const assistantContextObject = objects.find((object) => object.id === assistantContextObjectId) ?? undefined;
   const latestCanvasItem = canvasItems?.[0];
+  const emptyCreationBoardCopy = '空白创作案板：这里默认不放示例组件。先在右侧创作助手上传参考、描述目标或生成草稿，确认后的图片、文本和关系才会进入画布。';
 
   function openDetails(id: string) {
     setSelectedObjectId(id);
@@ -105,15 +106,32 @@ export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem
               文本对象、图片对象、品牌对象、交付画板都在同一张画布里；关系层可见但不工程化，单击打开详情，长按进入创作助手上下文。
             </p>
           </div>
-          <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-[#45506a]">技术诊断细节不外露</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full border-[#d6e7df] bg-[#e7f1ec] px-3 py-1 text-xs font-semibold text-[#486e64] hover:bg-[#fffaf2]"
+              disabled={!objects.length}
+              onClick={() => setArrangeVersion((version) => version + 1)}
+            >
+              整理画布
+            </Button>
+            <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-[#45506a]">技术诊断细节不外露</Badge>
+          </div>
         </div>
 
         <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,3.15fr)_minmax(320px,1fr)]">
           <div className="min-w-0 overflow-x-auto overflow-y-hidden rounded-[1.6rem] border border-[#e9d8c4] bg-[#fff1de]/48 p-2" aria-label="创作案板横向画布区域">
+            {objects.length === 0 ? <div data-testid="creation-board-empty-state" className="mb-2 rounded-[1.15rem] border border-dashed border-[#d9c2a7] bg-[#fffaf2]/78 p-4 text-sm leading-6 text-[#6b7488]">
+              <b className="block text-[#253048]">空白创作案板</b>
+              <span>{emptyCreationBoardCopy}</span>
+            </div> : null}
             <CreationBoardCanvas
               objects={objects}
               relations={relations}
               selectedObjectId={selectedObject?.id ?? selectedObjectId}
+              arrangeVersion={arrangeVersion}
               onShowDetails={openDetails}
               onUseInAssistant={useObjectInAssistant}
             />

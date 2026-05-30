@@ -32,22 +32,61 @@ function CreationFlowNode({ data }: NodeProps<CreationFlowNodeType>) {
 
 const nodeTypes = { creationObject: CreationFlowNode };
 
-export function CreationBoardCanvas({ objects, relations, selectedObjectId, onShowDetails, onUseInAssistant }: {
+const creationBoardPositionStorageKey = 'visual-stage.creation-board.node-positions.v1';
+
+type PersistedNodePositions = Record<string, { x: number; y: number }>;
+
+function loadPersistedNodePositions(): PersistedNodePositions {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(creationBoardPositionStorageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as PersistedNodePositions;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePersistedNodePositions(nodes: CreationFlowNodeType[]) {
+  if (typeof window === 'undefined') return;
+  const positions = nodes.reduce<PersistedNodePositions>((acc, node) => {
+    acc[node.id] = node.position;
+    return acc;
+  }, {});
+  window.localStorage.setItem(creationBoardPositionStorageKey, JSON.stringify(positions));
+}
+
+function arrangeNodesIntoReadableGrid(nodes: CreationFlowNodeType[]) {
+  if (!nodes.length) return nodes;
+  const originX = Math.min(...nodes.map((node) => node.position.x));
+  const originY = Math.min(...nodes.map((node) => node.position.y));
+  return nodes.map((node, index) => ({
+    ...node,
+    position: {
+      x: originX + (index % 3) * 280,
+      y: originY + Math.floor(index / 3) * 220,
+    },
+  }));
+}
+
+export function CreationBoardCanvas({ objects, relations, selectedObjectId, arrangeVersion = 0, onShowDetails, onUseInAssistant }: {
   objects: CreationObject[];
   relations: CreationRelation[];
   selectedObjectId: string;
+  arrangeVersion?: number;
   onShowDetails: (id: string) => void;
   onUseInAssistant: (id: string) => void;
 }) {
+  const persistedNodePositions = useMemo(() => loadPersistedNodePositions(), []);
   const hydratedNodes = useMemo<CreationFlowNodeType[]>(() => objects.map((object) => ({
     id: object.id,
     type: 'creationObject',
-    position: object.position,
+    position: persistedNodePositions[object.id] ?? object.position,
     draggable: true,
     selectable: true,
-    dragHandle: '.creation-object-drag-handle',
     data: { object, selectedObjectId, onShowDetails, onUseInAssistant },
-  })), [objects, onShowDetails, onUseInAssistant, selectedObjectId]);
+  })), [objects, onShowDetails, onUseInAssistant, persistedNodePositions, selectedObjectId]);
   const [nodes, setNodes, onNodesChange] = useNodesState<CreationFlowNodeType>(hydratedNodes);
 
   useEffect(() => {
@@ -59,6 +98,15 @@ export function CreationBoardCanvas({ objects, relations, selectedObjectId, onSh
       });
     });
   }, [hydratedNodes, setNodes]);
+
+  useEffect(() => {
+    if (!arrangeVersion) return;
+    setNodes((current) => {
+      const arrangedNodes = arrangeNodesIntoReadableGrid(current);
+      savePersistedNodePositions(arrangedNodes);
+      return arrangedNodes;
+    });
+  }, [arrangeVersion, setNodes]);
 
   const edges = useMemo<Edge[]>(() => relations.map((relation) => ({
     id: relation.id,
@@ -82,7 +130,11 @@ export function CreationBoardCanvas({ objects, relations, selectedObjectId, onSh
       nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       onNodeClick={(_, node) => onShowDetails(node.id)}
-      onNodeDragStop={(_, node) => setNodes((current) => current.map((item) => item.id === node.id ? { ...item, position: node.position } : item))}
+      onNodeDragStop={(_, node) => setNodes((current) => {
+        const updatedNodes = current.map((item) => item.id === node.id ? { ...item, position: node.position } : item);
+        savePersistedNodePositions(updatedNodes);
+        return updatedNodes;
+      })}
       fitView
       minZoom={0.25}
       maxZoom={1.8}

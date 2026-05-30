@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -162,8 +162,6 @@ const sourceClass: Record<ReferenceSource, string> = {
   canvas: 'border-[#eaaea4] bg-[#f4cfc7] text-[#8d4c43]',
 };
 
-const referenceRoles = ['构图', '人物', '色调', '风格', '产品', '背景'];
-
 const advancedReferences: Omit<ReferenceToken, 'id' | 'label'>[] = [
   { source: 'asset', title: '素材库：海报氛围图', hint: '引用素材图片，后续可扩展为素材库检索' },
   { source: 'history', title: '对话历史：上一张初稿', hint: '引用对话历史图片，后续可扩展为历史图选择器' },
@@ -205,15 +203,7 @@ function fileNameFromImage(image: TaskImage, fallback = '生成草稿') {
 }
 
 function buildReferenceGuidance(references: ReferenceToken[]) {
-  const roleCopy: Record<string, string> = {
-    构图: '作为构图参考，优先学习画面结构、景别和留白关系',
-    人物: '作为人物参考，优先保持人物姿态、气质和身份一致性',
-    色调: '只作为色调参考，提取冷暖、明暗和饱和度气质，不改变主体',
-    风格: '只作为风格参考，提取材质、镜头感和设计语言，不复制具体内容',
-    产品: '作为产品参考，优先保持主体和关键细节',
-    背景: '作为背景参考，服务主体但不抢画面中心',
-  };
-  const lines = references.map((reference) => `${reference.label} ${roleCopy[reference.role ?? ''] ?? '作为参考图使用，先确认它负责的用途再生成'}`);
+  const lines = references.map((reference) => `${reference.label}：${reference.hint || '按用户自然语言描述使用，系统只负责把它作为上下文参考编译进请求'}`);
   return lines.length ? `参考使用规则：${lines.join('；')}。` : '';
 }
 
@@ -244,8 +234,7 @@ function referenceFromCanvasItem(item: CanvasItem, nextNumber: number): Referenc
     label: `@图片${nextNumber}`,
     source: 'canvas',
     title: item.title,
-    hint: '来自创作案板的预览图引用；不会把图片名塞进输入框。',
-    role: '风格',
+    hint: '来自创作案板的预览图引用；点击缩略图或长按画布对象会把 @图片 指代写入输入框。',
     storageKey: item.image.storageKey,
     assetUrl: item.image.assetUrl,
     sourceObjectId,
@@ -261,7 +250,6 @@ function referenceFromCreationObject(object: CreationObject, nextNumber: number)
     source: 'canvas',
     title: object.title,
     hint: '来自画布对象的预览图引用；作为上下文卡片带入创作助手。',
-    role: object.kind === 'brand.palette' ? '品牌' : object.kind === 'text' ? '文字/版式' : '风格',
     storageKey: object.asset?.storageKey,
     assetUrl: object.asset?.assetUrl ?? object.asset?.thumbnailUrl,
     sourceObjectId,
@@ -281,7 +269,6 @@ function referenceFromDraft(draft: Draft, nextNumber: number): ReferenceToken | 
     source: 'canvas',
     title: fileNameFromImage(image, `生成图 ${championIndex + 1}`),
     hint: '来自对话生成图的预览引用；用于继续生成并在案板保留父子关系。',
-    role: '风格',
     storageKey: image.storageKey,
     assetUrl: image.assetUrl ?? image.thumbnailUrl,
     sourceObjectId,
@@ -397,19 +384,23 @@ function PhoneFrame({ children }: { children: ReactNode }) {
   </div>;
 }
 
-function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void }) {
+function ReferenceThumb({ reference, compact = false, tray = false, onRemove, onUseToken }: { reference: ReferenceToken; compact?: boolean; tray?: boolean; onRemove?: (id: string) => void; onUseToken?: (reference: ReferenceToken) => void }) {
   const src = referencePreviewSrc(reference);
+  const handleTokenKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    onUseToken?.(reference);
+  };
   const trayChildren = <>
     {src ? <img src={src} alt={`${reference.label} 缩略图`} className="h-7 w-7 shrink-0 rounded-full object-cover" /> : <span aria-hidden="true" className="h-7 w-7 shrink-0 rounded-full border border-current/15 bg-[#fffaf2]/60" />}
     <span className="min-w-0 flex-1 truncate font-semibold">{reference.label}</span>
-    {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={() => onRemove(reference.id)}>×</Button> : null}
-    <Button type="button" variant="ghost" size="sm" aria-label={`${reference.label} 用途`} className="h-6 shrink-0 rounded-full px-1.5 text-[0.62rem] opacity-80" onClick={() => onRemove?.(`${reference.id}:role`)}>{reference.role ?? '用途'}</Button>
+    {onRemove ? <Button type="button" variant="ghost" size="icon" aria-label={`删除 ${reference.label}`} className="h-5 w-5 shrink-0 rounded-full p-0 text-xs opacity-70" onClick={(event) => { event.stopPropagation(); onRemove(reference.id); }}>×</Button> : null}
   </>;
   if (tray && reference.source === 'canvas') {
-    return <div data-testid="composer-board-reference-token" className={cn('inline-flex h-9 w-[9rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>{trayChildren}</div>;
+    return <div role="button" tabIndex={0} data-testid="composer-board-reference-token" aria-label={`${reference.label} 插入指代`} className={cn('inline-flex h-9 w-[9rem] shrink-0 cursor-pointer items-center justify-between gap-1 rounded-full border px-2 text-left text-xs outline-none transition-colors hover:bg-[#fffaf2]/60 focus-visible:ring-2 focus-visible:ring-[#b96a5c]/25', sourceClass[reference.source])} onClick={() => onUseToken?.(reference)} onKeyDown={handleTokenKeyDown}>{trayChildren}</div>;
   }
   if (tray) {
-    return <div data-testid="reference-token" className={cn('inline-flex h-9 w-[9rem] shrink-0 items-center justify-between gap-1 rounded-full border px-2 text-xs', sourceClass[reference.source])}>{trayChildren}</div>;
+    return <div role="button" tabIndex={0} data-testid="reference-token" aria-label={`${reference.label} 插入指代`} className={cn('inline-flex h-9 w-[9rem] shrink-0 cursor-pointer items-center justify-between gap-1 rounded-full border px-2 text-left text-xs outline-none transition-colors hover:bg-[#fffaf2]/60 focus-visible:ring-2 focus-visible:ring-[#b96a5c]/25', sourceClass[reference.source])} onClick={() => onUseToken?.(reference)} onKeyDown={handleTokenKeyDown}>{trayChildren}</div>;
   }
   return <div className={cn('rounded-[1rem] border p-2', sourceClass[reference.source], 'min-w-0')}>
     <div className="flex min-w-0 items-center gap-2">
@@ -424,7 +415,7 @@ function ReferenceThumb({ reference, compact = false, tray = false, onRemove }: 
   </div>;
 }
 
-function DraftCard({ draft, onCommitDraft, onSelectChampion, onContinueEdit }: { draft: Draft; onCommitDraft?: (draft: Draft) => void; onSelectChampion?: (draft: Draft, index: number) => void; onContinueEdit?: (draft: Draft) => void }) {
+function DraftCard({ draft, onCommitDraft, onSelectChampion }: { draft: Draft; onCommitDraft?: (draft: Draft) => void; onSelectChampion?: (draft: Draft, index: number) => void }) {
   const images = draft.images?.length ? draft.images : draft.image ? [draft.image] : [];
   const championIndex = Math.min(draft.championIndex ?? 0, Math.max(images.length - 1, 0));
   const champion = images[championIndex];
@@ -448,10 +439,7 @@ function DraftCard({ draft, onCommitDraft, onSelectChampion, onContinueEdit }: {
         </div>
       </div> : null}
       {draft.error ? <span className="text-[#9e574c]">{draft.error}</span> : null}
-      <div className="grid grid-cols-2 gap-2">
-        <Button type="button" variant="outline" size="sm" className={cn('h-8 text-xs', vi.softButton)} disabled={!done} onClick={() => onContinueEdit?.(displayDraft)}>继续改</Button>
-        <Button type="button" size="sm" className={cn('h-8 text-xs', vi.primaryButton)} disabled={!done} onClick={() => onCommitDraft?.(displayDraft)}>加入画布</Button>
-      </div>
+      <Button type="button" size="sm" className={cn('h-8 text-xs', vi.primaryButton)} disabled={!done} onClick={() => onCommitDraft?.(displayDraft)}>加入画布</Button>
     </div>
   </div>;
 }
@@ -488,7 +476,7 @@ function MessageBubble({ message, onChipClick }: { message: AssistantMessage; on
         </div>)}
       </div> : null}
       {isDrafts ? <>
-        {message.draft ? <DraftCard draft={message.draft} onCommitDraft={message.onCommitDraft} onSelectChampion={message.onSelectChampion} onContinueEdit={message.onContinueEdit} /> : <div className="mt-3 grid grid-cols-2 gap-2">
+        {message.draft ? <DraftCard draft={message.draft} onCommitDraft={message.onCommitDraft} onSelectChampion={message.onSelectChampion} /> : <div className="mt-3 grid grid-cols-2 gap-2">
           {['初稿一', '初稿二', '初稿三', '初稿四'].map((label, index) => <div key={label} className="overflow-hidden rounded-[1rem] border border-[#e9d8c4] bg-[#fffaf2]">
             <div className={cn('aspect-square', index % 3 === 0 && 'bg-[linear-gradient(145deg,#fff1de,#f8e3dd)]', index % 3 === 1 && 'bg-[linear-gradient(145deg,#e7f1ec,#fffaf2)]', index % 3 === 2 && 'bg-[linear-gradient(145deg,#eef0f4,#fff1de)]')} />
             <div className="flex items-center justify-between gap-2 px-2 py-2 text-xs">
@@ -671,20 +659,6 @@ export function VisualStageClient() {
   }
 
   function removeReference(id: string) {
-    if (id.includes(':role:')) {
-      const [targetId, , role] = id.split(':');
-      setReferences((current) => current.map((reference) => reference.id === targetId ? { ...reference, role } : reference));
-      return;
-    }
-    if (id.endsWith(':role')) {
-      const targetId = id.replace(':role', '');
-      setReferences((current) => current.map((reference) => {
-        if (reference.id !== targetId) return reference;
-        const nextIndex = (referenceRoles.indexOf(reference.role ?? '') + 1) % referenceRoles.length;
-        return { ...reference, role: referenceRoles[nextIndex] };
-      }));
-      return;
-    }
     const removed = references.find((reference) => reference.id === id);
     setReferences((current) => current.filter((reference) => reference.id !== id));
     if (removed) setIntent((current) => current.replaceAll(removed.label, '').replace(/\s{2,}/g, ' ').trimStart());
@@ -770,7 +744,13 @@ export function VisualStageClient() {
     const fallback = async () => {
       if (fallbackStarted) return;
       fallbackStarted = true;
-      await pollTaskUntilTerminal<TaskResult>(id, onTask);
+      try {
+        await pollTaskUntilTerminal<TaskResult>(id, onTask);
+      } catch (error) {
+        const nextDraft = { id, taskId: id, status: 'FAILED', error: humanError(error) };
+        setDraft(nextDraft);
+        setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: nextDraft.error ?? '任务状态同步失败。', draft: { ...message.draft, ...nextDraft }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
+      }
     };
     const unsubscribe = subscribeTaskEvents<TaskResult>(id, (task) => {
       onTask(task);
@@ -842,7 +822,7 @@ export function VisualStageClient() {
 
   function useCanvasObjectInAssistant(object: CreationObject) {
     const reference = referenceFromCreationObject(object, references.length + 1);
-    pushReference(reference, { appendText: false });
+    pushReference(reference, { appendText: true });
     requestAnimationFrame(() => composerInputRef.current?.focus());
   }
 
@@ -1003,15 +983,16 @@ export function VisualStageClient() {
               <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2] p-2 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
                 <input ref={fileInputRef} aria-label="选择本地新图片" type="file" accept="image/*" className="sr-only" onChange={onLocalImageChange} />
                 {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex max-w-full gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1">
-                  {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact tray onRemove={removeReference} />)}
+                  {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact tray onRemove={removeReference} onUseToken={appendToken} />)}
                 </div> : null}
                 <Textarea
                   ref={composerInputRef}
                   aria-label="描述你想创作的画面"
                   value={intent}
                   onChange={(event) => setIntent(event.target.value)}
+                  disabled={!projectsHydrated}
                   placeholder="描述画面；用 @图片1 指定参考关系…"
-                  className="min-h-24 resize-none border-0 bg-transparent px-2 text-base text-[#253048] shadow-none placeholder:text-[#9ba4b3] focus-visible:ring-0"
+                  className="min-h-24 resize-none border-0 bg-transparent px-2 text-base text-[#253048] shadow-none placeholder:text-[#9ba4b3] focus-visible:ring-0 disabled:opacity-60"
                 />
                 <div className="flex items-center justify-between gap-2 pt-2">
                   <div className="flex items-center gap-1.5">
