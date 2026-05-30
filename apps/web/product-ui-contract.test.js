@@ -228,6 +228,50 @@ test('mobile canvas demo uses compact mobile-native layout instead of shrinking 
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Mobile Canvas demo must not expose diagnostics or raw provider data');
 });
 
+test('visual stage embeds the real Creation Board object model and WYSIWYG shell', () => {
+  const files = [
+    'visual-stage/VisualStageClient.tsx',
+    'visual-stage/creation-board/types.ts',
+    'visual-stage/creation-board/creation-board-fixtures.ts',
+    'visual-stage/creation-board/CreationBoard.tsx',
+    'visual-stage/creation-board/CreationBoardCanvas.tsx',
+    'visual-stage/creation-board/CreationObjectNode.tsx',
+    'visual-stage/creation-board/ObjectInspector.tsx',
+    'visual-stage/creation-board/MobileObjectStack.tsx',
+    'visual-stage/creation-board/RelationshipPeek.tsx',
+  ];
+  const surface = files.map((relative) => `\n/* ${relative} */\n${readPage(relative)}`).join('\n');
+
+  for (const marker of [
+    'Creation Board',
+    '创作案板',
+    'WYSIWYG',
+    '文本对象',
+    '图片对象',
+    '品牌对象',
+    '交付画板',
+    '创作助手上下文',
+    '单击对象',
+    '双击或长按',
+    'Focus Lens',
+    'Object Stack',
+    'Relationship Peek',
+    'Bottom Inspector',
+    '技术诊断细节不外露',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `Creation Board shell missing ${marker}`);
+  }
+
+  assert.match(surface, /export type CreationObjectKind/, 'Creation Board should define object kinds as a business model');
+  assert.match(surface, /export type CreationRelationType/, 'Creation Board should define lineage relation types');
+  assert.match(surface, /brief[\s\S]*reference\.image[\s\S]*generated\.image[\s\S]*text[\s\S]*brand\.palette[\s\S]*artboard[\s\S]*deliverable/, 'Creation Board kinds should cover brief/reference/generated/text/brand/artboard/deliverable objects');
+  assert.match(surface, /const\s+creationBoardObjects\s*:/, 'Creation Board fixtures should seed visible creative objects');
+  assert.match(surface, /const\s+creationBoardRelations\s*:/, 'Creation Board fixtures should seed visible lineage relations');
+  assert.match(surface, /data-testid="creation-board-shell"/, 'Visual Stage should render the Creation Board shell');
+  assert.match(surface, /data-testid="creation-board-canvas"/, 'Creation Board should expose a canvas audit hook');
+  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|raw task payload|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Creation Board surface must not expose provider/storage/task diagnostics');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',

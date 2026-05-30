@@ -10,6 +10,7 @@ import { subscribeTaskEvents, pollTaskUntilTerminal } from '@/lib/task-events';
 import type { TaskImage, TaskResult, Uploaded } from '../create-types';
 import { imageUrl } from '../create-utils';
 import { cn } from '@/lib/utils';
+import { CreationBoard } from './creation-board/CreationBoard';
 
 const vi = {
   system: 'warm-editorial-board-v1 · 温润编辑式创作板 · 中文优先 · Paper 0 · Ink 900 · Coral 600 · Sage 600 · no pure black UI surfaces · UI is the frame, not the artwork',
@@ -590,93 +591,104 @@ export function VisualStageClient() {
     <Glow className="left-0 top-10 h-72 w-72 bg-[#f8e3dd]/72" />
     <Glow className="right-0 top-24 h-72 w-72 bg-[#e7f1ec]/80" />
 
-    <div className="relative z-10 mx-auto grid max-w-6xl gap-5 px-4 py-5 md:grid-cols-[minmax(360px,0.74fr)_minmax(0,1fr)] md:px-8 md:py-8">
-      <div className="grid content-start gap-5 md:sticky md:top-6">
-        <div className="grid gap-3 px-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className={cn('rounded-full px-3 py-1 text-xs', vi.inkPill)}>创作中心原型</Badge>
-            <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', vi.coralPill)}>移动端优先</Badge>
-            <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-xs text-[#45506a]">中文优先</Badge>
-          </div>
-          <h1 className="text-4xl font-extrabold leading-[0.98] tracking-[-0.07em] text-[#253048] md:text-6xl">
-            先把一句想法变成可看的初稿
-          </h1>
-          <p className="max-w-xl text-sm leading-7 text-[#6b7488] md:text-base">
-            本切片固定移动端创作助手：＋添加本地新图片，@引用素材图片或对话历史图片；默认普通对话，打开出图后才进入生成草稿。
-          </p>
+    <div className="relative z-10 mx-auto grid max-w-[1680px] gap-5 px-4 py-5 md:px-8 md:py-8">
+      <div className="grid gap-3 px-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className={cn('rounded-full px-3 py-1 text-xs', vi.inkPill)}>创作中心原型</Badge>
+          <Badge variant="outline" className={cn('rounded-full px-3 py-1 text-xs', vi.coralPill)}>移动端优先</Badge>
+          <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-xs text-[#45506a]">中文优先</Badge>
         </div>
-        <CanvasPreview items={canvasItems} onReuse={reuseCanvasImage} />
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,0.72fr)_minmax(340px,0.28fr)] xl:items-end">
+          <div className="grid gap-3">
+            <h1 className="max-w-4xl text-4xl font-extrabold leading-[0.98] tracking-[-0.07em] text-[#253048] md:text-6xl">
+              先把一句想法变成可看的初稿，再沉淀成可操作的创作案板
+            </h1>
+            <p className="max-w-3xl text-sm leading-7 text-[#6b7488] md:text-base">
+              本切片把移动端创作助手和 Lovart-like WYSIWYG 画布合并：＋添加本地新图片，@引用素材图片或对话历史图片；默认普通对话，打开出图后才进入生成草稿，草稿确认后进画布。
+            </p>
+          </div>
+          <Card className={cn('rounded-[1.35rem]', vi.paperPanel)}>
+            <CardContent className="grid gap-2 p-4 text-sm text-[#6b7488]">
+              <b className="text-[#253048]">Phase 1 · 静态真实画布壳</b>
+              <span>当前不调用 AI；用 fixtures + 当前 session 数据混合渲染，先让审美和交互关系可确认。</span>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      <PhoneFrame>
-        <div data-testid="visual-stage-phone" className="flex h-[780px] max-h-[calc(100vh-2rem)] min-h-[720px] flex-col bg-[#fffaf2]">
-          <div className="shrink-0 border-b border-[#e9d8c4] bg-[#fffaf2]/92 px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs text-[#6b7488]">新的创作</p>
-                <h2 className="text-xl font-bold tracking-[-0.045em] text-[#253048]">创作助手</h2>
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
+        <CreationBoard canvasItems={canvasItems} onReuseCanvasItem={reuseCanvasImage} />
+
+        <PhoneFrame>
+          <div data-testid="visual-stage-phone" className="flex h-[780px] max-h-[calc(100vh-2rem)] min-h-[720px] flex-col bg-[#fffaf2]">
+            <div className="shrink-0 border-b border-[#e9d8c4] bg-[#fffaf2]/92 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-[#6b7488]">新的创作</p>
+                  <h2 className="text-xl font-bold tracking-[-0.045em] text-[#253048]">创作助手</h2>
+                </div>
+                <Badge variant="outline" className={cn('rounded-full px-3 py-1', generateMode ? vi.coralPill : vi.sagePill)}>{generateMode ? '出图开启' : '普通对话'}</Badge>
               </div>
-              <Badge variant="outline" className={cn('rounded-full px-3 py-1', generateMode ? vi.coralPill : vi.sagePill)}>{generateMode ? '出图开启' : '普通对话'}</Badge>
             </div>
-          </div>
 
-          <div ref={threadRef} data-testid="creation-assistant-thread" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#fff1de]/45 px-3 py-4">
-            {messages.map((message) => <MessageBubble key={message.id} message={message} onChipClick={applyChipSuggestion} />)}
-          </div>
+            <div ref={threadRef} data-testid="creation-assistant-thread" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain bg-[#fff1de]/45 px-3 py-4">
+              {messages.map((message) => <MessageBubble key={message.id} message={message} onChipClick={applyChipSuggestion} />)}
+            </div>
 
-          <div data-testid="creation-assistant-composer" className="relative shrink-0 border-t border-[#e9d8c4] bg-[#fffaf2] p-3">
-            {showMentionPicker ? <div data-testid="mention-reference-picker" className={cn('absolute bottom-[calc(100%-0.35rem)] left-3 right-3 z-20 rounded-[1.35rem] border p-3', vi.raisedPanel)}>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <b className="text-sm text-[#253048]">@ 引用图片</b>
-                <span className="text-xs text-[#6b7488]">素材 / 历史，后续拓展</span>
-              </div>
-              <div className="grid gap-2">
-                {advancedReferences.map((item) => <Button key={item.title} type="button" variant="outline" className={cn('h-auto justify-start rounded-[1rem] px-3 py-2 text-left', vi.softButton)} onClick={() => addReference(item.source, item.title, item.hint)}>
-                  <span className="grid gap-0.5">
-                    <b className="text-xs">{item.title}</b>
-                    <span className="text-[0.68rem] text-[#6b7488]">{item.hint}</span>
-                  </span>
-                </Button>)}
-              </div>
-            </div> : null}
-
-            {showParams ? <div data-testid="generation-params-drawer" className={cn('absolute bottom-0 left-0 right-0 z-30 rounded-t-[1.6rem] border border-[#e9d8c4] bg-[#fffaf2] p-4 shadow-[0_-18px_50px_rgba(37,48,72,0.16)]')}>
-              <div className="mb-3 flex items-center justify-between">
-                <b className="text-[#253048]">出图参数</b>
-                <Button type="button" variant="ghost" size="sm" className="rounded-full text-[#6b7488]" onClick={() => setShowParams(false)}>收起</Button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs text-[#45506a]">
-                {['尺寸 3:4', '数量 4张', '模型 自动', '风格强度 中', '参考权重 70%', '草稿先进对话'].map((item) => <div key={item} className="rounded-[1rem] border border-[#e9d8c4] bg-[#fff1de]/60 px-3 py-2">{item}</div>)}
-              </div>
-            </div> : null}
-
-            <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2] p-2 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
-              <input ref={fileInputRef} aria-label="选择本地新图片" type="file" accept="image/*" className="sr-only" onChange={onLocalImageChange} />
-              {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex max-w-full gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1">
-                {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact tray onRemove={removeReference} />)}
+            <div data-testid="creation-assistant-composer" className="relative shrink-0 border-t border-[#e9d8c4] bg-[#fffaf2] p-3">
+              {showMentionPicker ? <div data-testid="mention-reference-picker" className={cn('absolute bottom-[calc(100%-0.35rem)] left-3 right-3 z-20 rounded-[1.35rem] border p-3', vi.raisedPanel)}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <b className="text-sm text-[#253048]">@ 引用图片</b>
+                  <span className="text-xs text-[#6b7488]">素材 / 历史，后续拓展</span>
+                </div>
+                <div className="grid gap-2">
+                  {advancedReferences.map((item) => <Button key={item.title} type="button" variant="outline" className={cn('h-auto justify-start rounded-[1rem] px-3 py-2 text-left', vi.softButton)} onClick={() => addReference(item.source, item.title, item.hint)}>
+                    <span className="grid gap-0.5">
+                      <b className="text-xs">{item.title}</b>
+                      <span className="text-[0.68rem] text-[#6b7488]">{item.hint}</span>
+                    </span>
+                  </Button>)}
+                </div>
               </div> : null}
-              <Textarea
-                aria-label="描述你想创作的画面"
-                value={intent}
-                onChange={(event) => setIntent(event.target.value)}
-                placeholder="描述画面；用 @图片1 指定参考关系…"
-                className="min-h-24 resize-none border-0 bg-transparent px-2 text-base text-[#253048] shadow-none placeholder:text-[#9ba4b3] focus-visible:ring-0"
-              />
-              <div className="flex items-center justify-between gap-2 pt-2">
-                <div className="flex items-center gap-1.5">
-                  <Button type="button" variant="outline" size="icon" aria-label="添加本地新图片" className={cn('h-9 w-9 text-lg', vi.softButton)} onClick={() => fileInputRef.current?.click()}>＋</Button>
-                  <Button type="button" variant="outline" size="icon" aria-label="引用素材或历史图片" className={cn('h-9 w-9 text-base', vi.softButton)} onClick={() => setShowMentionPicker((current) => !current)}>@</Button>
-                  <Button type="button" variant="outline" size="sm" className={cn('h-9 px-3 text-xs', vi.softButton)} onClick={() => setShowParams(true)}>参数</Button>
+
+              {showParams ? <div data-testid="generation-params-drawer" className={cn('absolute bottom-0 left-0 right-0 z-30 rounded-t-[1.6rem] border border-[#e9d8c4] bg-[#fffaf2] p-4 shadow-[0_-18px_50px_rgba(37,48,72,0.16)]')}>
+                <div className="mb-3 flex items-center justify-between">
+                  <b className="text-[#253048]">出图参数</b>
+                  <Button type="button" variant="ghost" size="sm" className="rounded-full text-[#6b7488]" onClick={() => setShowParams(false)}>收起</Button>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Button type="button" variant="outline" size="sm" aria-pressed={generateMode} className={cn('h-9 px-3 text-xs', generateMode ? vi.coralPill : vi.sagePill)} onClick={() => setGenerateMode((current) => !current)}>{generateMode ? '出图开' : '出图关'}</Button>
-                  <Button type="button" size="sm" className={cn('h-9 px-4', vi.primaryButton)} disabled={loading || (!intent.trim() && !references.length)} onClick={submit}>{loading ? '提交中' : generateMode ? '发送出图' : '发送'}</Button>
+                <div className="grid grid-cols-2 gap-2 text-xs text-[#45506a]">
+                  {['尺寸 3:4', '数量 4张', '模型 自动', '风格强度 中', '参考权重 70%', '草稿先进对话'].map((item) => <div key={item} className="rounded-[1rem] border border-[#e9d8c4] bg-[#fff1de]/60 px-3 py-2">{item}</div>)}
+                </div>
+              </div> : null}
+
+              <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2] p-2 shadow-[0_10px_26px_rgba(37,48,72,0.07)]">
+                <input ref={fileInputRef} aria-label="选择本地新图片" type="file" accept="image/*" className="sr-only" onChange={onLocalImageChange} />
+                {references.length ? <div data-testid="composer-reference-tokens" className="mb-2 flex max-w-full gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1">
+                  {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact tray onRemove={removeReference} />)}
+                </div> : null}
+                <Textarea
+                  aria-label="描述你想创作的画面"
+                  value={intent}
+                  onChange={(event) => setIntent(event.target.value)}
+                  placeholder="描述画面；用 @图片1 指定参考关系…"
+                  className="min-h-24 resize-none border-0 bg-transparent px-2 text-base text-[#253048] shadow-none placeholder:text-[#9ba4b3] focus-visible:ring-0"
+                />
+                <div className="flex items-center justify-between gap-2 pt-2">
+                  <div className="flex items-center gap-1.5">
+                    <Button type="button" variant="outline" size="icon" aria-label="添加本地新图片" className={cn('h-9 w-9 text-lg', vi.softButton)} onClick={() => fileInputRef.current?.click()}>＋</Button>
+                    <Button type="button" variant="outline" size="icon" aria-label="引用素材或历史图片" className={cn('h-9 w-9 text-base', vi.softButton)} onClick={() => setShowMentionPicker((current) => !current)}>@</Button>
+                    <Button type="button" variant="outline" size="sm" className={cn('h-9 px-3 text-xs', vi.softButton)} onClick={() => setShowParams(true)}>参数</Button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Button type="button" variant="outline" size="sm" aria-pressed={generateMode} className={cn('h-9 px-3 text-xs', generateMode ? vi.coralPill : vi.sagePill)} onClick={() => setGenerateMode((current) => !current)}>{generateMode ? '出图开' : '出图关'}</Button>
+                    <Button type="button" size="sm" className={cn('h-9 px-4', vi.primaryButton)} disabled={loading || (!intent.trim() && !references.length)} onClick={submit}>{loading ? '提交中' : generateMode ? '发送出图' : '发送'}</Button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </PhoneFrame>
+        </PhoneFrame>
+      </div>
     </div>
   </section>;
 }

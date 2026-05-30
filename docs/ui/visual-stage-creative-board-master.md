@@ -127,6 +127,17 @@ Mobile must not become a crude stacked desktop:
 - Reference semantics must enter both the assistant context and generation prompt as human Chinese guidance such as `@图片1 作为产品参考，优先保持主体和关键细节`, while never exposing storage keys, provider routes, raw payloads, or API keys in public UI.
 - Public UI must show human Chinese statuses such as 生成中、生成完成、加入画布; it must not expose raw HTTP response bodies, provider routes, storage keys, or task JSON.
 
+## Creation Board Phase 1 object-model slice
+
+`/visual-stage` now owns a first real Creation Board shell, not only route-isolated static previews:
+
+- **Object model**: `brief`, `reference.image`, `generated.image`, `text`, `brand.palette`, `brand.font`, `task.generate`, `task.edit`, `artboard`, and `deliverable` are business-level creative objects.
+- **Canvas behavior**: desktop keeps the WYSIWYG 创作案板 as the main surface, with fixtures plus current session canvas items mixed into the visible board.
+- **Relationship layer**: lineage is visible through human relation labels such as reference, generation, variant, text-binding, brand-constraint, adoption, and export; it must not look like a raw workflow debugger.
+- **Assistant context**: single-click selection changes the 创作助手上下文; double-click or long-press opens object details. The user says human instructions while the system later decides whether to replace a variable, reuse a result image, edit locally, rewrite text, rearrange an artboard, or make same-series variants.
+- **Mobile behavior**: mobile does not render a tiny desktop canvas. It keeps capability through Focus Lens, horizontal Object Stack, Bottom Inspector, and Relationship Peek while keeping page-level horizontal overflow at zero; Object Stack internal horizontal scrolling is allowed.
+- **Security/product language**: public UI and tests must keep provider routes, storage keys, raw payloads, model limits, and debug labels out of the surface.
+
 ## Regression hooks
 
 `apps/web/product-ui-contract.test.js` locks these markers:
