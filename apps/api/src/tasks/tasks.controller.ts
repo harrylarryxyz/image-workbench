@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Req, Res, Sse } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import { Body, Controller, Get, Param, Post, Req, Sse } from '@nestjs/common';
+import type { Request } from 'express';
 import { TasksService } from './tasks.service';
 import { getRequestContext } from '../auth/request-context';
 
@@ -29,14 +29,8 @@ export class TasksController {
   get(@Param('id') id: string, @Req() req: Request = {} as any) { return this.tasks.getTask(id, getRequestContext(req)); }
 
   @Sse(':id/events')
-  events(@Param('id') id: string, @Req() reqOrRes: Request | Response = {} as any, @Res({ passthrough: true }) maybeRes?: Response) {
-    const res = (maybeRes ?? reqOrRes) as Response;
-    const req = maybeRes ? reqOrRes as Request : {} as Request;
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders?.();
-    return this.tasks.streamTaskEvents(id, res, getRequestContext(req));
+  events(@Param('id') id: string, @Req() req: Request = {} as any) {
+    return this.tasks.streamTaskEvents(id, req as any, getRequestContext(req));
   }
 
   @Post('bulk/retry-failed')

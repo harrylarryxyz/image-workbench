@@ -6,19 +6,12 @@ describe('TasksController SSE events contract', () => {
     const stream = { subscribe: vi.fn() };
     const tasks = { streamTaskEvents: vi.fn().mockReturnValue(stream) } as any;
     const controller = new TasksController(tasks);
-    const res = {
-      setHeader: vi.fn(),
-      flushHeaders: vi.fn(),
-      on: vi.fn(),
-    } as any;
+    const req = { on: vi.fn(), headers: {} } as any;
 
-    const result = controller.events('task_123', res);
+    const result = controller.events('task_123', req);
 
     expect(result).toBe(stream);
     expect(result).not.toBeInstanceOf(Promise);
-    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream');
-    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-cache, no-transform');
-    expect(res.setHeader).toHaveBeenCalledWith('Connection', 'keep-alive');
-    expect(tasks.streamTaskEvents).toHaveBeenCalledWith('task_123', res, expect.objectContaining({ workspaceId: 'default' }));
+    expect(tasks.streamTaskEvents).toHaveBeenCalledWith('task_123', req, expect.objectContaining({ workspaceId: 'default' }));
   });
 });
