@@ -14,6 +14,15 @@ const chipTone: Record<string, string> = {
   deliverable: 'border-[#e9d8c4] bg-[#fffaf2] text-[#253048]',
 };
 
+const kindCopy: Record<string, string> = {
+  'reference.image': '参考图',
+  'generated.image': '这一版',
+  text: '文本备注',
+  'brand.palette': '品牌色板',
+  artboard: '交付画板',
+  deliverable: '准备交付',
+};
+
 export function MobileObjectStack({ objects, selectedObjectId, onSelect }: {
   objects: CreationObject[];
   selectedObjectId: string;
@@ -22,7 +31,7 @@ export function MobileObjectStack({ objects, selectedObjectId, onSelect }: {
   return <div data-testid="creation-board-object-stack" className="lg:hidden w-full max-w-full min-w-0 overflow-hidden rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2]/94 p-3 shadow-[0_16px_40px_rgba(37,48,72,0.09)]">
     <div className="mb-2 flex items-center justify-between gap-2">
       <div>
-        <b className="block text-sm text-[#253048]">Object Stack</b>
+        <b className="block text-sm text-[#253048]">已选对象</b>
         <span className="text-xs text-[#6b7488]">移动端不是简化版：横向切换对象，能力不减少。</span>
       </div>
       <Badge variant="outline" className="rounded-full border-[#d6e7df] bg-[#e7f1ec] px-2 py-0.5 text-[#486e64]">完整画布</Badge>
@@ -44,7 +53,7 @@ export function MobileObjectStack({ objects, selectedObjectId, onSelect }: {
       >
         <span className="grid gap-0.5">
           <b className="truncate text-[#253048]">{object.title}</b>
-          <span className="truncate opacity-75">{object.kind}</span>
+          <span className="truncate opacity-75">{kindCopy[object.kind] ?? '画布对象'}</span>
         </span>
       </Button>)}
     </div>

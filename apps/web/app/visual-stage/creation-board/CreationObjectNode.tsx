@@ -21,21 +21,21 @@ const toneByKind: Record<string, string> = {
 };
 
 const labelByKind: Record<string, string> = {
-  brief: 'Brief',
-  'reference.image': '图片对象 · 参考',
-  'generated.image': '图片对象 · 生成',
-  text: '文本对象',
-  'brand.palette': '品牌对象',
+  brief: '创作目标',
+  'reference.image': '参考图',
+  'generated.image': '这一版',
+  text: '文本备注',
+  'brand.palette': '品牌色板',
   'brand.font': '品牌字体',
-  'task.generate': '创作动作',
-  'task.edit': '局部动作',
+  'task.generate': '创作尝试',
+  'task.edit': '修改意见',
   artboard: '交付画板',
-  deliverable: '导出对象',
+  deliverable: '准备交付',
 };
 
 function StatusDot({ object }: { object: CreationObject }) {
-  if (object.status === 'champion') return <Badge className="rounded-full bg-[#253048] px-2 py-0.5 text-[0.62rem] text-[#fffaf2]">冠军路径</Badge>;
-  if (object.status === 'rejected') return <Badge variant="outline" className="rounded-full border-[#d9c2a7] bg-[#fff1de]/50 px-2 py-0.5 text-[0.62rem] text-[#9ba4b3]">废弃分支</Badge>;
+  if (object.status === 'champion') return <Badge className="rounded-full bg-[#253048] px-2 py-0.5 text-[0.62rem] text-[#fffaf2]">当前最好</Badge>;
+  if (object.status === 'rejected') return <Badge variant="outline" className="rounded-full border-[#d9c2a7] bg-[#fff1de]/50 px-2 py-0.5 text-[0.62rem] text-[#9ba4b3]">已放弃尝试</Badge>;
   if (object.status === 'exported') return <Badge variant="outline" className="rounded-full border-[#d6e7df] bg-[#e7f1ec] px-2 py-0.5 text-[0.62rem] text-[#486e64]">可交付</Badge>;
   return null;
 }
@@ -120,7 +120,7 @@ export function CreationObjectNode({ object, selected, onShowDetails, onUseInAss
     </span>
 
     {isImage ? <span className="mb-2 grid aspect-[4/3] place-items-center overflow-hidden rounded-[0.85rem] border border-current/15 bg-[linear-gradient(145deg,#fffaf2,#f8e3dd_52%,#e7f1ec)] text-[0.68rem] font-semibold opacity-95">
-      {object.asset ? assetSrc ? <img src={assetSrc} alt={`${object.title} 预览`} className="h-full w-full object-cover" /> : '图片待载入' : object.status === 'champion' ? '主图' : object.kind === 'reference.image' ? '参考图' : '生成图'}
+      {object.asset ? assetSrc ? <img src={assetSrc} alt={`${object.title} 预览`} className="h-full w-full object-cover" /> : '图片待载入' : object.status === 'champion' ? '主图' : object.kind === 'reference.image' ? '参考图' : '这一版'}
     </span> : null}
 
     {isText && object.text ? <span className="mb-2 block rounded-[0.8rem] border border-current/12 bg-[#fffaf2]/55 px-2 py-2 text-xs leading-5">
@@ -134,6 +134,6 @@ export function CreationObjectNode({ object, selected, onShowDetails, onUseInAss
     {object.kind === 'artboard' ? <span className="mb-2 grid aspect-[3/4] w-16 place-items-center rounded-[0.75rem] border border-[#e9d8c4] bg-[#fffaf2]/70 text-[0.62rem]">3:4</span> : null}
 
     <span className="line-clamp-2 text-[0.72rem] leading-5 opacity-82">{object.summary}</span>
-    {selected ? <Button type="button" variant="outline" size="sm" className="nodrag mt-2 h-7 rounded-full border-[#f2d6cf] bg-[#fffaf2]/72 px-2 text-[0.66rem] text-[#9e574c] hover:bg-[#f8e3dd]" onClick={(event) => { event.stopPropagation(); onUseInAssistant(object.id); }}>长按进入创作助手</Button> : null}
+    {selected ? <Button type="button" variant="outline" size="sm" className="nodrag mt-2 h-7 rounded-full border-[#f2d6cf] bg-[#fffaf2]/72 px-2 text-[0.66rem] text-[#9e574c] hover:bg-[#f8e3dd]" onClick={(event) => { event.stopPropagation(); onUseInAssistant(object.id); }}>基于这张继续</Button> : null}
   </div>;
 }

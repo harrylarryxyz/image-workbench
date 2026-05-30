@@ -132,7 +132,6 @@ type PersistedVisualStageSession = {
   sessionRelations: SessionRelation[];
   conversation: ConversationEntry[];
   generationParams: GenerationParams;
-  autoCommitTaskImagesToBoard: boolean;
 };
 
 const defaultGenerationParams: GenerationParams = {
@@ -318,7 +317,6 @@ function createEmptySession(overrides: Partial<PersistedVisualStageSession> = {}
     sessionRelations: overrides.sessionRelations ?? [],
     conversation: overrides.conversation ?? [],
     generationParams: { ...defaultGenerationParams, ...(overrides.generationParams ?? {}) },
-    autoCommitTaskImagesToBoard: overrides.autoCommitTaskImagesToBoard ?? true,
   };
 }
 
@@ -430,7 +428,7 @@ function DraftCard({ draft, onCommitDraft, onSelectChampion }: { draft: Draft; o
     <div className="grid gap-2 px-2 py-2 text-xs">
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[#253048]">{summary}</span>
-        <span className="shrink-0 text-[#b96a5c]">{done ? '可确认' : '等待结果'}</span>
+        <span className="shrink-0 text-[#b96a5c]">{done ? '待审美确认' : '等待结果'}</span>
       </div>
       {images.length > 1 ? <div className="grid gap-2">
         <div className="flex items-center justify-between text-[#6b7488]"><span>比较草稿</span><b className="text-[#9e574c]">冠军图 {championIndex + 1}</b></div>
@@ -568,7 +566,6 @@ export function VisualStageClient() {
     sessionRelations,
     conversation,
     generationParams,
-    autoCommitTaskImagesToBoard: true,
   }), [canvasItems, conversation, draft, draftMessages, generateMode, generationParams, intent, references, sessionRelations, showDrafts]);
 
   function applySession(session: Partial<PersistedVisualStageSession> | null | undefined) {
@@ -690,19 +687,21 @@ export function VisualStageClient() {
     setGenerationParams((current) => ({ ...current, [key]: value }));
   }
 
-  function autoCommitTaskImagesToBoard(nextDraft: Draft, refs = lastReferencesRef.current, prompt = lastIntentRef.current, params = generationParams) {
+  function commitDraftToBoard(nextDraft: Draft, refs = lastReferencesRef.current, prompt = lastIntentRef.current, params = generationParams) {
     if (nextDraft.status !== 'SUCCEEDED') return;
-    const images = nextDraft.images?.length ? nextDraft.images : nextDraft.image ? [nextDraft.image] : [];
-    if (!images.length) return;
+    const confirmedImages = nextDraft.image
+      ? [{ image: nextDraft.image, index: nextDraft.championIndex ?? 0 }]
+      : (nextDraft.images ?? []).map((image, index) => ({ image, index }));
+    if (!confirmedImages.length) return;
     const directParentObjectIds = uniqueNonEmpty(refs.map((reference) => reference.sourceObjectId));
     const parentObjectIds = uniqueNonEmpty(refs.flatMap((reference) => [reference.sourceObjectId, ...(reference.parentObjectIds ?? [])]));
-    const additions = images.map((image, index) => {
+    const additions = confirmedImages.map(({ image, index }) => {
       const id = canvasItemIdFromImage(nextDraft, image, index);
       const sourceObjectId = `session-${id}`;
       return {
         id,
         sourceObjectId,
-        title: fileNameFromImage(image, `生成图 ${index + 1}`),
+        title: fileNameFromImage(image, `这一版 ${index + 1}`),
         image,
         intent: prompt,
         references: refs,
@@ -720,7 +719,7 @@ export function VisualStageClient() {
     });
     setSessionRelations((current) => {
       const seen = new Set(current.map((relation) => `${relation.from}->${relation.to}`));
-      const fresh = additions.flatMap((item) => directParentObjectIds.map((parentId) => ({ from: parentId, to: item.sourceObjectId ?? `session-${item.id}`, label: 'generation' }))).filter((relation) => {
+      const fresh = additions.flatMap((item) => directParentObjectIds.map((parentId) => ({ from: parentId, to: item.sourceObjectId ?? `session-${item.id}`, label: 'reference' }))).filter((relation) => {
         const key = `${relation.from}->${relation.to}`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -736,10 +735,8 @@ export function VisualStageClient() {
       const images = task.images ?? [];
       const image = images[0];
       const nextDraft = { id, taskId: task.id ?? id, status: task.status ?? 'RUNNING', image, images, championIndex: 0, error: task.errorMessage ?? task.error ?? null };
-      const taskContext = taskContextRef.current[id] ?? { intent: lastIntentRef.current, references: lastReferencesRef.current, generationParams };
       setDraft(nextDraft);
-      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? `${draftStatusSummary(nextDraft)}。已自动加入创作案板，可继续选冠军图或基于它再生成。` : '已进入真实生成流程，等待任务返回。', draft: { ...message.draft, ...nextDraft, championIndex: message.draft.championIndex ?? 0 }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
-      autoCommitTaskImagesToBoard(nextDraft, taskContext.references, taskContext.intent, taskContext.generationParams);
+      setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: task.status === 'SUCCEEDED' ? `${draftStatusSummary(nextDraft)}。待审美确认，满意后点“加入画布”。` : '已开始出图，结果会先留在对话里。', draft: { ...message.draft, ...nextDraft, championIndex: message.draft.championIndex ?? 0 }, onCommitDraft: confirmDraftContext, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
     };
     const fallback = async () => {
       if (fallbackStarted) return;
@@ -749,7 +746,7 @@ export function VisualStageClient() {
       } catch (error) {
         const nextDraft = { id, taskId: id, status: 'FAILED', error: humanError(error) };
         setDraft(nextDraft);
-        setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: nextDraft.error ?? '任务状态同步失败。', draft: { ...message.draft, ...nextDraft }, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
+        setDraftMessages((current) => current.map((message) => message.draft.taskId === id || message.draft.id === id ? { ...message, body: nextDraft.error ?? '生成状态同步失败。', draft: { ...message.draft, ...nextDraft }, onCommitDraft: confirmDraftContext, onSelectChampion: selectChampion, onContinueEdit: continueEdit } : message));
       }
     };
     const unsubscribe = subscribeTaskEvents<TaskResult>(id, (task) => {
@@ -799,8 +796,7 @@ export function VisualStageClient() {
       const initialDraft = { id: created.id ?? 'draft', taskId: created.id, status: created.status ?? 'QUEUED', image: initialImages[0], images: initialImages, championIndex: 0 };
       if (created.id) taskContextRef.current[created.id] = { intent: intent.trim(), references, generationParams: params };
       setDraft(initialDraft);
-      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: initialDraft.status === 'SUCCEEDED' ? '生成已完成，并已自动加入创作案板。' : '已进入真实生成流程，等待任务返回。', draft: initialDraft, onCommitDraft: commitDraft, onSelectChampion: selectChampion, onContinueEdit: continueEdit, createdAt: Date.now() }]);
-      autoCommitTaskImagesToBoard(initialDraft, references, intent.trim(), params);
+      setDraftMessages((current) => [...current, { id: `draft-${created.id ?? Date.now()}`, tone: 'drafts', title: '真实生成草稿', body: initialDraft.status === 'SUCCEEDED' ? '生成已完成，待审美确认；满意后再加入画布。' : '已开始出图，结果会先留在对话里。', draft: initialDraft, onCommitDraft: confirmDraftContext, onSelectChampion: selectChampion, onContinueEdit: continueEdit, createdAt: Date.now() }]);
       if (created.id) watchTask(created.id);
     } catch (error) {
       setDraft({ id: 'failed', status: 'FAILED', error: humanError(error) });
@@ -809,8 +805,9 @@ export function VisualStageClient() {
     }
   }
 
-  function commitDraft(nextDraft: Draft) {
-    autoCommitTaskImagesToBoard(nextDraft);
+  function confirmDraftContext(nextDraft: Draft) {
+    const context = taskContextRef.current[nextDraft.taskId ?? nextDraft.id];
+    commitDraftToBoard(nextDraft, context?.references ?? lastReferencesRef.current, context?.intent ?? lastIntentRef.current, context?.generationParams ?? generationParams);
   }
 
   function reuseCanvasImage(item: CanvasItem) {

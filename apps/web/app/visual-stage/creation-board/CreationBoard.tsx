@@ -15,14 +15,14 @@ import type { CreationObject, CreationRelation, CreationRelationType, SessionCan
 
 function objectsFromSession(items: SessionCanvasItem[]): CreationObject[] {
   return items.map((item, index) => {
-    const referenceSummary = item.references?.length ? `参考：${item.references.map((reference) => `${reference.label} · ${reference.role ?? '参考'}`).join('、')}` : '无显式参考';
-    const branchSummary = `分支 ${item.branchCount ?? index + 1}`;
+    const referenceSummary = item.references?.length ? `参考：${item.references.map((reference) => `${reference.label} · ${reference.role ?? '参考'}`).join('、')}` : '没有额外参考';
+    const branchSummary = `第 ${item.branchCount ?? index + 1} 版`;
     const sourceNodeIds = item.parentObjectIds ?? item.references?.flatMap((reference) => reference.parentObjectIds ?? []) ?? [];
     return {
       id: item.sourceObjectId ?? `session-${item.id}`,
       kind: 'generated.image',
       title: `会话主图 · ${item.title}`,
-      summary: item.intent ? `已加入画布。来自当前创作助手会话：${item.intent}。${referenceSummary}。${branchSummary}。` : `已加入画布。来自当前会话的已确认主图。${branchSummary}。`,
+      summary: item.intent ? `已加入画布。来自这次创作：${item.intent}。${referenceSummary}。${branchSummary}。` : `已加入画布。来自对话里确认过的一版。${branchSummary}。`,
       position: { x: 1180 + index * 118, y: 70 + index * 150 },
       size: { width: 168, height: 132 },
       status: index === 0 ? 'champion' : 'active',
@@ -53,7 +53,7 @@ function selectedContextCopy(object?: CreationObject) {
   if (!object) return '未进入对象上下文：长按画布对象，即可带着它进入创作助手。';
   if (object.kind === 'text') return `正在编辑标题文本：${object.title}`;
   if (object.kind === 'reference.image') return `正在基于参考图：${object.title}`;
-  if (object.kind === 'generated.image') return `正在基于生成图：${object.title}`;
+  if (object.kind === 'generated.image') return `正在基于这一版：${object.title}`;
   if (object.kind === 'brand.palette') return `正在约束品牌对象：${object.title}`;
   if (object.kind === 'artboard') return `正在调整交付画板：${object.title}`;
   return `正在基于 ${object.title}`;
@@ -77,7 +77,7 @@ export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem
   const inspectorObject = objects.find((object) => object.id === inspectorOpenObjectId) ?? undefined;
   const assistantContextObject = objects.find((object) => object.id === assistantContextObjectId) ?? undefined;
   const latestCanvasItem = canvasItems?.[0];
-  const emptyCreationBoardCopy = '空白创作案板：这里默认不放示例组件。先在右侧创作助手上传参考、描述目标或生成草稿，确认后的图片、文本和关系才会进入画布。';
+  const emptyCreationBoardCopy = '空白创作案板：这里默认不放示例。先在创作助手上传参考、描述目标或出一版图；审美确认后，图片、文本备注和来源说明才会进入画布。';
 
   function openDetails(id: string) {
     setSelectedObjectId(id);
@@ -103,7 +103,7 @@ export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem
             </div>
             <h2 className="text-2xl font-extrabold tracking-[-0.055em] text-[#253048] md:text-3xl">把对话结果沉淀成可操作画布</h2>
             <p className="max-w-3xl text-sm leading-6 text-[#6b7488]">
-              文本对象、图片对象、品牌对象、交付画板都在同一张画布里；关系层可见但不工程化，单击打开详情，长按进入创作助手上下文。
+              自然语言设计会沉淀为视觉记忆：图片、文本备注、品牌色板和交付画板；来源提示很轻，不需要懂后台。单击看详情，长按带入创作助手。
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -117,7 +117,7 @@ export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem
             >
               整理画布
             </Button>
-            <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-[#45506a]">技术诊断细节不外露</Badge>
+            <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-[#45506a]">只保留创作信息</Badge>
           </div>
         </div>
 
@@ -141,12 +141,12 @@ export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem
             <div data-testid="creation-assistant-context" className="rounded-[1.35rem] border border-[#f2d6cf] bg-[#f8e3dd]/68 p-3 shadow-[0_14px_36px_rgba(37,48,72,0.08)]">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <b className="text-[#253048]">创作助手上下文</b>
-                <Badge variant="outline" className="rounded-full border-[#f2d6cf] bg-[#fffaf2]/70 px-2 py-0.5 text-[#9e574c]">长按进入创作助手</Badge>
+                <Badge variant="outline" className="rounded-full border-[#f2d6cf] bg-[#fffaf2]/70 px-2 py-0.5 text-[#9e574c]">长按带入创作助手</Badge>
               </div>
               <p className="mb-2 text-sm leading-6 text-[#9e574c]">{selectedContextCopy(assistantContextObject)}</p>
               <Textarea
                 readOnly
-                value={assistantContextObject ? `已带入「${assistantContextObject.title}」：可以直接说“保持这个感觉继续”“把标题改克制”“重排交付画板”。` : '长按任意对象后，它会进入创作助手输入框；系统自动判断变量替换、视觉锚点、文本改写或画板重排。'}
+                value={assistantContextObject ? `已带入「${assistantContextObject.title}」：可以直接说“保持这个感觉继续”“把标题改克制”“重排交付画板”。` : '长按任意对象后，它会进入创作助手输入框；你只要说想换什么、保留什么、怎么改文字或重排画板。'}
                 aria-label="创作助手上下文示例"
                 className="min-h-24 resize-none border-[#f2d6cf] bg-[#fffaf2]/72 text-sm text-[#45506a] shadow-none focus-visible:ring-[#b96a5c]/25"
               />
@@ -168,7 +168,7 @@ export function CreationBoard({ canvasItems, sessionRelations, onReuseCanvasItem
     <div className="grid w-full max-w-full min-w-0 gap-3 overflow-hidden lg:hidden">
       <div className="rounded-[1.35rem] border border-[#e9d8c4] bg-[#fffaf2]/94 p-3 shadow-[0_16px_40px_rgba(37,48,72,0.09)]">
         <b className="block text-sm text-[#253048]">Focus Lens</b>
-        <p className="text-xs leading-5 text-[#6b7488]">移动端聚焦当前对象，不减少编辑能力；Bottom Inspector 承接详情，Relationship Peek 承接关系。</p>
+        <p className="text-xs leading-5 text-[#6b7488]">移动端聚焦当前对象，不减少编辑能力；详情卡看说明，来源提示看来龙去脉。</p>
       </div>
       <MobileObjectStack objects={objects} selectedObjectId={selectedObject?.id ?? selectedObjectId} onSelect={openDetails} />
       <ObjectInspector object={inspectorObject} relations={relations} />

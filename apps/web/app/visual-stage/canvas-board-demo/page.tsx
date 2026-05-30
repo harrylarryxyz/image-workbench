@@ -23,7 +23,7 @@ const vi = {
 
 type CanvasObject = {
   id: string;
-  kind: 'brief' | 'reference' | 'image' | 'text' | 'brand' | 'task' | 'artboard';
+  kind: 'brief' | 'reference' | 'image' | 'text' | 'brand' | 'action' | 'artboard';
   label: string;
   x: number;
   y: number;
@@ -37,33 +37,33 @@ type CanvasObject = {
 };
 
 const canvasObjects = [
-  { id: 'brief', kind: 'brief', label: '设计层 · 项目 Brief', subtitle: '温润修护精华 · 春季主视觉', x: 4, y: 8, w: 22, h: 13, tone: 'paper' },
-  { id: 'ref-product', kind: 'reference', label: '参考语义对象', subtitle: '产品参考：瓶身比例不可变', x: 5, y: 28, w: 17, h: 18, tone: 'sage' },
+  { id: 'brief', kind: 'brief', label: '项目目标', subtitle: '温润修护精华 · 春季主视觉', x: 4, y: 8, w: 22, h: 13, tone: 'paper' },
+  { id: 'ref-product', kind: 'reference', label: '产品参考图', subtitle: '瓶身比例不可变', x: 5, y: 28, w: 17, h: 18, tone: 'sage' },
   { id: 'ref-mood', kind: 'reference', label: '氛围参考', subtitle: '只借暖纸质感与留白', x: 24, y: 31, w: 15, h: 15, tone: 'coral' },
-  { id: 'brand', kind: 'brand', label: '品牌色板对象', subtitle: 'Paper / Ink / Coral / Sage', x: 4, y: 53, w: 22, h: 12, tone: 'sage' },
-  { id: 'prompt', kind: 'text', label: 'Prompt 文本对象', subtitle: '低饱和杂志页，瓶身居中，纸面阴影', x: 31, y: 10, w: 23, h: 13, tone: 'paper' },
+  { id: 'brand', kind: 'brand', label: '品牌色板', subtitle: 'Paper / Ink / Coral / Sage', x: 4, y: 53, w: 22, h: 12, tone: 'sage' },
+  { id: 'prompt', kind: 'text', label: '文本备注', subtitle: '低饱和杂志页，瓶身居中，纸面阴影', x: 31, y: 10, w: 23, h: 13, tone: 'paper' },
   { id: 'draft-a', kind: 'image', label: '初稿 A', subtitle: '像参考，但产品弱', x: 44, y: 30, w: 16, h: 16, tone: 'paper', faded: true },
-  { id: 'draft-b', kind: 'image', label: '冠军路径 · 初稿 B', subtitle: '构图稳，标题空间够', x: 63, y: 24, w: 22, h: 23, tone: 'coral', champion: true },
-  { id: 'draft-c', kind: 'image', label: '废弃分支 · 初稿 C', subtitle: '商业但太硬', x: 84, y: 38, w: 13, h: 14, tone: 'paper', faded: true },
-  { id: 'title', kind: 'text', label: '标题文本对象', subtitle: '温润修护 · 春季限定', x: 61, y: 8, w: 25, h: 11, tone: 'ink', selected: true },
-  { id: 'note', kind: 'text', label: '反馈批注文本对象', subtitle: '标题再高级一点，产品高光收一点', x: 66, y: 52, w: 22, h: 11, tone: 'paper' },
-  { id: 'edit-task', kind: 'task', label: 'Lineage / Flow · 局部修改', subtitle: '标题绑定 + 产品高光微调', x: 40, y: 57, w: 20, h: 10, tone: 'coral' },
-  { id: 'art-xhs', kind: 'artboard', label: '交付画板对象', subtitle: '小红书首图 3:4', x: 27, y: 70, w: 21, h: 18, tone: 'sage' },
+  { id: 'draft-b', kind: 'image', label: '当前最好 · 初稿 B', subtitle: '构图稳，标题空间够', x: 63, y: 24, w: 22, h: 23, tone: 'coral', champion: true },
+  { id: 'draft-c', kind: 'image', label: '已放弃尝试 · 初稿 C', subtitle: '商业但太硬', x: 84, y: 38, w: 13, h: 14, tone: 'paper', faded: true },
+  { id: 'title', kind: 'text', label: '标题文本备注', subtitle: '温润修护 · 春季限定', x: 61, y: 8, w: 25, h: 11, tone: 'ink', selected: true },
+  { id: 'note', kind: 'text', label: '修改意见', subtitle: '标题再高级一点，产品高光收一点', x: 66, y: 52, w: 22, h: 11, tone: 'paper' },
+  { id: 'edit-action', kind: 'action', label: '按意见修改', subtitle: '标题贴近画面 + 产品高光微调', x: 40, y: 57, w: 20, h: 10, tone: 'coral' },
+  { id: 'art-xhs', kind: 'artboard', label: '交付画板', subtitle: '小红书首图 3:4', x: 27, y: 70, w: 21, h: 18, tone: 'sage' },
   { id: 'art-poster', kind: 'artboard', label: '海报交付画板', subtitle: '线下竖版海报', x: 52, y: 72, w: 20, h: 18, tone: 'paper' },
-  { id: 'export', kind: 'task', label: '导出包', subtitle: '冠军图 + 文本 + 色板 + 画板', x: 78, y: 73, w: 17, h: 12, tone: 'ink' },
+  { id: 'export', kind: 'action', label: '准备交付', subtitle: '当前最好 + 文本 + 色板 + 画板', x: 78, y: 73, w: 17, h: 12, tone: 'ink' },
 ] satisfies CanvasObject[];
 
-const lineageEdges = [
-  { from: 'brief', to: 'prompt', type: '生成', className: 'left-[25%] top-[16%] w-[10%] rotate-[-8deg] border-solid border-[#253048]/35' },
+const sourceHints = [
+  { from: 'brief', to: 'prompt', type: '自然语言设计', className: 'left-[25%] top-[16%] w-[10%] rotate-[-8deg] border-solid border-[#253048]/35' },
   { from: 'ref-product', to: 'draft-b', type: '参考', className: 'left-[21%] top-[39%] w-[43%] rotate-[-9deg] border-dashed border-[#5b8277]/55' },
   { from: 'ref-mood', to: 'draft-b', type: '参考', className: 'left-[38%] top-[42%] w-[27%] rotate-[-8deg] border-dashed border-[#b96a5c]/55' },
-  { from: 'prompt', to: 'draft-a', type: '生成', className: 'left-[52%] top-[26%] w-[11%] rotate-[47deg] border-solid border-[#253048]/30' },
-  { from: 'prompt', to: 'draft-b', type: '生成', className: 'left-[53%] top-[22%] w-[14%] rotate-[16deg] border-solid border-[#253048]/35' },
-  { from: 'draft-b', to: 'title', type: '文本绑定', className: 'left-[72%] top-[21%] w-[7%] rotate-[-76deg] border-solid border-[#b96a5c]/80 border-t-2' },
-  { from: 'draft-b', to: 'edit-task', type: '编辑', className: 'left-[57%] top-[55%] w-[12%] rotate-[154deg] border-solid border-[#b96a5c]/80 border-t-2' },
-  { from: 'draft-b', to: 'art-xhs', type: '采纳', className: 'left-[47%] top-[68%] w-[21%] rotate-[145deg] border-solid border-[#b96a5c]/80 border-t-2' },
-  { from: 'brand', to: 'art-poster', type: '品牌约束', className: 'left-[25%] top-[66%] w-[29%] rotate-[24deg] border-dashed border-[#5b8277]/60' },
-  { from: 'art-poster', to: 'export', type: '导出', className: 'left-[71%] top-[83%] w-[8%] rotate-[0deg] border-solid border-[#253048]/50' },
+  { from: 'prompt', to: 'draft-a', type: '由这版改来', className: 'left-[52%] top-[26%] w-[11%] rotate-[47deg] border-solid border-[#253048]/30' },
+  { from: 'prompt', to: 'draft-b', type: '由这版改来', className: 'left-[53%] top-[22%] w-[14%] rotate-[16deg] border-solid border-[#253048]/35' },
+  { from: 'draft-b', to: 'title', type: '文字贴在这版上', className: 'left-[72%] top-[21%] w-[7%] rotate-[-76deg] border-solid border-[#b96a5c]/80 border-t-2' },
+  { from: 'draft-b', to: 'edit-action', type: '按意见改过', className: 'left-[57%] top-[55%] w-[12%] rotate-[154deg] border-solid border-[#b96a5c]/80 border-t-2' },
+  { from: 'draft-b', to: 'art-xhs', type: '准备交付', className: 'left-[47%] top-[68%] w-[21%] rotate-[145deg] border-solid border-[#b96a5c]/80 border-t-2' },
+  { from: 'brand', to: 'art-poster', type: '沿用品牌要求', className: 'left-[25%] top-[66%] w-[29%] rotate-[24deg] border-dashed border-[#5b8277]/60' },
+  { from: 'art-poster', to: 'export', type: '已经整理好', className: 'left-[71%] top-[83%] w-[8%] rotate-[0deg] border-solid border-[#253048]/50' },
 ];
 
 const toneClass = {
@@ -71,6 +71,16 @@ const toneClass = {
   coral: 'border-[#e5b8ae] bg-[#f8e3dd]/88 text-[#9e574c]',
   sage: 'border-[#c5dbd3] bg-[#e7f1ec]/88 text-[#486e64]',
   ink: 'border-[#253048] bg-[#253048]/94 text-[#fffaf2]',
+};
+
+const kindCopy: Record<CanvasObject['kind'], string> = {
+  brief: '创作目标',
+  reference: '参考图',
+  image: '这一版',
+  text: '文本备注',
+  brand: '品牌色板',
+  action: '继续动作',
+  artboard: '交付画板',
 };
 
 function ObjectPreview({ object }: { object: CanvasObject }) {
@@ -101,11 +111,11 @@ function CanvasNode({ object }: { object: CanvasObject }) {
     <ObjectPreview object={object} />
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0">
-        <p className="truncate text-[0.72rem] font-semibold uppercase tracking-[0.13em] opacity-70">{object.kind}</p>
+        <p className="truncate text-[0.72rem] font-semibold uppercase tracking-[0.13em] opacity-70">{kindCopy[object.kind]}</p>
         <h3 className="mt-1 truncate text-sm font-semibold tracking-[-0.025em]">{object.label}</h3>
       </div>
       {object.selected ? <span className="rounded-full bg-[#b96a5c] px-2 py-0.5 text-[0.62rem] font-bold text-[#fffaf2]">选中</span> : null}
-      {object.champion ? <span className="rounded-full bg-[#253048] px-2 py-0.5 text-[0.62rem] font-bold text-[#fffaf2]">冠军</span> : null}
+      {object.champion ? <span className="rounded-full bg-[#253048] px-2 py-0.5 text-[0.62rem] font-bold text-[#fffaf2]">当前最好</span> : null}
     </div>
     <p className="mt-1.5 line-clamp-2 text-xs leading-4 opacity-80">{object.subtitle}</p>
   </article>;
@@ -117,19 +127,19 @@ function CanvasArea() {
     <div className="absolute left-4 top-4 z-20 flex flex-wrap items-center gap-2 rounded-full border border-[#e9d8c4] bg-[#fffaf2]/90 px-3 py-2 shadow-[0_12px_30px_rgba(37,48,72,0.08)] backdrop-blur">
       <Badge className={cn('rounded-full', vi.ink)}>WYSIWYG</Badge>
       <span className="text-xs font-semibold text-[#6b7488]">静态画布演示 · 不调用 AI</span>
-      <span className="text-xs font-semibold text-[#9e574c]">Lineage / Flow 开启</span>
+      <span className="text-xs font-semibold text-[#9e574c]">来源提示开启</span>
     </div>
     <div className="absolute right-4 top-4 z-20 flex gap-2 rounded-full border border-[#e9d8c4] bg-[#fffaf2]/90 p-1 shadow-[0_12px_30px_rgba(37,48,72,0.08)]">
-      {['设计层', '关系层', '智能层'].map((item, index) => <span key={item} className={cn('rounded-full px-3 py-1 text-xs font-semibold', index === 1 ? 'bg-[#253048] text-[#fffaf2]' : 'text-[#45506a]')}>{item}</span>)}
+      {['画面内容', '来源说明', '交付准备'].map((item, index) => <span key={item} className={cn('rounded-full px-3 py-1 text-xs font-semibold', index === 1 ? 'bg-[#253048] text-[#fffaf2]' : 'text-[#45506a]')}>{item}</span>)}
     </div>
-    {lineageEdges.map((edge) => <div key={`${edge.from}-${edge.to}`} className={cn('absolute z-0 border-t', edge.className)}>
+    {sourceHints.map((edge) => <div key={`${edge.from}-${edge.to}`} className={cn('absolute z-0 border-t', edge.className)}>
       <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-[#e9d8c4] bg-[#fffaf2]/90 px-2 py-0.5 text-[0.62rem] font-semibold text-[#6b7488]">{edge.type}</span>
     </div>)}
     <div className="absolute inset-0 z-10">
       {canvasObjects.map((object) => <CanvasNode key={object.id} object={object} />)}
     </div>
     <div className="absolute bottom-4 left-4 z-30 flex items-center gap-2 rounded-full border border-[#e9d8c4] bg-[#fffaf2]/94 p-2 shadow-[0_16px_38px_rgba(37,48,72,0.10)]">
-      {['选择', '文本', '图片', '连线', '画板', 'AI 改写'].map((tool, index) => <Button key={tool} size="sm" variant={index === 1 ? 'default' : 'outline'} className={cn('h-8 rounded-full text-xs', index === 1 ? 'bg-[#253048] text-[#fffaf2] hover:bg-[#303b55]' : 'border-[#d9c2a7] bg-[#fffaf2] text-[#45506a] hover:bg-[#fff1de]')}>{tool}</Button>)}
+      {['选择', '文本', '图片', '来源', '画板', 'AI 改写'].map((tool, index) => <Button key={tool} size="sm" variant={index === 1 ? 'default' : 'outline'} className={cn('h-8 rounded-full text-xs', index === 1 ? 'bg-[#253048] text-[#fffaf2] hover:bg-[#303b55]' : 'border-[#d9c2a7] bg-[#fffaf2] text-[#45506a] hover:bg-[#fff1de]')}>{tool}</Button>)}
     </div>
     <div className="absolute bottom-4 right-4 z-30 h-28 w-40 rounded-[1rem] border border-[#d9c2a7] bg-[#fffaf2]/90 p-2 shadow-[0_16px_38px_rgba(37,48,72,0.10)]">
       <div className="mb-1 flex items-center justify-between text-[0.64rem] font-semibold text-[#6b7488]"><span>MiniMap</span><span>38%</span></div>
@@ -140,14 +150,14 @@ function CanvasArea() {
   </section>;
 }
 
-function Inspector() {
+function DetailsPanel() {
   return <aside className="grid gap-4 xl:content-start">
     <Card className={cn('rounded-[1.7rem]', vi.raised)}>
       <CardContent className="space-y-4 p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#9e574c]">右侧 Inspector</p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.055em] text-[#253048]">选中：标题文本对象</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#9e574c]">详情卡</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-[-0.055em] text-[#253048]">选中：标题文本备注</h2>
           </div>
           <Badge className={cn('rounded-full', vi.coral)}>Text</Badge>
         </div>
@@ -167,10 +177,10 @@ function Inspector() {
     <Card className={cn('rounded-[1.7rem]', vi.card)}>
       <CardContent className="space-y-4 p-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#9e574c]">关系层</p>
-          <h3 className="mt-1 text-xl font-semibold tracking-[-0.04em] text-[#253048]">当前高亮关系</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#9e574c]">来源说明</p>
+          <h3 className="mt-1 text-xl font-semibold tracking-[-0.04em] text-[#253048]">当前选中的来源提示</h3>
         </div>
-        {['文本绑定：标题 → 冠军图', '品牌约束：色板 → 交付画板', '采纳：初稿 B → 小红书首图', '废弃分支：初稿 C 已淡化'].map((item) => <div key={item} className="rounded-[1rem] border border-[#e9d8c4] bg-[#fff1de]/62 p-3 text-sm font-semibold text-[#45506a]">{item}</div>)}
+        {['文字贴在这版上：标题 → 当前最好', '沿用品牌要求：色板 → 交付画板', '准备交付：初稿 B → 小红书首图', '已放弃尝试：初稿 C 已淡化'].map((item) => <div key={item} className="rounded-[1rem] border border-[#e9d8c4] bg-[#fff1de]/62 p-3 text-sm font-semibold text-[#45506a]">{item}</div>)}
       </CardContent>
     </Card>
   </aside>;
@@ -179,9 +189,9 @@ function Inspector() {
 function MobilePreview() {
   return <section className="grid gap-4 lg:grid-cols-[minmax(0,0.62fr)_minmax(320px,0.38fr)] lg:items-center">
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#9e574c]">Mobile review mode</p>
-      <h2 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#253048]">手机端先看画布、选对象、看 Inspector。</h2>
-      <p className="mt-3 max-w-2xl text-sm leading-7 text-[#45506a]">复杂编排桌面优先；移动端保留 pan/zoom、选择对象、查看关系、做简单判断，不把专业画布硬塞成表单。</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#9e574c]">Mobile creation board</p>
+      <h2 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#253048]">手机端也能看画布、选对象、继续创作。</h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-[#45506a]">移动端不降级：保留缩放、平移、选择对象、来源提示和自然语言继续创作，不把专业画布硬塞成表单。</p>
     </div>
     <div className="mx-auto w-full max-w-[390px] rounded-[2.4rem] border border-[#d9c2a7] bg-[#fffaf2]/70 p-2 shadow-[0_28px_80px_rgba(37,48,72,0.16)]">
       <div className="overflow-hidden rounded-[1.95rem] border border-[#e9d8c4] bg-[#fffaf2] p-3">
@@ -193,7 +203,7 @@ function MobilePreview() {
           </div>)}
         </div>
         <div className="mt-3 rounded-[1.2rem] border border-[#e9d8c4] bg-[#fff1de]/70 p-3">
-          <p className="text-xs font-semibold text-[#9e574c]">选中：标题文本对象</p>
+          <p className="text-xs font-semibold text-[#9e574c]">选中：标题文本备注</p>
           <p className="mt-1 text-sm font-semibold text-[#253048]">可改写、换字体、绑定到交付画板。</p>
         </div>
       </div>
@@ -211,26 +221,26 @@ export default function CanvasBoardDemoPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className={cn('rounded-full px-3 py-1', vi.ink)}>创作案板</Badge>
-              <Badge variant="outline" className={cn('rounded-full', vi.coral)}>Canvas-first</Badge>
+              <Badge variant="outline" className={cn('rounded-full', vi.coral)}>自然语言设计</Badge>
               <Badge variant="outline" className={cn('rounded-full', vi.sage)}>Warm Editorial Board</Badge>
             </div>
             <Button asChild variant="outline" className="rounded-full border-[#d9c2a7] bg-[#fffaf2] text-[#253048] hover:bg-[#fff1de]"><Link href="/visual-stage">回到 Visual Stage</Link></Button>
           </div>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.32fr)] lg:items-end">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#9e574c]">WYSIWYG 创作画布 · 静态画布演示 · 不调用 AI</p>
-              <h1 className="mt-3 max-w-5xl text-4xl font-semibold leading-[0.96] tracking-[-0.075em] text-[#253048] md:text-6xl">图片、文本对象、参考、品牌与交付物都在同一张专业画布上。</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#9e574c]">WYSIWYG 创作画布 · 自然语言设计 · 静态画布演示</p>
+              <h1 className="mt-3 max-w-5xl text-4xl font-semibold leading-[0.96] tracking-[-0.075em] text-[#253048] md:text-6xl">图片、文本备注、参考、品牌与交付物都在同一张视觉记忆画布上。</h1>
             </div>
             <Card className={cn('rounded-[1.5rem]', vi.card)}><CardContent className="space-y-2 p-4 text-sm leading-6 text-[#45506a]">
               <b className="text-[#253048]">这版验证点</b>
-              <p>不再是过程面板；重点看是否像 Lovart + flow 工具融合后的 AI 设计项目画布。</p>
+              <p>不再是过程面板；重点看是否像 Lovart 式无限画布 + 自然语言创作的设计案板，并且不显示技术细节。</p>
             </CardContent></Card>
           </div>
         </header>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <CanvasArea />
-          <Inspector />
+          <DetailsPanel />
         </section>
 
         <MobilePreview />

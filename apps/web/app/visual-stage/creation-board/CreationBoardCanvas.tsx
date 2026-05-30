@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import { Background, Controls, MiniMap, ReactFlow, useNodesState, type Edge, type Node as FlowNode, type NodeProps } from '@xyflow/react';
+import { Background, Controls, MiniMap, ReactFlow, useNodesState, type AriaLabelConfig, type Edge, type Node as FlowNode, type NodeProps } from '@xyflow/react';
 import type { CreationObject, CreationRelation } from './types';
 import { CreationObjectNode } from './CreationObjectNode';
 
@@ -31,6 +31,19 @@ function CreationFlowNode({ data }: NodeProps<CreationFlowNodeType>) {
 }
 
 const nodeTypes = { creationObject: CreationFlowNode };
+
+const naturalLanguageAriaLabelConfig: Partial<AriaLabelConfig> = {
+  'node.a11yDescription.default': '按 Enter 或空格选择画布对象；按 Delete 移除，按 Esc 取消。',
+  'node.a11yDescription.keyboardDisabled': '按 Enter 或空格选择画布对象；随后可用方向键移动，按 Delete 移除，按 Esc 取消。',
+  'node.a11yDescription.ariaLiveMessage': ({ direction, x, y }) => `已移动选中的画布对象 ${direction}。当前位置：x ${x}，y ${y}。`,
+  'edge.a11yDescription.default': '按 Enter 或空格选择来源提示；按 Delete 移除，按 Esc 取消。',
+  'controls.ariaLabel': '画布控制',
+  'controls.zoomIn.ariaLabel': '放大画布',
+  'controls.zoomOut.ariaLabel': '缩小画布',
+  'controls.fitView.ariaLabel': '适配全部画布对象',
+  'controls.interactive.ariaLabel': '切换画布交互',
+  'minimap.ariaLabel': '画布缩略导航',
+};
 
 const creationBoardPositionStorageKey = 'visual-stage.creation-board.node-positions.v1';
 
@@ -68,6 +81,20 @@ function arrangeNodesIntoReadableGrid(nodes: CreationFlowNodeType[]) {
       y: originY + Math.floor(index / 3) * 220,
     },
   }));
+}
+
+function relationLabel(relation: CreationRelation) {
+  const labels: Record<CreationRelation['type'], string> = {
+    reference: '参考了这张',
+    generation: '由这版改来',
+    variant: '同系列',
+    edit: '按意见改过',
+    'text-binding': '文字贴在这版上',
+    'brand-constraint': '沿用品牌要求',
+    adoption: '准备交付',
+    export: '已经整理好',
+  };
+  return labels[relation.type];
 }
 
 export function CreationBoardCanvas({ objects, relations, selectedObjectId, arrangeVersion = 0, onShowDetails, onUseInAssistant }: {
@@ -114,7 +141,7 @@ export function CreationBoardCanvas({ objects, relations, selectedObjectId, arra
     target: relation.targetId,
     type: 'smoothstep',
     animated: relation.selectedLineage,
-    label: relation.type,
+    label: relationLabel(relation),
     markerEnd: relation.selectedLineage ? { type: 'arrowclosed', color: '#b96a5c' } : undefined,
     style: edgeStyle(relation),
     labelStyle: { fill: '#6b7488', fontSize: 10, fontWeight: 700 },
@@ -136,6 +163,7 @@ export function CreationBoardCanvas({ objects, relations, selectedObjectId, arra
         return updatedNodes;
       })}
       fitView
+      ariaLabelConfig={naturalLanguageAriaLabelConfig}
       minZoom={0.25}
       maxZoom={1.8}
       defaultEdgeOptions={{ interactionWidth: 18 }}

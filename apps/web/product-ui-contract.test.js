@@ -158,7 +158,7 @@ test('creation board demo is an isolated static aesthetic preview route', () => 
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Creation Board demo must not expose diagnostics or raw provider data');
 });
 
-test('canvas board demo is a canvas-first WYSIWYG creation board preview', () => {
+test('canvas board demo is a natural-language WYSIWYG creation board preview', () => {
   const surface = readPage('visual-stage/canvas-board-demo/page.tsx');
 
   for (const marker of [
@@ -168,29 +168,27 @@ test('canvas board demo is a canvas-first WYSIWYG creation board preview', () =>
     '静态画布演示',
     '不调用 AI',
     'Warm Editorial Board',
-    '文本对象',
-    '标题文本对象',
-    '参考语义对象',
-    '品牌色板对象',
-    '交付画板对象',
-    'Lineage / Flow',
+    '自然语言设计',
+    '视觉记忆',
+    '文本备注',
+    '标题文本备注',
+    '参考图',
+    '沿用品牌要求',
+    '交付画板',
     'MiniMap',
-    '冠军路径',
-    '废弃分支',
-    '右侧 Inspector',
-    '设计层',
-    '关系层',
-    '智能层',
+    '当前最好',
+    '已放弃尝试',
+    '来源说明',
   ]) {
     assert.match(surface, new RegExp(escapeRegExp(marker)), `canvas board demo missing ${marker}`);
   }
 
   assert.match(surface, /@\/components\/ui\/(badge|button|card)/, 'Canvas Board demo should compose shadcn-style primitives');
   assert.match(surface, /const\s+canvasObjects\s*=\s*\[/, 'Canvas Board demo should model visible canvas objects');
-  assert.match(surface, /const\s+lineageEdges\s*=\s*\[/, 'Canvas Board demo should model visible flow relationships');
+  assert.match(surface, /const\s+sourceHints\s*=\s*\[/, 'Canvas Board demo should model lightweight source hints, not an editable flow graph');
   assert.match(surface, /kind:\s*['"]text['"][\s\S]*selected:\s*true/, 'Canvas Board demo should include one selected visible text object');
   assert.doesNotMatch(surface, /apiPost|apiFormPost|subscribeTaskEvents|pollTaskUntilTerminal|fetch\(/, 'Static Canvas Board demo must not call runtime APIs or providers');
-  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Canvas Board demo must not expose diagnostics or raw provider data');
+  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|Lineage \/ Flow|\bflow\b|关系层|智能层|连线|语义槽位|优先级|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Canvas Board demo must not expose diagnostics, raw provider data, or flow-editor language');
 });
 
 test('mobile canvas demo uses compact mobile-native layout instead of shrinking desktop panels', () => {
@@ -205,13 +203,13 @@ test('mobile canvas demo uses compact mobile-native layout instead of shrinking 
     '淡粉色参考图',
     '桃粉色生成图',
     '灰色系文字',
-    '废弃 flow 透明度',
+    '已放弃尝试弱化显示',
     '底部对象面板',
     '选择具体模块后展开详情',
     'Focus Lens',
-    'Object Stack',
-    'Relationship Peek',
-    'Bottom Inspector',
+    '已选对象',
+    '来源提示',
+    '详情卡',
   ]) {
     assert.match(surface, new RegExp(escapeRegExp(marker)), `mobile canvas demo missing ${marker}`);
   }
@@ -221,9 +219,9 @@ test('mobile canvas demo uses compact mobile-native layout instead of shrinking 
   assert.match(surface, /kind:\s*['"]reference['"][\s\S]*tone:\s*['"]reference['"]/, 'Reference objects should use the light-pink reference tone');
   assert.match(surface, /kind:\s*['"]generated['"][\s\S]*tone:\s*['"]generated['"]/, 'Generated objects should use the peach-pink generated tone');
   assert.match(surface, /kind:\s*['"]text['"][\s\S]*tone:\s*['"]text['"]/, 'Text objects should use the grey text tone');
-  assert.match(surface, /discarded:\s*true[\s\S]*opacity-35/, 'Discarded flow should be visually de-emphasized');
+  assert.match(surface, /discarded:\s*true[\s\S]*opacity-35/, 'Discarded attempts should be visually de-emphasized');
   assert.match(surface, /@\/components\/ui\/(badge|button|card)/, 'Mobile Canvas demo should compose shadcn-style primitives');
-  assert.doesNotMatch(surface, /复杂编排桌面优先|做简单判断/, 'Mobile Canvas demo must not describe mobile as reduced-capability review mode');
+  assert.doesNotMatch(surface, /复杂编排桌面优先|做简单判断|废弃 flow|\bflow\b|语义槽位|优先级/, 'Mobile Canvas demo must not describe mobile as reduced-capability review mode or expose flow-editor language');
   assert.doesNotMatch(surface, /apiPost|apiFormPost|subscribeTaskEvents|pollTaskUntilTerminal|fetch\(/, 'Static Mobile Canvas demo must not call runtime APIs or providers');
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Mobile Canvas demo must not expose diagnostics or raw provider data');
 });
@@ -257,27 +255,27 @@ test('visual stage embeds the real Creation Board object model and WYSIWYG shell
     'Creation Board',
     '创作案板',
     'WYSIWYG',
-    '文本对象',
-    '图片对象',
-    '品牌对象',
+    '文本备注',
+    '参考图',
+    '品牌色板',
     '交付画板',
     '创作助手上下文',
     '单击打开详情',
-    '长按进入创作助手',
+    '长按带入创作助手',
     'Focus Lens',
-    'Object Stack',
-    'Relationship Peek',
-    'Bottom Inspector',
-    '技术诊断细节不外露',
+    '已选对象',
+    '来源提示',
+    '详情卡',
+    '只保留创作信息',
   ]) {
     assert.match(surface, new RegExp(escapeRegExp(marker)), `Creation Board shell missing ${marker}`);
   }
 
   assert.match(surface, /export type CreationObjectKind/, 'Creation Board should define object kinds as a business model');
-  assert.match(surface, /export type CreationRelationType/, 'Creation Board should define lineage relation types');
+  assert.match(surface, /export type CreationRelationType/, 'Creation Board should define source relation types');
   assert.match(surface, /brief[\s\S]*reference\.image[\s\S]*generated\.image[\s\S]*text[\s\S]*brand\.palette[\s\S]*artboard[\s\S]*deliverable/, 'Creation Board kinds should cover brief/reference/generated/text/brand/artboard/deliverable objects');
   assert.match(surface, /const\s+creationBoardObjects\s*:/, 'Creation Board fixtures should seed visible creative objects');
-  assert.match(surface, /const\s+creationBoardRelations\s*:/, 'Creation Board fixtures should seed visible lineage relations');
+  assert.match(surface, /const\s+creationBoardRelations\s*:/, 'Creation Board fixtures should seed visible source relations');
   assert.match(surface, /data-testid="creation-board-shell"/, 'Visual Stage should render the Creation Board shell');
   assert.match(surface, /data-testid="creation-board-canvas"/, 'Creation Board should expose a canvas audit hook');
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|raw task payload|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Creation Board surface must not expose provider/storage/task diagnostics');
@@ -320,7 +318,6 @@ test('visual stage supports isolated creation cases, real generation parameters,
     'data-testid="composer-board-reference-token"',
     'sourceObjectId',
     'parentObjectIds',
-    'autoCommitTaskImagesToBoard',
     'sessionRelations',
   ]) {
     assert.match(surface, new RegExp(escapeRegExp(marker)), `Visual Stage missing project/parameter/lineage contract marker: ${marker}`);
@@ -328,8 +325,36 @@ test('visual stage supports isolated creation cases, real generation parameters,
 
   assert.match(surface, /<CreationBoard[\s\S]*sessionRelations=\{sessionRelations\}/, 'Creation Board must receive live session lineage relations');
   assert.match(surface, /function continueEdit[\s\S]*referenceFromDraft[\s\S]*pushReference\([\s\S]*appendText:\s*false[\s\S]*setGenerateMode\(true\)/, 'Continue edit should add a generated-image preview reference instead of a text-only prompt');
+  assert.match(surface, /function commitDraftToBoard|const commitDraftToBoard/, 'Drafts should enter the board through an explicit confirmation action');
   assert.doesNotMatch(surface, /数量 4张|count:\s*2,\s*timeoutSec/, 'Visual Stage must not hard-code two/four generated candidates by default');
+  assert.doesNotMatch(surface, /autoCommitTaskImagesToBoard|已自动加入创作案板|生成已完成，并已自动加入/, 'Generated drafts must not silently enter the board before user confirmation');
   assert.doesNotMatch(surface, /setIntent\(\(current\) => current\.trim\(\) \? `\$\{nextIntent\}/, 'Board long-press should not inject object titles into the text input');
+});
+
+test('visual stage public copy frames the canvas as natural-language visual memory, not a flow editor', () => {
+  const surface = [
+    'visual-stage/VisualStageClient.tsx',
+    'visual-stage/creation-board/CreationBoard.tsx',
+    'visual-stage/creation-board/CreationObjectNode.tsx',
+    'visual-stage/creation-board/ObjectInspector.tsx',
+    'visual-stage/creation-board/MobileObjectStack.tsx',
+    'visual-stage/creation-board/RelationshipPeek.tsx',
+  ].map((relative) => `\n/* ${relative} */\n${readPage(relative)}`).join('\n');
+
+  for (const marker of [
+    '自然语言设计',
+    '视觉记忆',
+    '当前最好',
+    '参考了这张',
+    '由这版改来',
+    '基于这张继续',
+    '待审美确认',
+    '确认后加入画布',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `Visual Stage natural-language board copy missing ${marker}`);
+  }
+
+  assert.doesNotMatch(surface, /Lineage \/ Flow|\bflow\b|关系层|智能层|连线|语义槽位|优先级|参考语义对象|技术诊断细节不外露|变量替换|视觉锚点|执行层|对象语义|task payload|provider route|debug-json|Storage Key/i, 'Visual Stage public copy must not ask users to understand flow/editor/debug internals');
 });
 
 test('visual stage creation board is a real pannable infinite canvas and renders generated images as visual objects', () => {
@@ -346,8 +371,11 @@ test('visual stage creation board is a real pannable infinite canvas and renders
   }
 
   assert.match(surface, /fitView/, 'Creation Board should fit canvas objects on entry');
-  assert.match(surface, /nodes=\{/, 'Creation Board should render objects as canvas nodes');
-  assert.match(surface, /edges=\{/, 'Creation Board should render lineage as canvas edges');
+  assert.match(surface, /ariaLabelConfig=\{/, 'Creation Board should override ReactFlow hidden accessibility labels with natural-language copy');
+  assert.match(surface, /node\.a11yDescription\.default[\s\S]*选择画布对象/, 'Creation Board should not leak ReactFlow default node wording to assistive text');
+  assert.match(surface, /edge\.a11yDescription\.default[\s\S]*选择来源提示/, 'Creation Board should not leak ReactFlow default edge wording to assistive text');
+  assert.match(surface, /nodes=\{/, 'Creation Board should render objects as canvas objects');
+  assert.match(surface, /edges=\{/, 'Creation Board should render source hints as canvas relationships');
   assert.match(surface, /object\.asset[\s\S]*<img|<img[\s\S]*object\.asset/, 'image objects must render their actual asset thumbnail/url, not a text placeholder');
   assert.match(surface, /imageUrl\(item\.image\)|imageUrl\(champion\)/, 'session generated images should be converted to browser-visible URLs before entering the board or chat');
   assert.doesNotMatch(surface, /phase-1-static-wysiwyg|静态真实画布壳|当前不调用 AI/, 'reviewable Visual Stage must not present the deployed surface as a static shell');

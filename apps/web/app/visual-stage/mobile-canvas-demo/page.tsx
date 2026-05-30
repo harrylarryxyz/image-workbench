@@ -38,18 +38,18 @@ const mobileLayerLegend = [
   { label: '淡粉色参考图', tone: 'reference', dot: 'bg-[#fde9ec] border-[#f4cbd0]' },
   { label: '桃粉色生成图', tone: 'generated', dot: 'bg-[#ffd5d1] border-[#eba9a7]' },
   { label: '灰色系文字', tone: 'text', dot: 'bg-[#edf0f4] border-[#cfd3da]' },
-  { label: '废弃 flow 透明度', tone: 'control', dot: 'bg-[#9ba4b3]/35 border-[#9ba4b3]/20' },
+  { label: '已放弃尝试弱化显示', tone: 'control', dot: 'bg-[#9ba4b3]/35 border-[#9ba4b3]/20' },
 ];
 
 const mobileCanvasObjects = [
-  { id: 'brief', kind: 'brief', tone: 'control', label: 'Brief', short: '目标', x: 38, y: 34, w: 118, h: 66 },
+  { id: 'brief', kind: 'brief', tone: 'control', label: '创作目标', short: '目标', x: 38, y: 34, w: 118, h: 66 },
   { id: 'ref-a', kind: 'reference', tone: 'reference', label: '产品参考', short: 'Ref A', x: 72, y: 150, w: 112, h: 86 },
   { id: 'ref-b', kind: 'reference', tone: 'reference', label: '氛围参考', short: 'Ref B', x: 220, y: 112, w: 102, h: 76 },
-  { id: 'prompt', kind: 'text', tone: 'text', label: 'Prompt', short: '文案', x: 356, y: 58, w: 124, h: 64 },
+  { id: 'prompt', kind: 'text', tone: 'text', label: '文本备注', short: '文案', x: 356, y: 58, w: 124, h: 64 },
   { id: 'brand', kind: 'brand', tone: 'brand', label: '品牌色板', short: '色板', x: 516, y: 110, w: 112, h: 64 },
-  { id: 'draft-a', kind: 'generated', tone: 'generated', label: '生成 A', short: 'Gen A', x: 232, y: 282, w: 118, h: 92, discarded: true },
-  { id: 'draft-b', kind: 'generated', tone: 'generated', label: '冠军图', short: 'Gen B', x: 398, y: 242, w: 154, h: 118, selected: true, champion: true },
-  { id: 'draft-c', kind: 'generated', tone: 'generated', label: '生成 C', short: 'Gen C', x: 584, y: 310, w: 106, h: 82, discarded: true },
+  { id: 'draft-a', kind: 'generated', tone: 'generated', label: '这一版 A', short: 'A版', x: 232, y: 282, w: 118, h: 92, discarded: true },
+  { id: 'draft-b', kind: 'generated', tone: 'generated', label: '当前最好', short: 'B版', x: 398, y: 242, w: 154, h: 118, selected: true, champion: true },
+  { id: 'draft-c', kind: 'generated', tone: 'generated', label: '这一版 C', short: 'C版', x: 584, y: 310, w: 106, h: 82, discarded: true },
   { id: 'title', kind: 'text', tone: 'text', label: '标题文字', short: '标题', x: 390, y: 404, w: 146, h: 58 },
   { id: 'note', kind: 'text', tone: 'text', label: '反馈批注', short: '批注', x: 564, y: 478, w: 114, h: 62 },
   { id: 'board-xhs', kind: 'artboard', tone: 'artboard', label: '小红书画板', short: '画板1', x: 150, y: 540, w: 150, h: 110 },
@@ -57,14 +57,14 @@ const mobileCanvasObjects = [
   { id: 'export', kind: 'brief', tone: 'control', label: '交付包', short: '导出', x: 560, y: 648, w: 104, h: 60 },
 ] satisfies MobileObject[];
 
-const mobileFlowEdges = [
-  { id: 'brief-prompt', label: '生成', x: 144, y: 86, w: 225, rotate: -5, discarded: false },
+const mobileSourceHints = [
+  { id: 'brief-prompt', label: '自然语言设计', x: 144, y: 86, w: 225, rotate: -5, discarded: false },
   { id: 'ref-a-b', label: '参考', x: 176, y: 222, w: 244, rotate: 18, discarded: false },
   { id: 'ref-b-b', label: '参考', x: 308, y: 184, w: 152, rotate: 24, discarded: false },
-  { id: 'a-old', label: '废弃', x: 348, y: 338, w: 96, rotate: -24, discarded: true, styleClass: 'opacity-35' },
-  { id: 'b-title', label: '绑定', x: 472, y: 360, w: 58, rotate: 76, discarded: false },
-  { id: 'b-board', label: '采纳', x: 306, y: 522, w: 154, rotate: 142, discarded: false },
-  { id: 'brand-board', label: '约束', x: 500, y: 558, w: 130, rotate: 24, discarded: false },
+  { id: 'a-old', label: '已放弃', x: 348, y: 338, w: 96, rotate: -24, discarded: true, styleClass: 'opacity-35' },
+  { id: 'b-title', label: '文字贴近', x: 472, y: 360, w: 58, rotate: 76, discarded: false },
+  { id: 'b-board', label: '准备交付', x: 306, y: 522, w: 154, rotate: 142, discarded: false },
+  { id: 'brand-board', label: '品牌要求', x: 500, y: 558, w: 130, rotate: 24, discarded: false },
 ] satisfies Array<{ id: string; label: string; x: number; y: number; w: number; rotate: number; discarded: boolean; styleClass?: string }>;
 
 function CanvasGlyph({ object }: { object: MobileObject }) {
@@ -100,7 +100,7 @@ function MobileCanvas() {
 
     <div className="absolute left-1/2 top-[3.6rem] h-[760px] w-[720px] origin-top -translate-x-1/2 scale-[0.48] sm:scale-[0.54]">
       <div className="absolute inset-0 rounded-[2.5rem] border border-[#e9d8c4]/70 bg-[#fff1de]/28" />
-      {mobileFlowEdges.map((edge) => <div
+      {mobileSourceHints.map((edge) => <div
         key={edge.id}
         className={cn(
           'absolute z-0 border-t-2 border-dashed border-[#b96a5c]/55',
@@ -130,17 +130,17 @@ function BottomInspector() {
       <div className="mx-auto h-1 w-10 rounded-full bg-[#d9c2a7]" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-[#9e574c]">Bottom Inspector · 选择具体模块后展开详情</p>
-          <h2 className="mt-1 truncate text-lg font-semibold tracking-[-0.045em] text-[#253048]">Gen B · 冠军生成图</h2>
+          <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-[#9e574c]">详情卡 · 选择具体模块后展开说明</p>
+          <h2 className="mt-1 truncate text-lg font-semibold tracking-[-0.045em] text-[#253048]">当前最好 · 这一版 B</h2>
         </div>
         <Badge className="rounded-full bg-[#ffd5d1] text-[#913f3f]">桃粉色生成图</Badge>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {['来源链', '局部改', '做变体'].map((action, index) => <Button key={action} size="sm" variant={index === 0 ? 'default' : 'outline'} className={cn('h-9 rounded-full text-xs', index === 0 ? 'bg-[#253048] text-[#fffaf2] hover:bg-[#303b55]' : 'border-[#d9c2a7] bg-[#fffaf2] text-[#45506a] hover:bg-[#fff1de]')}>{action}</Button>)}
+        {['来源提示', '局部改', '同系列'].map((action, index) => <Button key={action} size="sm" variant={index === 0 ? 'default' : 'outline'} className={cn('h-9 rounded-full text-xs', index === 0 ? 'bg-[#253048] text-[#fffaf2] hover:bg-[#303b55]' : 'border-[#d9c2a7] bg-[#fffaf2] text-[#45506a] hover:bg-[#fff1de]')}>{action}</Button>)}
       </div>
       <div className="grid grid-cols-[1fr_auto] gap-2 rounded-[1rem] border border-[#e9d8c4] bg-[#fff1de]/70 p-3 text-xs leading-5 text-[#45506a]">
-        <span><b className="text-[#253048]">Object Stack：</b>画布只保留短标签；长说明进面板。</span>
-        <span className="rounded-full border border-[#d6e7df] bg-[#e7f1ec] px-2 py-1 font-semibold text-[#456f63]">Relationship Peek</span>
+        <span><b className="text-[#253048]">已选对象：</b>画布只保留短标签；长说明进面板。</span>
+        <span className="rounded-full border border-[#d6e7df] bg-[#e7f1ec] px-2 py-1 font-semibold text-[#456f63]">来源提示</span>
       </div>
     </CardContent>
   </Card>;
@@ -148,7 +148,7 @@ function BottomInspector() {
 
 function ObjectStack() {
   return <section aria-label="底部对象面板" className="space-y-1.5">
-    <p className="px-1 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-[#6b7488]">底部对象面板 · Object Stack</p>
+    <p className="px-1 text-[0.64rem] font-bold uppercase tracking-[0.16em] text-[#6b7488]">底部对象面板 · 已选对象</p>
     <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
       {mobileCanvasObjects.filter((object) => ['reference', 'generated', 'text', 'artboard'].includes(object.kind)).slice(0, 8).map((object) => <button key={object.id} className={cn('min-w-[4.8rem] rounded-[1rem] border px-2 py-2 text-left shadow-sm', tone[object.tone], object.selected && 'ring-2 ring-[#b96a5c]/25')}>
         <span className="block truncate text-[0.62rem] font-bold uppercase tracking-[0.13em] opacity-65">{object.kind}</span>
@@ -180,7 +180,7 @@ export default function MobileCanvasDemoPage() {
 
         <section className="sr-only">
           <h2>移动端布局原则</h2>
-          <p>移动端不是简化版，而是用 Focus Lens、Object Stack、Relationship Peek、Bottom Inspector 完成完整复杂能力。</p>
+          <p>移动端不是简化版，而是用聚焦镜头、已选对象、来源提示和详情卡完成完整复杂能力。</p>
           <p>信息块是背景块，用于区分不同模块；如果需要进一步信息，选择具体模块后展开详情面板。</p>
         </section>
       </div>

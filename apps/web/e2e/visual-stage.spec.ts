@@ -22,7 +22,7 @@ test('Visual Stage mobile-first creation assistant prototype renders without deb
   await expect(page.getByTestId('visual-stage-shell')).not.toContainText(forbiddenMainFlow);
 });
 
-test('Creation Board starts empty, then generated objects can be arranged, inspected, and long-pressed into the assistant', async ({ page }) => {
+test('Creation Board starts empty, then confirmed drafts can be arranged, inspected, and long-pressed into the assistant', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 920 });
   await page.route('**/api/tasks/generate', async (route) => {
     await route.fulfill({ json: { id: 'task_board_drag', type: 'image.generate', status: 'QUEUED' } });
@@ -45,6 +45,11 @@ test('Creation Board starts empty, then generated objects can be arranged, inspe
   await page.getByRole('button', { name: '发送出图' }).click();
 
   const imageNode = page.locator('[data-creation-object-id^="session-task_board_drag-0-"]').first();
+  await expect(page.getByTestId('draft-card')).toContainText('待审美确认');
+  await expect(imageNode).toHaveCount(0);
+  await expect(page.getByTestId('creation-board-empty-state')).toContainText('审美确认后，图片、文本备注和来源说明才会进入画布');
+
+  await page.getByTestId('draft-card').getByRole('button', { name: '加入画布' }).click();
   await expect(imageNode).toBeVisible();
   await expect(page.getByTestId('creation-board-empty-state')).toHaveCount(0);
   await page.getByRole('button', { name: '整理画布' }).click();
@@ -415,7 +420,7 @@ test('Visual Stage Creation Board tracks intent, natural-language references, br
   await expect(page.getByTestId('creation-board-shell')).toContainText('做一张温润纸面感产品海报');
   await expect(page.getByTestId('creation-board-shell')).toContainText('@图片1 · 参考');
   await expect(page.getByTestId('creation-board-shell')).toContainText('会话主图 · board-b.png');
-  await expect(page.getByTestId('creation-board-shell')).toContainText('分支 1');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('第 1 版');
 
   await page.getByRole('button', { name: '把当前主图作为 @图片 继续参考' }).click();
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片2');
