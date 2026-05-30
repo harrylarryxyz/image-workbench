@@ -1,4 +1,4 @@
-export function toImageAssetCreate(saved: any, prompt: string, workspaceId?: string | null, sourceAssetId?: string | null) {
+export function toImageAssetCreate(saved: any, prompt: string, workspaceId?: string | null, sourceAssetId?: string | null, revisedPrompt?: string | null) {
   const metadataJson = {
     backend: saved.backend,
     assetUrl: saved.assetUrl,
@@ -13,6 +13,7 @@ export function toImageAssetCreate(saved: any, prompt: string, workspaceId?: str
     sizeBytes: saved.sizeBytes,
     sha256: saved.sha256,
     prompt,
+    ...(revisedPrompt ? { revisedPrompt } : {}),
     workspaceId: workspaceId ?? undefined,
     sourceAssetId: sourceAssetId ?? undefined,
     metadataJson,

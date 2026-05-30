@@ -16,6 +16,9 @@ export type Provider = {
     maxRefs: number | null;
     recommendedTimeoutSec: number | null;
     maxOutputCount?: number | null;
+    maxGenerateOutputCount?: number | null;
+    maxEditOutputCount?: number | null;
+    maxProviderEditOutputCount?: number | null;
     sizes?: string[] | null;
     qualities?: string[] | null;
     formats?: string[] | null;

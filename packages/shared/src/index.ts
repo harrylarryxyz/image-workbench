@@ -35,7 +35,14 @@ export const ModelCapabilitySchema = z.object({
   supportsMultipleRefs: z.boolean(),
   maxRefs: z.number().int().positive().optional(),
   maxOutputCount: z.number().int().positive().optional(),
+  maxGenerateOutputCount: z.number().int().positive().optional(),
+  maxEditOutputCount: z.number().int().positive().optional(),
+  maxProviderEditOutputCount: z.number().int().positive().optional(),
   recommendedTimeoutSec: z.number().int().positive().optional(),
+  sizes: z.array(z.string()).optional(),
+  qualities: z.array(z.string()).optional(),
+  formats: z.array(z.string()).optional(),
+  apiModes: z.array(ApiModeSchema).optional(),
 });
 export type ModelCapability = z.infer<typeof ModelCapabilitySchema>;
 

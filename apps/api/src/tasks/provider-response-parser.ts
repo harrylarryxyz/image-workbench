@@ -1,3 +1,5 @@
+export type ProviderImagePayload = { b64Json?: string | null; url?: string | null; revisedPrompt?: string | null };
+
 export function parseProviderBody(text: string): any {
   try { return JSON.parse(text); } catch {}
   const trimmed = text.trim();
@@ -34,8 +36,32 @@ export function parseProviderBody(text: string): any {
   throw new Error(`Provider returned non-JSON response: ${text.slice(0, 240)}`);
 }
 
-export function extractImage(json: any): string | null {
-  for (const item of json?.data || []) if (item?.b64_json) return item.b64_json;
-  for (const item of json?.output || []) if (item?.type === 'image_generation_call' && (item.result || item.b64_json)) return item.result || item.b64_json;
+function payloadFromDataItem(item: any): ProviderImagePayload | null {
+  if (!item) return null;
+  const revisedPrompt = item.revised_prompt ?? null;
+  if (item.b64_json) return { b64Json: item.b64_json, revisedPrompt };
+  if (item.url) return { url: item.url, revisedPrompt };
   return null;
+}
+
+export function extractImages(json: any): ProviderImagePayload[] {
+  const images: ProviderImagePayload[] = [];
+  for (const item of json?.data || []) {
+    const image = payloadFromDataItem(item);
+    if (image) images.push(image);
+  }
+  for (const item of json?.output || []) {
+    if (item?.type === 'image_generation_call') {
+      if (item.result || item.b64_json) {
+        images.push({ b64Json: item.result || item.b64_json, revisedPrompt: item.revised_prompt ?? null });
+      } else if (item.url || item.image_url) {
+        images.push({ url: item.url || item.image_url, revisedPrompt: item.revised_prompt ?? null });
+      }
+    }
+  }
+  return images;
+}
+
+export function extractImage(json: any): string | null {
+  return extractImages(json)[0]?.b64Json ?? null;
 }
