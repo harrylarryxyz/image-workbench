@@ -136,6 +136,28 @@ test('visual direction board presents divergent art directions for review', () =
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json/i, 'Visual direction board must not expose provider/storage diagnostics');
 });
 
+test('creation board demo is an isolated static aesthetic preview route', () => {
+  const surface = readPage('visual-stage/creation-board-demo/page.tsx');
+
+  for (const marker of [
+    'data-preview-route="creation-board-demo"',
+    '创作案板',
+    '静态界面演示',
+    '不调用 AI',
+    'Warm Editorial Board',
+    '当前主图',
+    '参考图',
+    '候选比较',
+    '继续微调',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `creation board demo missing ${marker}`);
+  }
+
+  assert.match(surface, /@\/components\/ui\/(badge|button|card)/, 'Creation Board demo should compose shadcn-style primitives');
+  assert.doesNotMatch(surface, /apiPost|apiFormPost|subscribeTaskEvents|pollTaskUntilTerminal|fetch\(/, 'Static Creation Board demo must not call runtime APIs or providers');
+  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Creation Board demo must not expose diagnostics or raw provider data');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',
