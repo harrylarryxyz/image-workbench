@@ -16,16 +16,28 @@ export function subscribeTaskEvents<T>(
   }
 
   const source = new EventSource(`/api/tasks/${encodeURIComponent(taskId)}/events`);
+  let snapshotReceived = false;
+  const fallbackTimer = window.setTimeout(() => {
+    if (!snapshotReceived) onFallback?.(new Error('Task event stream produced no snapshots'));
+  }, 3000);
+
+  const clearFallbackTimer = () => window.clearTimeout(fallbackTimer);
   const handle = (event: MessageEvent) => {
+    snapshotReceived = true;
+    clearFallbackTimer();
     const parsed = JSON.parse(event.data);
     if (parsed) onTask(parsed as T);
   };
   source.addEventListener('task.snapshot', handle as EventListener);
   source.onerror = (error) => {
+    clearFallbackTimer();
     source.close();
     onFallback?.(error);
   };
-  return () => source.close();
+  return () => {
+    clearFallbackTimer();
+    source.close();
+  };
 }
 
 export async function pollTaskUntilTerminal<T extends { status?: string }>(

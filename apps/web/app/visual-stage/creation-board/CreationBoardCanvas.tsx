@@ -60,7 +60,7 @@ export function CreationBoardCanvas({ objects, relations, selectedObjectId, onSe
     className: relation.strength === 'faded' ? 'opacity-30' : relation.strength === 'secondary' ? 'opacity-70' : undefined,
   })), [relations]);
 
-  return <div data-testid="creation-board-canvas" className="relative h-[680px] min-h-[620px] overflow-hidden rounded-[1.5rem] border border-[#e9d8c4] bg-[#fff1de]/72 shadow-[inset_0_1px_0_rgba(255,250,242,0.82)]">
+  return <div data-testid="creation-board-canvas" className="relative h-[520px] min-h-[460px] overflow-hidden rounded-[1.5rem] border border-[#e9d8c4] bg-[#fff1de]/72 shadow-[inset_0_1px_0_rgba(255,250,242,0.82)] md:h-[620px] lg:h-[680px] lg:min-h-[620px]">
     <div aria-hidden="true" className="pointer-events-none absolute left-6 top-5 z-10 rounded-full border border-[#d6e7df] bg-[#e7f1ec]/90 px-3 py-1 text-xs font-semibold text-[#486e64] shadow-[0_10px_24px_rgba(37,48,72,0.08)]">WYSIWYG 无限画布 · 可拖拽 / 缩放 / 平移</div>
     <ReactFlow
       nodes={nodes}

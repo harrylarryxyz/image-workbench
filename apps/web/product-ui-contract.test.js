@@ -228,6 +228,17 @@ test('mobile canvas demo uses compact mobile-native layout instead of shrinking 
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Mobile Canvas demo must not expose diagnostics or raw provider data');
 });
 
+
+test('visual stage keeps the real canvas visible on mobile and falls back when SSE is silent', () => {
+  const board = readPage('visual-stage/creation-board/CreationBoard.tsx');
+  const taskEvents = readWeb('lib/task-events.ts');
+
+  assert.doesNotMatch(board, /hidden[^\n]+lg:grid[\s\S]{0,260}<CreationBoardCanvas/, 'Creation Board canvas must not be hidden until desktop; mobile needs a real canvas too');
+  assert.match(board, /<CreationBoardCanvas/, 'Creation Board should render the real canvas component');
+  assert.match(taskEvents, /setTimeout\(/, 'Task event subscription needs a watchdog fallback when SSE connects but sends no snapshots');
+  assert.match(taskEvents, /clearTimeout\(/, 'Task event fallback watchdog must be cleared after the first snapshot or unsubscribe');
+});
+
 test('visual stage embeds the real Creation Board object model and WYSIWYG shell', () => {
   const files = [
     'visual-stage/VisualStageClient.tsx',

@@ -77,7 +77,7 @@ export function CreationBoard({ canvasItems, onReuseCanvasItem }: {
           <Badge variant="outline" className="rounded-full border-[#e9d8c4] bg-[#fff1de] px-3 py-1 text-[#45506a]">技术诊断细节不外露</Badge>
         </div>
 
-        <div className="hidden min-w-0 gap-4 lg:grid xl:grid-cols-[minmax(0,3.15fr)_minmax(320px,1fr)]">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,3.15fr)_minmax(320px,1fr)]">
           <div className="min-w-0 overflow-x-auto overflow-y-hidden rounded-[1.6rem] border border-[#e9d8c4] bg-[#fff1de]/48 p-2" aria-label="创作案板横向画布区域">
             <CreationBoardCanvas
               objects={objects}
@@ -88,7 +88,7 @@ export function CreationBoard({ canvasItems, onReuseCanvasItem }: {
             />
           </div>
 
-          <aside className="grid min-w-0 content-start gap-3">
+          <aside className="hidden min-w-0 content-start gap-3 lg:grid">
             <div className="rounded-[1.35rem] border border-[#f2d6cf] bg-[#f8e3dd]/68 p-3 shadow-[0_14px_36px_rgba(37,48,72,0.08)]">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <b className="text-[#253048]">创作助手上下文</b>

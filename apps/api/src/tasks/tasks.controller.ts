@@ -29,7 +29,7 @@ export class TasksController {
   get(@Param('id') id: string, @Req() req: Request = {} as any) { return this.tasks.getTask(id, getRequestContext(req)); }
 
   @Sse(':id/events')
-  async events(@Param('id') id: string, @Req() reqOrRes: Request | Response = {} as any, @Res({ passthrough: true }) maybeRes?: Response) {
+  events(@Param('id') id: string, @Req() reqOrRes: Request | Response = {} as any, @Res({ passthrough: true }) maybeRes?: Response) {
     const res = (maybeRes ?? reqOrRes) as Response;
     const req = maybeRes ? reqOrRes as Request : {} as Request;
     res.setHeader('Content-Type', 'text/event-stream');
