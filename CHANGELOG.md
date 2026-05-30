@@ -16,6 +16,7 @@ All notable changes to Image Workbench are documented here. The format follows [
 
 ### Added
 
+- Route-isolated `/visual-stage/mobile-canvas-demo` static mobile-first 创作案板 preview for aesthetic review, keeping an infinite canvas on phone while using compact color-coded information blocks, faded discarded flow, bottom Object Stack, Focus Lens, Relationship Peek, and Bottom Inspector detail expansion.
 - Route-isolated `/visual-stage/canvas-board-demo` static Canvas-first 创作案板 preview for aesthetic review, showing a WYSIWYG canvas with visible image/text/reference/brand/artboard objects, Lineage / Flow relationships, selected text-object Inspector, MiniMap, champion path, and no AI/provider calls.
 - Route-isolated `/visual-stage/creation-board-demo` static 创作案板 interface preview for aesthetic review, showing the Warm Editorial Board direction as a visual decision desk without AI, provider, or generation calls.
 - Route-isolated `/visual-directions` art-direction board with six divergent polished styles — Lunar Precision, Cinema Studio, Atelier Gallery, Creative Board, Velvet Suite, and Warm Craft — so visual taste can be selected before committing to a single design-system theme.

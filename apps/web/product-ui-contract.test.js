@@ -193,6 +193,41 @@ test('canvas board demo is a canvas-first WYSIWYG creation board preview', () =>
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Canvas Board demo must not expose diagnostics or raw provider data');
 });
 
+test('mobile canvas demo uses compact mobile-native layout instead of shrinking desktop panels', () => {
+  const surface = readPage('visual-stage/mobile-canvas-demo/page.tsx');
+
+  for (const marker of [
+    'data-preview-route="mobile-canvas-demo"',
+    '移动端不是简化版',
+    '无限画布',
+    '寸土寸金',
+    '信息块',
+    '淡粉色参考图',
+    '桃粉色生成图',
+    '灰色系文字',
+    '废弃 flow 透明度',
+    '底部对象面板',
+    '选择具体模块后展开详情',
+    'Focus Lens',
+    'Object Stack',
+    'Relationship Peek',
+    'Bottom Inspector',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `mobile canvas demo missing ${marker}`);
+  }
+
+  assert.match(surface, /const\s+mobileCanvasObjects\s*=\s*\[/, 'Mobile Canvas demo should model compact canvas objects');
+  assert.match(surface, /const\s+mobileLayerLegend\s*=\s*\[/, 'Mobile Canvas demo should define a compact color-role legend');
+  assert.match(surface, /kind:\s*['"]reference['"][\s\S]*tone:\s*['"]reference['"]/, 'Reference objects should use the light-pink reference tone');
+  assert.match(surface, /kind:\s*['"]generated['"][\s\S]*tone:\s*['"]generated['"]/, 'Generated objects should use the peach-pink generated tone');
+  assert.match(surface, /kind:\s*['"]text['"][\s\S]*tone:\s*['"]text['"]/, 'Text objects should use the grey text tone');
+  assert.match(surface, /discarded:\s*true[\s\S]*opacity-35/, 'Discarded flow should be visually de-emphasized');
+  assert.match(surface, /@\/components\/ui\/(badge|button|card)/, 'Mobile Canvas demo should compose shadcn-style primitives');
+  assert.doesNotMatch(surface, /复杂编排桌面优先|做简单判断/, 'Mobile Canvas demo must not describe mobile as reduced-capability review mode');
+  assert.doesNotMatch(surface, /apiPost|apiFormPost|subscribeTaskEvents|pollTaskUntilTerminal|fetch\(/, 'Static Mobile Canvas demo must not call runtime APIs or providers');
+  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Mobile Canvas demo must not expose diagnostics or raw provider data');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',
