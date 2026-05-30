@@ -1,3 +1,4 @@
+import '@xyflow/react/dist/style.css';
 import { VisualStageClient } from './VisualStageClient';
 
 export const metadata = {

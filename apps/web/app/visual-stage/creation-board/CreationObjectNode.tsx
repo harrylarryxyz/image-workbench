@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
+import { Handle, Position } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { CreationObject } from './types';
@@ -48,6 +49,7 @@ export function CreationObjectNode({ object, selected, onSelect, onOpenInspector
   const isText = object.kind === 'text' || object.kind === 'brief';
   const isRejected = object.status === 'rejected';
   const tone = toneByKind[object.kind] ?? toneByKind.brief;
+  const assetSrc = object.asset?.thumbnailUrl ?? object.asset?.assetUrl;
 
   return <div
     role="button"
@@ -56,18 +58,20 @@ export function CreationObjectNode({ object, selected, onSelect, onOpenInspector
     data-selected={selected ? 'true' : 'false'}
     aria-label={`单击对象：${object.title}`}
     className={cn(
-      'absolute grid min-w-0 cursor-pointer rounded-[1.1rem] border p-3 text-left shadow-[0_14px_32px_rgba(37,48,72,0.10)] transition',
+      'grid min-w-0 cursor-pointer rounded-[1.1rem] border p-3 text-left shadow-[0_14px_32px_rgba(37,48,72,0.10)] transition',
       tone,
       selected && 'ring-2 ring-[#b96a5c]/70 ring-offset-2 ring-offset-[#fff1de]',
       isRejected && 'opacity-35',
     )}
-    style={{ left: object.position.x, top: object.position.y, width: object.size?.width ?? 190, minHeight: object.size?.height ?? 112 }}
+    style={{ width: object.size?.width ?? 190, minHeight: object.size?.height ?? 112 }}
     onClick={() => onSelect(object.id)}
     onDoubleClick={() => onOpenInspector(object.id)}
     onKeyDown={(event) => {
       if (event.key === 'Enter' || event.key === ' ') onSelect(object.id);
     }}
   >
+    <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-[#d9c2a7] !bg-[#fffaf2]" />
+    <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border-[#b96a5c] !bg-[#fffaf2]" />
     <span className="mb-2 flex min-w-0 items-start justify-between gap-2">
       <span className="min-w-0">
         <span className="block text-[0.62rem] font-semibold uppercase tracking-[0.16em] opacity-70">{labelByKind[object.kind]}</span>
@@ -77,7 +81,7 @@ export function CreationObjectNode({ object, selected, onSelect, onOpenInspector
     </span>
 
     {isImage ? <span className="mb-2 grid aspect-[4/3] place-items-center overflow-hidden rounded-[0.85rem] border border-current/15 bg-[linear-gradient(145deg,#fffaf2,#f8e3dd_52%,#e7f1ec)] text-[0.68rem] font-semibold opacity-95">
-      {object.status === 'champion' ? '主图' : object.kind === 'reference.image' ? '参考图' : '生成图'}
+      {object.asset ? assetSrc ? <img src={assetSrc} alt={`${object.title} 预览`} className="h-full w-full object-cover" /> : '图片待载入' : object.status === 'champion' ? '主图' : object.kind === 'reference.image' ? '参考图' : '生成图'}
     </span> : null}
 
     {isText && object.text ? <span className="mb-2 block rounded-[0.8rem] border border-current/12 bg-[#fffaf2]/55 px-2 py-2 text-xs leading-5">

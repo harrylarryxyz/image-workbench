@@ -251,6 +251,33 @@ describe('ImageGenerationProcessor persistence', () => {
     vi.unstubAllGlobals();
   });
 
+  it('notifies task event subscribers when generation reaches running and terminal states', async () => {
+    const prisma = {
+      generationTask: {
+        findUnique: vi.fn().mockResolvedValue(makeTask()),
+        update: vi.fn().mockImplementation(async (args) => args),
+      },
+      imageAsset: { findFirst: vi.fn().mockResolvedValue(null) },
+    } as any;
+    const storage = {
+      putImage: vi.fn().mockResolvedValue({ storageKey: 'local://notify-out.png', format: 'png', sizeBytes: 123, sha256: 'notify' }),
+    } as any;
+    const diagnostics = { classify: vi.fn() } as any;
+    const events = { notify: vi.fn() } as any;
+    const processor = new ImageGenerationProcessor(prisma, storage, diagnostics, events);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/json' },
+      json: async () => ({ data: [{ b64_json: tinyPngB64 }] }),
+    }));
+
+    await processor.process({ data: { taskId: 'task_1' } } as any);
+
+    expect(events.notify).toHaveBeenCalledWith('task_1');
+    expect(events.notify).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
   it('loops responses-mode generation when count is greater than one instead of silently dropping variants', async () => {
     const updates: any[] = [];
     const prisma = {

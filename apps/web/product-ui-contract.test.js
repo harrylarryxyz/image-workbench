@@ -272,6 +272,27 @@ test('visual stage embeds the real Creation Board object model and WYSIWYG shell
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|raw task payload|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Creation Board surface must not expose provider/storage/task diagnostics');
 });
 
+test('visual stage creation board is a real pannable infinite canvas and renders generated images as visual objects', () => {
+  const surface = [
+    'visual-stage/creation-board/types.ts',
+    'visual-stage/creation-board/CreationBoard.tsx',
+    'visual-stage/creation-board/CreationBoardCanvas.tsx',
+    'visual-stage/creation-board/CreationObjectNode.tsx',
+    'visual-stage/VisualStageClient.tsx',
+  ].map((relative) => `\n/* ${relative} */\n${readPage(relative)}`).join('\n');
+
+  for (const marker of ['ReactFlow', 'Background', 'MiniMap', 'Controls', '@xyflow/react']) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `Creation Board should use real infinite-canvas affordance: ${marker}`);
+  }
+
+  assert.match(surface, /fitView/, 'Creation Board should fit canvas objects on entry');
+  assert.match(surface, /nodes=\{/, 'Creation Board should render objects as canvas nodes');
+  assert.match(surface, /edges=\{/, 'Creation Board should render lineage as canvas edges');
+  assert.match(surface, /object\.asset[\s\S]*<img|<img[\s\S]*object\.asset/, 'image objects must render their actual asset thumbnail/url, not a text placeholder');
+  assert.match(surface, /imageUrl\(item\.image\)|imageUrl\(champion\)/, 'session generated images should be converted to browser-visible URLs before entering the board or chat');
+  assert.doesNotMatch(surface, /phase-1-static-wysiwyg|静态真实画布壳|当前不调用 AI/, 'reviewable Visual Stage must not present the deployed surface as a static shell');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',

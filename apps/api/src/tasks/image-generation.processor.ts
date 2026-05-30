@@ -10,6 +10,7 @@ import { toImageAssetCreate } from './image-asset-mapper';
 import { callImagesEdit } from './image-edit-request.builder';
 import { callImageGenerationProvider, extractImages } from './provider-image-client';
 import type { ProviderImagePayload } from './provider-response-parser';
+import { TaskEventsService } from './task-events.service';
 
 async function providerImageBytes(image: ProviderImagePayload): Promise<Uint8Array> {
   if (image.b64Json) return Uint8Array.from(Buffer.from(image.b64Json, 'base64'));
@@ -27,6 +28,7 @@ export class ImageGenerationProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly storage: LocalStorageService,
     private readonly diagnostics: DiagnosticsService,
+    private readonly events?: TaskEventsService,
   ) { super(); }
 
   async process(job: Job<{ taskId: string }>) {
@@ -34,6 +36,7 @@ export class ImageGenerationProcessor extends WorkerHost {
     if (!task || !task.provider) return;
     const started = Date.now();
     await this.prisma.generationTask.update({ where: { id: task.id }, data: { status: 'RUNNING' } });
+    this.events?.notify(task.id);
     const request = GenerateImageRequestSchema.parse(task.paramsJson);
     const model = task.model;
     try {
@@ -75,10 +78,12 @@ export class ImageGenerationProcessor extends WorkerHost {
         where: { id: task.id },
         data: { status: 'SUCCEEDED', routeJson: route as any, elapsedMs: Date.now() - started, images: { create: imageCreates } },
       });
+      this.events?.notify(task.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const diagnostic = this.diagnostics.classify(message);
       await this.prisma.generationTask.update({ where: { id: task.id }, data: { status: 'FAILED', errorCode: diagnostic?.code, errorMessage: message, diagnosticsJson: diagnostic as any, elapsedMs: Date.now() - started } });
+      this.events?.notify(task.id);
       throw error;
     }
   }

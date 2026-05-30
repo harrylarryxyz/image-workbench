@@ -609,8 +609,8 @@ export function VisualStageClient() {
           </div>
           <Card className={cn('rounded-[1.35rem]', vi.paperPanel)}>
             <CardContent className="grid gap-2 p-4 text-sm text-[#6b7488]">
-              <b className="text-[#253048]">Phase 1 · 静态真实画布壳</b>
-              <span>当前不调用 AI；用 fixtures + 当前 session 数据混合渲染，先让审美和交互关系可确认。</span>
+              <b className="text-[#253048]">Live Board · 无限画布创作案板</b>
+              <span>对话生成图会进入案板，作为可继续参考、可选中、可审美判断的图片对象。</span>
             </CardContent>
           </Card>
         </div>

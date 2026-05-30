@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { imageUrl } from '../../create-utils';
 import { creationBoardObjects, creationBoardRelations } from './creation-board-fixtures';
 import { CreationBoardCanvas } from './CreationBoardCanvas';
 import { MobileObjectStack } from './MobileObjectStack';
@@ -22,7 +23,7 @@ function objectsFromSession(items: SessionCanvasItem[]): CreationObject[] {
     position: { x: 1180 + index * 118, y: 70 + index * 150 },
     size: { width: 168, height: 132 },
     status: index === 0 ? 'champion' : 'active',
-    asset: { assetUrl: item.image?.assetUrl },
+    asset: { assetUrl: imageUrl(item.image) ?? undefined, thumbnailUrl: imageUrl(item.image) ?? undefined },
     semantic: { slot: 'resultAnchor', priority: 78 - index * 8, borrow: ['当前会话感觉', '可继续作为参考'] },
   }));
 }
@@ -58,7 +59,7 @@ export function CreationBoard({ canvasItems, onReuseCanvasItem }: {
     setInspectorOpenObjectId(id);
   }
 
-  return <section data-testid="creation-board-shell" data-phase="phase-1-static-wysiwyg" className="grid w-full max-w-full min-w-0 overflow-hidden gap-4">
+  return <section data-testid="creation-board-shell" data-phase="live-wysiwyg-infinite-canvas" className="grid w-full max-w-full min-w-0 overflow-hidden gap-4">
     <Card className="w-full max-w-full min-w-0 overflow-hidden rounded-[1.7rem] border-[#e9d8c4]/90 bg-[#fffaf2]/92 shadow-[0_20px_54px_rgba(37,48,72,0.10)]">
       <CardContent className="w-full max-w-full min-w-0 overflow-hidden p-4 md:p-5">
         <div className="mb-4 flex min-w-0 flex-wrap items-start justify-between gap-3">
