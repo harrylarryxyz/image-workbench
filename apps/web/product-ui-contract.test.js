@@ -158,6 +158,41 @@ test('creation board demo is an isolated static aesthetic preview route', () => 
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Creation Board demo must not expose diagnostics or raw provider data');
 });
 
+test('canvas board demo is a canvas-first WYSIWYG creation board preview', () => {
+  const surface = readPage('visual-stage/canvas-board-demo/page.tsx');
+
+  for (const marker of [
+    'data-preview-route="canvas-board-demo"',
+    '创作案板',
+    'WYSIWYG',
+    '静态画布演示',
+    '不调用 AI',
+    'Warm Editorial Board',
+    '文本对象',
+    '标题文本对象',
+    '参考语义对象',
+    '品牌色板对象',
+    '交付画板对象',
+    'Lineage / Flow',
+    'MiniMap',
+    '冠军路径',
+    '废弃分支',
+    '右侧 Inspector',
+    '设计层',
+    '关系层',
+    '智能层',
+  ]) {
+    assert.match(surface, new RegExp(escapeRegExp(marker)), `canvas board demo missing ${marker}`);
+  }
+
+  assert.match(surface, /@\/components\/ui\/(badge|button|card)/, 'Canvas Board demo should compose shadcn-style primitives');
+  assert.match(surface, /const\s+canvasObjects\s*=\s*\[/, 'Canvas Board demo should model visible canvas objects');
+  assert.match(surface, /const\s+lineageEdges\s*=\s*\[/, 'Canvas Board demo should model visible flow relationships');
+  assert.match(surface, /kind:\s*['"]text['"][\s\S]*selected:\s*true/, 'Canvas Board demo should include one selected visible text object');
+  assert.doesNotMatch(surface, /apiPost|apiFormPost|subscribeTaskEvents|pollTaskUntilTerminal|fetch\(/, 'Static Canvas Board demo must not call runtime APIs or providers');
+  assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|task id|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Canvas Board demo must not expose diagnostics or raw provider data');
+});
+
 test('public web pages do not expose debug diagnostics or engineering readiness copy', () => {
   const files = [
     'page.tsx',
