@@ -18,8 +18,48 @@ test('Visual Stage mobile-first creation assistant prototype renders without deb
   await expect(page.getByRole('button', { name: '添加本地新图片' })).toBeVisible();
   await expect(page.getByRole('button', { name: '引用素材或历史图片' })).toBeVisible();
   await expect(page.getByRole('button', { name: '出图关' })).toBeVisible();
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('Creation Board');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('Creation Board');
   await expect(page.getByTestId('visual-stage-shell')).not.toContainText(forbiddenMainFlow);
+});
+
+test('Creation Board objects can be dragged, clicked for details, and long-pressed into the assistant', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 920 });
+  await page.goto('/visual-stage');
+
+  const textNode = page.locator('[data-creation-object-id="text-title-1"]');
+  await expect(textNode).toBeVisible();
+  await textNode.scrollIntoViewIfNeeded();
+  const before = await textNode.boundingBox();
+  expect(before).not.toBeNull();
+
+  await page.mouse.move((before?.x ?? 0) + 40, (before?.y ?? 0) + 28);
+  await page.mouse.down();
+  await page.mouse.move((before?.x ?? 0) + 170, (before?.y ?? 0) + 98, { steps: 8 });
+  await page.mouse.up();
+
+  await expect.poll(async () => {
+    const after = await textNode.boundingBox();
+    if (!after || !before) return 0;
+    return Math.abs(after.x - before.x) + Math.abs(after.y - before.y);
+  }).toBeGreaterThan(40);
+
+  const refNode = page.locator('[data-creation-object-id="ref-product-1"]');
+  await refNode.click();
+  const inspector = page.getByRole('complementary').getByTestId('creation-object-inspector');
+  await expect(inspector).toContainText('产品参考图');
+  await expect(inspector).toContainText('单击打开详情');
+
+  const artboardNode = page.locator('[data-creation-object-id="artboard-xhs-1"]');
+  await artboardNode.scrollIntoViewIfNeeded();
+  const artboardBox = await artboardNode.boundingBox();
+  expect(artboardBox).not.toBeNull();
+  await page.mouse.move((artboardBox?.x ?? 0) + 32, (artboardBox?.y ?? 0) + 32);
+  await page.mouse.down();
+  await page.waitForTimeout(720);
+  await page.mouse.up();
+
+  await expect(page.getByTestId('creation-assistant-context')).toContainText('小红书 3:4 交付画板');
+  await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/小红书 3:4 交付画板/);
 });
 
 test('Visual Stage supports + local image and @ advanced reference tokens on mobile', async ({ page }) => {
@@ -323,7 +363,7 @@ test('Visual Stage supports comparison drafts, champion selection, continue-edit
   await page.getByRole('button', { name: '继续改' }).click();
   await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/继续优化冠军图 2/);
   await page.getByRole('button', { name: '加入画布' }).click();
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('draft-b.png');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('draft-b.png');
 });
 
 test('Visual Stage Creation Board tracks intent, references, champion, branches, and reuses board image as reference', async ({ page }) => {
@@ -360,13 +400,13 @@ test('Visual Stage Creation Board tracks intent, references, champion, branches,
   await page.getByRole('button', { name: '继续改' }).click();
   await page.getByRole('button', { name: '加入画布' }).click();
 
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('Creation Board');
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('做一张温润纸面感产品海报');
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('@图片1 · 产品');
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('主图 · board-b.png');
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('分支 1');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('Creation Board');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('做一张温润纸面感产品海报');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('@图片1 · 产品');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('主图 · board-b.png');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('分支 1');
 
-  await page.getByRole('button', { name: '把主图作为参考' }).click();
+  await page.getByRole('button', { name: '把当前主图作为 @图片 继续参考' }).click();
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('@图片2');
   await expect(page.getByTestId('composer-reference-tokens')).toContainText('风格');
   await expect(page.getByLabel('描述你想创作的画面')).toHaveValue(/@图片2/);
@@ -418,7 +458,7 @@ test('Visual Stage uploads local reference, creates a real draft task, then comm
   await expect(page.getByRole('button', { name: '加入画布' })).toBeVisible();
 
   await page.getByRole('button', { name: '加入画布' }).click();
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('已加入画布');
-  await expect(page.getByTestId('mobile-canvas-preview')).toContainText('visual-stage-draft.png');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('已加入画布');
+  await expect(page.getByTestId('creation-board-shell')).toContainText('visual-stage-draft.png');
   await expect(page.getByTestId('visual-stage-shell')).not.toContainText(forbiddenMainFlow);
 });

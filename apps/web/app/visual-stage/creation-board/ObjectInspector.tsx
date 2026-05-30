@@ -18,7 +18,7 @@ export function ObjectInspector({ object, relations }: { object?: CreationObject
     return <Card className="rounded-[1.35rem] border-[#e9d8c4] bg-[#fffaf2]/88 shadow-[0_14px_36px_rgba(37,48,72,0.08)]">
       <CardContent className="grid gap-2 p-4 text-sm text-[#6b7488]">
         <b className="text-[#253048]">Bottom Inspector</b>
-        <span>单击对象后，这里会显示创作助手上下文、对象语义和相关关系。</span>
+        <span>单击打开详情后，这里会显示对象语义和相关关系；长按对象会进入创作助手上下文。</span>
       </CardContent>
     </Card>;
   }
@@ -31,7 +31,7 @@ export function ObjectInspector({ object, relations }: { object?: CreationObject
       <div className="grid gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="rounded-full border-[#f2d6cf] bg-[#f8e3dd] px-2 py-0.5 text-[#9e574c]">创作助手上下文</Badge>
-          <Badge variant="outline" className="rounded-full border-[#d6e7df] bg-[#e7f1ec] px-2 py-0.5 text-[#486e64]">单击对象已选中</Badge>
+          <Badge variant="outline" className="rounded-full border-[#d6e7df] bg-[#e7f1ec] px-2 py-0.5 text-[#486e64]">单击打开详情</Badge>
         </div>
         <h3 className="text-lg font-bold tracking-[-0.035em] text-[#253048]">{object.title}</h3>
         <p className="text-sm leading-6 text-[#6b7488]">{object.summary}</p>
@@ -65,7 +65,7 @@ export function ObjectInspector({ object, relations }: { object?: CreationObject
         </div>
       </div>
 
-      <p className="text-xs leading-5 text-[#9ba4b3]">双击或长按用于打开详情卡；执行层不会在这里展示技术细节。</p>
+      <p className="text-xs leading-5 text-[#9ba4b3]">单击打开详情卡；长按对象会把它带入创作助手。执行层不会在这里展示技术细节。</p>
     </CardContent>
   </Card>;
 }

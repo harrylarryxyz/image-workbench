@@ -11,6 +11,7 @@ import type { TaskImage, TaskResult, Uploaded } from '../create-types';
 import { imageUrl } from '../create-utils';
 import { cn } from '@/lib/utils';
 import { CreationBoard } from './creation-board/CreationBoard';
+import type { CreationObject } from './creation-board/types';
 
 const vi = {
   system: 'warm-editorial-board-v1 · 温润编辑式创作板 · 中文优先 · Paper 0 · Ink 900 · Coral 600 · Sage 600 · no pure black UI surfaces · UI is the frame, not the artwork',
@@ -390,6 +391,7 @@ export function VisualStageClient() {
   const lastReferencesRef = useRef<ReferenceToken[]>([]);
   const threadRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composerInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     const persisted = loadPersistedSession();
@@ -557,6 +559,12 @@ export function VisualStageClient() {
     pushReference({ id: `canvas-${nextNumber}`, label: `@图片${nextNumber}`, source: 'history', title: item.title, hint: '来自 Creation Board 主图，可继续作为风格或成片参考。', role: '风格', storageKey: item.image.storageKey, assetUrl: item.image.assetUrl });
   }
 
+  function useCanvasObjectInAssistant(object: CreationObject) {
+    const nextIntent = `基于「${object.title}」继续：`;
+    setIntent((current) => current.trim() ? `${nextIntent} ${current.trim()}` : nextIntent);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  }
+
   function selectChampion(nextDraft: Draft, index: number) {
     setDraft((current) => current && (current.id === nextDraft.id || current.taskId === nextDraft.taskId) ? { ...current, championIndex: index, image: current.images?.[index] ?? current.image } : current);
     setDraftMessages((current) => current.map((message) => message.draft.id === nextDraft.id || message.draft.taskId === nextDraft.taskId ? { ...message, draft: { ...message.draft, championIndex: index, image: message.draft.images?.[index] ?? message.draft.image } } : message));
@@ -617,7 +625,7 @@ export function VisualStageClient() {
       </div>
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(360px,1fr)]">
-        <CreationBoard canvasItems={canvasItems} onReuseCanvasItem={reuseCanvasImage} />
+        <CreationBoard canvasItems={canvasItems} onReuseCanvasItem={reuseCanvasImage} onUseObjectInAssistant={useCanvasObjectInAssistant} />
 
         <PhoneFrame>
           <div data-testid="visual-stage-phone" className="flex h-[780px] max-h-[calc(100vh-2rem)] min-h-[720px] flex-col bg-[#fffaf2]">
@@ -667,6 +675,7 @@ export function VisualStageClient() {
                   {references.map((reference) => <ReferenceThumb key={reference.id} reference={reference} compact tray onRemove={removeReference} />)}
                 </div> : null}
                 <Textarea
+                  ref={composerInputRef}
                   aria-label="描述你想创作的画面"
                   value={intent}
                   onChange={(event) => setIntent(event.target.value)}

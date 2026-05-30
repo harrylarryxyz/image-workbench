@@ -1,16 +1,18 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Background, Controls, MiniMap, ReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react';
+import { useEffect, useMemo } from 'react';
+import { Background, Controls, MiniMap, ReactFlow, useNodesState, type Edge, type Node as FlowNode, type NodeProps } from '@xyflow/react';
 import type { CreationObject, CreationRelation } from './types';
 import { CreationObjectNode } from './CreationObjectNode';
 
-type CreationNodeData = {
+type CreationNodeData = Record<string, unknown> & {
   object: CreationObject;
   selectedObjectId: string;
-  onSelectObject: (id: string) => void;
-  onOpenInspector: (id: string) => void;
+  onShowDetails: (id: string) => void;
+  onUseInAssistant: (id: string) => void;
 };
+
+type CreationFlowNodeType = FlowNode<CreationNodeData, 'creationObject'>;
 
 function edgeStyle(relation: CreationRelation) {
   if (relation.selectedLineage) return { stroke: '#b96a5c', strokeWidth: 2.8 };
@@ -19,32 +21,44 @@ function edgeStyle(relation: CreationRelation) {
   return { stroke: '#d9c2a7', strokeWidth: 1.6 };
 }
 
-function CreationFlowNode({ data }: NodeProps<Node<CreationNodeData>>) {
+function CreationFlowNode({ data }: NodeProps<CreationFlowNodeType>) {
   return <CreationObjectNode
     object={data.object}
     selected={data.object.id === data.selectedObjectId}
-    onSelect={data.onSelectObject}
-    onOpenInspector={data.onOpenInspector}
+    onShowDetails={data.onShowDetails}
+    onUseInAssistant={data.onUseInAssistant}
   />;
 }
 
 const nodeTypes = { creationObject: CreationFlowNode };
 
-export function CreationBoardCanvas({ objects, relations, selectedObjectId, onSelectObject, onOpenInspector }: {
+export function CreationBoardCanvas({ objects, relations, selectedObjectId, onShowDetails, onUseInAssistant }: {
   objects: CreationObject[];
   relations: CreationRelation[];
   selectedObjectId: string;
-  onSelectObject: (id: string) => void;
-  onOpenInspector: (id: string) => void;
+  onShowDetails: (id: string) => void;
+  onUseInAssistant: (id: string) => void;
 }) {
-  const nodes = useMemo<Node<CreationNodeData>[]>(() => objects.map((object) => ({
+  const hydratedNodes = useMemo<CreationFlowNodeType[]>(() => objects.map((object) => ({
     id: object.id,
     type: 'creationObject',
     position: object.position,
     draggable: true,
     selectable: true,
-    data: { object, selectedObjectId, onSelectObject, onOpenInspector },
-  })), [objects, onOpenInspector, onSelectObject, selectedObjectId]);
+    dragHandle: '.creation-object-drag-handle',
+    data: { object, selectedObjectId, onShowDetails, onUseInAssistant },
+  })), [objects, onShowDetails, onUseInAssistant, selectedObjectId]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CreationFlowNodeType>(hydratedNodes);
+
+  useEffect(() => {
+    setNodes((current) => {
+      const currentById = new Map(current.map((node) => [node.id, node]));
+      return hydratedNodes.map((node) => {
+        const existing = currentById.get(node.id);
+        return existing ? { ...node, position: existing.position, selected: existing.selected } : node;
+      });
+    });
+  }, [hydratedNodes, setNodes]);
 
   const edges = useMemo<Edge[]>(() => relations.map((relation) => ({
     id: relation.id,
@@ -66,12 +80,14 @@ export function CreationBoardCanvas({ objects, relations, selectedObjectId, onSe
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
-      onNodeClick={(_, node) => onSelectObject(node.id)}
-      onNodeDoubleClick={(_, node) => onOpenInspector(node.id)}
+      onNodesChange={onNodesChange}
+      onNodeClick={(_, node) => onShowDetails(node.id)}
+      onNodeDragStop={(_, node) => setNodes((current) => current.map((item) => item.id === node.id ? { ...item, position: node.position } : item))}
       fitView
       minZoom={0.25}
       maxZoom={1.8}
       defaultEdgeOptions={{ interactionWidth: 18 }}
+      panOnDrag={[1, 2]}
       proOptions={{ hideAttribution: true }}
       className="bg-[#fff1de]/72"
     >

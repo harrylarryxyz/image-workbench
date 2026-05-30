@@ -36,7 +36,7 @@ export const creationBoardObjects: CreationObject[] = [
     id: 'text-title-1',
     kind: 'text',
     title: '标题文本对象',
-    summary: '文本对象 · 可单击进入创作助手上下文，也可双击或长按展开详情。',
+    summary: '文本对象 · 单击打开详情，长按进入创作助手上下文。',
     position: { x: 328, y: 234 },
     size: { width: 230, height: 112 },
     selected: true,

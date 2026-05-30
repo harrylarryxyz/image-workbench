@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, type PointerEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Handle, Position } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
@@ -39,35 +40,73 @@ function StatusDot({ object }: { object: CreationObject }) {
   return null;
 }
 
-export function CreationObjectNode({ object, selected, onSelect, onOpenInspector }: {
+export function CreationObjectNode({ object, selected, onShowDetails, onUseInAssistant }: {
   object: CreationObject;
   selected?: boolean;
-  onSelect: (id: string) => void;
-  onOpenInspector: (id: string) => void;
+  onShowDetails: (id: string) => void;
+  onUseInAssistant: (id: string) => void;
 }) {
+  const longPressTimer = useRef<number | null>(null);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const longPressFired = useRef(false);
   const isImage = object.kind === 'reference.image' || object.kind === 'generated.image';
   const isText = object.kind === 'text' || object.kind === 'brief';
   const isRejected = object.status === 'rejected';
   const tone = toneByKind[object.kind] ?? toneByKind.brief;
   const assetSrc = object.asset?.thumbnailUrl ?? object.asset?.assetUrl;
 
+  function clearLongPress() {
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    pointerStart.current = null;
+  }
+
+  function startLongPress(event: PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    longPressFired.current = false;
+    pointerStart.current = { x: event.clientX, y: event.clientY };
+    longPressTimer.current = window.setTimeout(() => {
+      longPressFired.current = true;
+      onUseInAssistant(object.id);
+      clearLongPress();
+    }, 640) as unknown as number;
+  }
+
+  function cancelIfDragging(event: PointerEvent<HTMLDivElement>) {
+    const start = pointerStart.current;
+    if (!start) return;
+    if (Math.abs(event.clientX - start.x) + Math.abs(event.clientY - start.y) > 10) clearLongPress();
+  }
+
   return <div
     role="button"
     tabIndex={0}
+    data-creation-object-id={object.id}
     data-creation-object-kind={object.kind}
     data-selected={selected ? 'true' : 'false'}
-    aria-label={`单击对象：${object.title}`}
+    aria-label={`单击打开详情：${object.title}`}
     className={cn(
-      'grid min-w-0 cursor-pointer rounded-[1.1rem] border p-3 text-left shadow-[0_14px_32px_rgba(37,48,72,0.10)] transition',
+      'creation-object-drag-handle grid min-w-0 cursor-pointer rounded-[1.1rem] border p-3 text-left shadow-[0_14px_32px_rgba(37,48,72,0.10)] transition',
       tone,
       selected && 'ring-2 ring-[#b96a5c]/70 ring-offset-2 ring-offset-[#fff1de]',
       isRejected && 'opacity-35',
     )}
     style={{ width: object.size?.width ?? 190, minHeight: object.size?.height ?? 112 }}
-    onClick={() => onSelect(object.id)}
-    onDoubleClick={() => onOpenInspector(object.id)}
+    onPointerDown={startLongPress}
+    onPointerMove={cancelIfDragging}
+    onPointerUp={clearLongPress}
+    onPointerCancel={clearLongPress}
+    onPointerLeave={clearLongPress}
+    onClick={(event) => {
+      if (longPressFired.current) {
+        longPressFired.current = false;
+        event.preventDefault();
+        return;
+      }
+      onShowDetails(object.id);
+    }}
     onKeyDown={(event) => {
-      if (event.key === 'Enter' || event.key === ' ') onSelect(object.id);
+      if (event.key === 'Enter' || event.key === ' ') onShowDetails(object.id);
     }}
   >
     <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border-[#d9c2a7] !bg-[#fffaf2]" />
@@ -95,6 +134,6 @@ export function CreationObjectNode({ object, selected, onSelect, onOpenInspector
     {object.kind === 'artboard' ? <span className="mb-2 grid aspect-[3/4] w-16 place-items-center rounded-[0.75rem] border border-[#e9d8c4] bg-[#fffaf2]/70 text-[0.62rem]">3:4</span> : null}
 
     <span className="line-clamp-2 text-[0.72rem] leading-5 opacity-82">{object.summary}</span>
-    {selected ? <Button type="button" variant="outline" size="sm" className="mt-2 h-7 rounded-full border-[#f2d6cf] bg-[#fffaf2]/72 px-2 text-[0.66rem] text-[#9e574c] hover:bg-[#f8e3dd]" onClick={(event) => { event.stopPropagation(); onOpenInspector(object.id); }}>双击或长按看详情</Button> : null}
+    {selected ? <Button type="button" variant="outline" size="sm" className="nodrag mt-2 h-7 rounded-full border-[#f2d6cf] bg-[#fffaf2]/72 px-2 text-[0.66rem] text-[#9e574c] hover:bg-[#f8e3dd]" onClick={(event) => { event.stopPropagation(); onUseInAssistant(object.id); }}>长按进入创作助手</Button> : null}
   </div>;
 }

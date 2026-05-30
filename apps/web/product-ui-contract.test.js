@@ -262,8 +262,8 @@ test('visual stage embeds the real Creation Board object model and WYSIWYG shell
     '品牌对象',
     '交付画板',
     '创作助手上下文',
-    '单击对象',
-    '双击或长按',
+    '单击打开详情',
+    '长按进入创作助手',
     'Focus Lens',
     'Object Stack',
     'Relationship Peek',
@@ -281,6 +281,24 @@ test('visual stage embeds the real Creation Board object model and WYSIWYG shell
   assert.match(surface, /data-testid="creation-board-shell"/, 'Visual Stage should render the Creation Board shell');
   assert.match(surface, /data-testid="creation-board-canvas"/, 'Creation Board should expose a canvas audit hook');
   assert.doesNotMatch(surface, /Storage Key|Provider readiness|debug-json|raw task payload|provider route|JSON\.stringify\([^)]*,\s*null,\s*2\)/i, 'Creation Board surface must not expose provider/storage/task diagnostics');
+});
+
+test('visual stage creation board supports draggable relayout, click details, and long-press assistant context', () => {
+  const surface = [
+    'visual-stage/creation-board/CreationBoard.tsx',
+    'visual-stage/creation-board/CreationBoardCanvas.tsx',
+    'visual-stage/creation-board/CreationObjectNode.tsx',
+    'visual-stage/VisualStageClient.tsx',
+  ].map((relative) => `\n/* ${relative} */\n${readPage(relative)}`).join('\n');
+
+  assert.match(surface, /useNodesState/, 'Creation Board should keep React Flow nodes in state so drag relayout persists visually');
+  assert.match(surface, /onNodesChange=\{/, 'Creation Board should wire React Flow node changes for draggable relayout');
+  assert.match(surface, /onNodeDragStop=\{/, 'Creation Board should handle drag-stop relayout, not rebuild nodes from fixed fixture positions');
+  assert.match(surface, /data-creation-object-id=/, 'Creation objects need stable selectors for interaction and audits');
+  assert.match(surface, /onPointerDown[\s\S]*longPress|longPress[\s\S]*onPointerDown/, 'Creation objects should implement long-press handling');
+  assert.match(surface, /onShowDetails|openDetails/, 'Single click should open the object detail card');
+  assert.match(surface, /onUseInAssistant|useObjectInAssistant/, 'Long press should enter the creation assistant context');
+  assert.doesNotMatch(surface, /双击或长按用于打开详情卡|双击或长按看详情|单击对象已选中/, 'Creation Board copy must not preserve the old click/long-press contract');
 });
 
 test('visual stage creation board is a real pannable infinite canvas and renders generated images as visual objects', () => {
