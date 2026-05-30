@@ -3,7 +3,7 @@ import { Subject, type Observable, fromEvent, interval, merge, NEVER, of } from 
 import { filter, map, startWith, switchMap, takeUntil } from 'rxjs/operators';
 
 type TaskEvent = {
-  event: 'task.snapshot' | 'task.update' | 'task.heartbeat';
+  type: 'task.snapshot' | 'task.update' | 'task.heartbeat';
   data: unknown;
 };
 
@@ -21,10 +21,10 @@ export class TaskEventsService {
       of(taskId),
       this.updates.pipe(filter((id) => id === taskId)),
     ).pipe(
-      switchMap(async () => ({ event: 'task.snapshot' as const, data: await getSnapshot() })),
+      switchMap(async () => ({ type: 'task.snapshot' as const, data: await getSnapshot() })),
     );
-    const heartbeat$ = interval(15000).pipe(map(() => ({ event: 'task.heartbeat' as const, data: { at: new Date().toISOString() } })));
-    return merge(snapshot$, heartbeat$).pipe(startWith({ event: 'task.update' as const, data: { id: taskId, status: 'CONNECTED' } }), takeUntil(stop$));
+    const heartbeat$ = interval(15000).pipe(map(() => ({ type: 'task.heartbeat' as const, data: { at: new Date().toISOString() } })));
+    return merge(snapshot$, heartbeat$).pipe(startWith({ type: 'task.update' as const, data: { id: taskId, status: 'CONNECTED' } }), takeUntil(stop$));
   }
 
   closeSignal(reqOrRes: any): Observable<unknown> {

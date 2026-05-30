@@ -3,7 +3,7 @@ import { firstValueFrom, skip, take, toArray } from 'rxjs';
 import { TaskEventsService } from './task-events.service';
 
 describe('TaskEventsService', () => {
-  it('streams initial connection event and task snapshots on notification', async () => {
+  it('streams initial connection event and named task snapshots on notification', async () => {
     const events = new TaskEventsService();
     let status = 'QUEUED';
     const collected = firstValueFrom(events.stream('task_1', async () => ({ id: 'task_1', status })).pipe(take(2), toArray()));
@@ -12,8 +12,8 @@ describe('TaskEventsService', () => {
     events.notify('task_1');
 
     await expect(collected).resolves.toEqual([
-      { event: 'task.update', data: { id: 'task_1', status: 'CONNECTED' } },
-      { event: 'task.snapshot', data: { id: 'task_1', status: 'SUCCEEDED' } },
+      { type: 'task.update', data: { id: 'task_1', status: 'CONNECTED' } },
+      { type: 'task.snapshot', data: { id: 'task_1', status: 'SUCCEEDED' } },
     ]);
   });
 
@@ -24,6 +24,6 @@ describe('TaskEventsService', () => {
     events.notify('task_b');
     events.notify('task_a');
 
-    await expect(firstSnapshot).resolves.toEqual({ event: 'task.snapshot', data: { id: 'task_a', status: 'RUNNING' } });
+    await expect(firstSnapshot).resolves.toEqual({ type: 'task.snapshot', data: { id: 'task_a', status: 'RUNNING' } });
   });
 });
